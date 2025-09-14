@@ -5,10 +5,95 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Wallet, Shield } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowLeft, Wallet, Shield, Loader2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useWallet } from "@/hooks/useWallet";
+import { useEscrow } from "@/hooks/useEscrow";
+import { db } from "@/lib/supabase";
+import { formatUSDC } from "@/lib/solana";
+import { useToast } from "@/hooks/use-toast";
 
 const PostProject = () => {
+  const navigate = useNavigate();
+  const { isConnected, address } = useWallet();
+  const { createProjectEscrow, isLoading: escrowLoading } = useEscrow();
+  const { toast } = useToast();
+
+  const [formData, setFormData] = useState({
+    title: '',
+    category: '',
+    description: '',
+    budget: '',
+    timeline: '',
+    skills: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const platformFeePercent = 10;
+  const budget = parseFloat(formData.budget) || 0;
+  const platformFee = (budget * platformFeePercent) / 100;
+  const totalEscrow = budget + platformFee;
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async () => {
+    if (!isConnected || !address) {
+      toast({
+        title: "Wallet Required",
+        description: "Please connect your wallet to post a project",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.title || !formData.category || !formData.description || !formData.budget) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Create project in database
+      const project = await db.createProject({
+        client_id: address, // In production, use actual user ID from auth
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        required_skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
+        budget_usdc: budget,
+        timeline: formData.timeline,
+        status: 'active'
+      });
+
+      // Create escrow smart contract
+      const escrowId = await createProjectEscrow(project.id, budget);
+      
+      if (escrowId) {
+        toast({
+          title: "Project Posted Successfully!",
+          description: "Your project is now live with smart contract escrow protection",
+        });
+        navigate('/');
+      }
+    } catch (error) {
+      console.error('Error posting project:', error);
+      toast({
+        title: "Failed to Post Project",
+        description: "Please try again or contact support",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -45,12 +130,14 @@ const PostProject = () => {
                       id="title" 
                       placeholder="e.g., DeFi Trading Bot Development"
                       className="bg-muted/50"
+                      value={formData.title}
+                      onChange={(e) => handleInputChange('title', e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="category">Category</Label>
-                    <Select>
+                    <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
                       <SelectTrigger className="bg-muted/50">
                         <SelectValue placeholder="Select project category" />
                       </SelectTrigger>
@@ -74,6 +161,8 @@ const PostProject = () => {
                       placeholder="Describe your project in detail. Include technical requirements, expected deliverables, and any specific technologies you want to use..."
                       rows={6}
                       className="bg-muted/50"
+                      value={formData.description}
+                      onChange={(e) => handleInputChange('description', e.target.value)}
                     />
                   </div>
 
@@ -85,11 +174,13 @@ const PostProject = () => {
                         type="number"
                         placeholder="5000"
                         className="bg-muted/50"
+                        value={formData.budget}
+                        onChange={(e) => handleInputChange('budget', e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="timeline">Timeline</Label>
-                      <Select>
+                      <Select value={formData.timeline} onValueChange={(value) => handleInputChange('timeline', value)}>
                         <SelectTrigger className="bg-muted/50">
                           <SelectValue placeholder="Select timeline" />
                         </SelectTrigger>
@@ -110,12 +201,29 @@ const PostProject = () => {
                       id="skills" 
                       placeholder="Solidity, React, Web3.js, DeFi protocols..."
                       className="bg-muted/50"
+                      value={formData.skills}
+                      onChange={(e) => handleInputChange('skills', e.target.value)}
                     />
                   </div>
 
-                  <Button variant="default" size="lg" className="w-full">
-                    <Wallet className="w-5 h-5 mr-2" />
-                    Post Project & Setup Escrow
+                  <Button 
+                    variant="default" 
+                    size="lg" 
+                    className="w-full"
+                    onClick={handleSubmit}
+                    disabled={!isConnected || isSubmitting || escrowLoading}
+                  >
+                    {isSubmitting || escrowLoading ? (
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    ) : (
+                      <Wallet className="w-5 h-5 mr-2" />
+                    )}
+                    {isSubmitting || escrowLoading 
+                      ? 'Creating Escrow...' 
+                      : isConnected 
+                        ? 'Post Project & Setup Escrow'
+                        : 'Connect Wallet First'
+                    }
                   </Button>
                 </CardContent>
               </Card>
@@ -153,15 +261,15 @@ const PostProject = () => {
                 <CardContent className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Project Budget</span>
-                    <span className="text-foreground">$5,000</span>
+                    <span className="text-foreground">{formatUSDC(budget)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Platform Fee (10%)</span>
-                    <span className="text-foreground">$500</span>
+                    <span className="text-foreground">{formatUSDC(platformFee)}</span>
                   </div>
                   <div className="border-t border-border pt-3 flex justify-between font-semibold">
-                    <span className="text-foreground">Total Escrow</span>
-                    <span className="text-web3-primary">$5,500</span>
+                    <span className="text-foreground">Total Escrow (USDC)</span>
+                    <span className="text-web3-primary">{formatUSDC(totalEscrow)}</span>
                   </div>
                 </CardContent>
               </Card>
