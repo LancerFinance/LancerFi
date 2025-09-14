@@ -21,27 +21,32 @@ export const useEscrow = (): UseEscrowReturn => {
     projectId: string, 
     amount: number
   ): Promise<string | null> => {
-    if (!provider || !address) {
+
+    const w: any = window as any;
+    const ph = w.solana;
+    if (!ph?.isPhantom) {
       toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet to create escrow",
+        title: "Phantom required",
+        description: "Please connect your Phantom (Solana) wallet to create escrow",
         variant: "destructive",
       });
       return null;
     }
-
-    if (chain !== 'solana' || typeof (provider as any)?.signAndSendTransaction !== 'function') {
-      toast({
-        title: "Solana wallet required",
-        description: "Please connect Phantom (Solana) to create escrow",
-        variant: "destructive",
-      });
+    if (!ph.isConnected) {
+      try { await ph.connect(); } catch {
+        toast({ title: "Wallet not connected", description: "Phantom connection was rejected", variant: "destructive" });
+        return null;
+      }
+    }
+    const solAddress: string | undefined = ph.publicKey?.toString?.();
+    if (!solAddress) {
+      toast({ title: "Wallet error", description: "Could not read Phantom public key", variant: "destructive" });
       return null;
     }
 
     setIsLoading(true);
     try {
-      const clientWallet = new PublicKey(address);
+      const clientWallet = new PublicKey(solAddress);
       const platformFeePercent = 10; // 10% platform fee
       const platformFee = (amount * platformFeePercent) / 100;
       const totalLocked = amount + platformFee;
@@ -60,7 +65,7 @@ export const useEscrow = (): UseEscrowReturn => {
       transaction.feePayer = clientWallet;
 
       // Sign and send with Phantom
-      const res = await (provider as any).signAndSendTransaction(transaction);
+      const res = await ph.signAndSendTransaction(transaction);
       const signature = typeof res === 'string' ? res : res?.signature;
       if (!signature) throw new Error('No signature returned from wallet');
       await connection.confirmTransaction(signature);
@@ -68,7 +73,7 @@ export const useEscrow = (): UseEscrowReturn => {
       // Store escrow in database
       const escrow = await db.createEscrow({
         project_id: projectId,
-        client_wallet: address,
+        client_wallet: solAddress,
         amount_usdc: amount,
         platform_fee: platformFee,
         total_locked: totalLocked,
@@ -100,21 +105,25 @@ export const useEscrow = (): UseEscrowReturn => {
     escrowId: string, 
     amount: number
   ): Promise<boolean> => {
-    if (!provider || !address) {
+    const w: any = window as any;
+    const ph = w.solana;
+    if (!ph?.isPhantom) {
       toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet to fund escrow",
+        title: "Phantom required",
+        description: "Please connect your Phantom (Solana) wallet to fund escrow",
         variant: "destructive",
       });
       return false;
     }
-
-    if (chain !== 'solana' || typeof (provider as any)?.signAndSendTransaction !== 'function') {
-      toast({
-        title: "Solana wallet required",
-        description: "Please connect Phantom (Solana) to fund escrow",
-        variant: "destructive",
-      });
+    if (!ph.isConnected) {
+      try { await ph.connect(); } catch {
+        toast({ title: "Wallet not connected", description: "Phantom connection was rejected", variant: "destructive" });
+        return false;
+      }
+    }
+    const solAddress: string | undefined = ph.publicKey?.toString?.();
+    if (!solAddress) {
+      toast({ title: "Wallet error", description: "Could not read Phantom public key", variant: "destructive" });
       return false;
     }
 
@@ -125,7 +134,7 @@ export const useEscrow = (): UseEscrowReturn => {
         throw new Error('Escrow account not found');
       }
 
-      const clientWallet = new PublicKey(address);
+      const clientWallet = new PublicKey(solAddress);
       const escrowAccount = new PublicKey(escrow.escrow_account);
 
       // Create USDC transfer transaction
@@ -137,7 +146,7 @@ export const useEscrow = (): UseEscrowReturn => {
       transaction.feePayer = clientWallet;
 
       // Sign and send with Phantom
-      const res = await (provider as any).signAndSendTransaction(transaction);
+      const res = await ph.signAndSendTransaction(transaction);
       const signature = typeof res === 'string' ? res : res?.signature;
       if (!signature) throw new Error('No signature returned from wallet');
       await connection.confirmTransaction(signature);
@@ -172,21 +181,25 @@ export const useEscrow = (): UseEscrowReturn => {
     escrowId: string, 
     milestoneId: string
   ): Promise<boolean> => {
-    if (!provider || !address) {
+    const w: any = window as any;
+    const ph = w.solana;
+    if (!ph?.isPhantom) {
       toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet to release payment",
+        title: "Phantom required",
+        description: "Please connect your Phantom (Solana) wallet to release payment",
         variant: "destructive",
       });
       return false;
     }
-
-    if (chain !== 'solana' || typeof (provider as any)?.signAndSendTransaction !== 'function') {
-      toast({
-        title: "Solana wallet required",
-        description: "Please connect Phantom (Solana) to release payment",
-        variant: "destructive",
-      });
+    if (!ph.isConnected) {
+      try { await ph.connect(); } catch {
+        toast({ title: "Wallet not connected", description: "Phantom connection was rejected", variant: "destructive" });
+        return false;
+      }
+    }
+    const solAddress: string | undefined = ph.publicKey?.toString?.();
+    if (!solAddress) {
+      toast({ title: "Wallet error", description: "Could not read Phantom public key", variant: "destructive" });
       return false;
     }
 
@@ -200,7 +213,7 @@ export const useEscrow = (): UseEscrowReturn => {
         throw new Error('Required escrow data not found');
       }
 
-      const clientWallet = new PublicKey(address);
+      const clientWallet = new PublicKey(solAddress);
       const freelancerWallet = new PublicKey(escrow.freelancer_wallet);
       const escrowAccount = new PublicKey(escrow.escrow_account);
 
@@ -218,7 +231,7 @@ export const useEscrow = (): UseEscrowReturn => {
       transaction.feePayer = clientWallet;
 
       // Sign and send with Phantom
-      const res = await (provider as any).signAndSendTransaction(transaction);
+      const res = await ph.signAndSendTransaction(transaction);
       const signature = typeof res === 'string' ? res : res?.signature;
       if (!signature) throw new Error('No signature returned from wallet');
       await connection.confirmTransaction(signature);
