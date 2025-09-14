@@ -181,6 +181,15 @@ export const db = {
     return data;
   },
 
+  async getEscrowById(id: string) {
+    const { data, error } = await supabase
+      .from('escrows')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error) throw error;
+    return data;
+  },
   // Milestones
   async createMilestone(milestone: Omit<Milestone, 'id' | 'created_at'>) {
     const { data, error } = await supabase

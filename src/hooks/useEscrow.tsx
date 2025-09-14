@@ -14,7 +14,7 @@ interface UseEscrowReturn {
 
 export const useEscrow = (): UseEscrowReturn => {
   const [isLoading, setIsLoading] = useState(false);
-  const { provider, address } = useWallet();
+  const { provider, address, chain } = useWallet();
   const { toast } = useToast();
 
   const createProjectEscrow = useCallback(async (
@@ -25,6 +25,15 @@ export const useEscrow = (): UseEscrowReturn => {
       toast({
         title: "Wallet not connected",
         description: "Please connect your wallet to create escrow",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    if (chain !== 'solana' || typeof (provider as any)?.signAndSendTransaction !== 'function') {
+      toast({
+        title: "Solana wallet required",
+        description: "Please connect Phantom (Solana) to create escrow",
         variant: "destructive",
       });
       return null;
@@ -50,9 +59,10 @@ export const useEscrow = (): UseEscrowReturn => {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = clientWallet;
 
-      // Sign and send transaction through wallet adapter
-      // Note: In production, use Solana wallet adapter instead of ethers
-      const signature = await connection.sendTransaction(transaction, []);
+      // Sign and send with Phantom
+      const res = await (provider as any).signAndSendTransaction(transaction);
+      const signature = typeof res === 'string' ? res : res?.signature;
+      if (!signature) throw new Error('No signature returned from wallet');
       await connection.confirmTransaction(signature);
 
       // Store escrow in database
@@ -99,9 +109,18 @@ export const useEscrow = (): UseEscrowReturn => {
       return false;
     }
 
+    if (chain !== 'solana' || typeof (provider as any)?.signAndSendTransaction !== 'function') {
+      toast({
+        title: "Solana wallet required",
+        description: "Please connect Phantom (Solana) to fund escrow",
+        variant: "destructive",
+      });
+      return false;
+    }
+
     setIsLoading(true);
     try {
-      const escrow = await db.getEscrow(escrowId);
+      const escrow = await db.getEscrowById(escrowId);
       if (!escrow.escrow_account) {
         throw new Error('Escrow account not found');
       }
@@ -117,9 +136,10 @@ export const useEscrow = (): UseEscrowReturn => {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = clientWallet;
 
-      // Sign and send transaction
-      // Note: In production, use Solana wallet adapter
-      const signature = await connection.sendTransaction(transaction, []);
+      // Sign and send with Phantom
+      const res = await (provider as any).signAndSendTransaction(transaction);
+      const signature = typeof res === 'string' ? res : res?.signature;
+      if (!signature) throw new Error('No signature returned from wallet');
       await connection.confirmTransaction(signature);
 
       // Update escrow status in database
@@ -161,9 +181,18 @@ export const useEscrow = (): UseEscrowReturn => {
       return false;
     }
 
+    if (chain !== 'solana' || typeof (provider as any)?.signAndSendTransaction !== 'function') {
+      toast({
+        title: "Solana wallet required",
+        description: "Please connect Phantom (Solana) to release payment",
+        variant: "destructive",
+      });
+      return false;
+    }
+
     setIsLoading(true);
     try {
-      const escrow = await db.getEscrow(escrowId);
+      const escrow = await db.getEscrowById(escrowId);
       const milestone = await db.getMilestones(escrow.project_id);
       const targetMilestone = milestone.find(m => m.id === milestoneId);
 
@@ -188,9 +217,10 @@ export const useEscrow = (): UseEscrowReturn => {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = clientWallet;
 
-      // Sign and send transaction
-      // Note: In production, use Solana wallet adapter
-      const signature = await connection.sendTransaction(transaction, []);
+      // Sign and send with Phantom
+      const res = await (provider as any).signAndSendTransaction(transaction);
+      const signature = typeof res === 'string' ? res : res?.signature;
+      if (!signature) throw new Error('No signature returned from wallet');
       await connection.confirmTransaction(signature);
 
       // Update milestone and escrow status
