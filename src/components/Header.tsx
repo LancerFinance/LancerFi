@@ -27,6 +27,9 @@ const Header = () => {
             <Link to="/hire-talent" className="text-muted-foreground hover:text-foreground transition-colors">
               Hire Talent
             </Link>
+            <Link to="/freelancer" className="text-muted-foreground hover:text-foreground transition-colors">
+              Find Work
+            </Link>
             <Link to="/faq" className="text-muted-foreground hover:text-foreground transition-colors">
               FAQ
             </Link>
@@ -66,6 +69,13 @@ const Header = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Hire Talent
+              </Link>
+              <Link 
+                to="/freelancer" 
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Find Work
               </Link>
               <Link 
                 to="/faq" 

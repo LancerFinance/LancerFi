@@ -9,6 +9,7 @@ import FAQ from "./pages/FAQ";
 import PostProject from "./pages/PostProject";
 import ProjectDashboard from "./pages/ProjectDashboard";
 import HireTalent from "./pages/HireTalent";
+import FreelancerDashboard from "./pages/FreelancerDashboard";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ const App = () => (
         <Route path="/post-project" element={<PostProject />} />
         {/* <Route path="/dashboard" element={<ProjectDashboard />} /> */}
         <Route path="/hire-talent" element={<HireTalent />} />
+        <Route path="/freelancer" element={<FreelancerDashboard />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -14,15 +14,185 @@ export type Database = {
   }
   public: {
     Tables: {
+      escrows: {
+        Row: {
+          amount_usdc: number
+          client_wallet: string
+          created_at: string | null
+          escrow_account: string | null
+          freelancer_wallet: string | null
+          funded_at: string | null
+          id: string
+          platform_fee: number
+          project_id: string | null
+          released_at: string | null
+          solana_program_id: string | null
+          status: string | null
+          total_locked: number
+          transaction_signature: string | null
+        }
+        Insert: {
+          amount_usdc: number
+          client_wallet: string
+          created_at?: string | null
+          escrow_account?: string | null
+          freelancer_wallet?: string | null
+          funded_at?: string | null
+          id?: string
+          platform_fee: number
+          project_id?: string | null
+          released_at?: string | null
+          solana_program_id?: string | null
+          status?: string | null
+          total_locked: number
+          transaction_signature?: string | null
+        }
+        Update: {
+          amount_usdc?: number
+          client_wallet?: string
+          created_at?: string | null
+          escrow_account?: string | null
+          freelancer_wallet?: string | null
+          funded_at?: string | null
+          id?: string
+          platform_fee?: number
+          project_id?: string | null
+          released_at?: string | null
+          solana_program_id?: string | null
+          status?: string | null
+          total_locked?: number
+          transaction_signature?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escrows_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      milestones: {
+        Row: {
+          amount_usdc: number
+          approved_at: string | null
+          created_at: string | null
+          deliverable_urls: string[] | null
+          description: string | null
+          due_date: string | null
+          escrow_id: string | null
+          id: string
+          project_id: string | null
+          status: string | null
+          submitted_at: string | null
+          title: string
+          work_description: string | null
+        }
+        Insert: {
+          amount_usdc: number
+          approved_at?: string | null
+          created_at?: string | null
+          deliverable_urls?: string[] | null
+          description?: string | null
+          due_date?: string | null
+          escrow_id?: string | null
+          id?: string
+          project_id?: string | null
+          status?: string | null
+          submitted_at?: string | null
+          title: string
+          work_description?: string | null
+        }
+        Update: {
+          amount_usdc?: number
+          approved_at?: string | null
+          created_at?: string | null
+          deliverable_urls?: string[] | null
+          description?: string | null
+          due_date?: string | null
+          escrow_id?: string | null
+          id?: string
+          project_id?: string | null
+          status?: string | null
+          submitted_at?: string | null
+          title?: string
+          work_description?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "milestones_escrow_id_fkey"
+            columns: ["escrow_id"]
+            isOneToOne: false
+            referencedRelation: "escrows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          bio: string | null
+          completed_projects: number | null
+          created_at: string | null
+          full_name: string | null
+          hourly_rate: number | null
+          id: string
+          rating: number | null
+          skills: string[] | null
+          total_earned: number | null
+          updated_at: string | null
+          username: string | null
+          wallet_address: string | null
+        }
+        Insert: {
+          bio?: string | null
+          completed_projects?: number | null
+          created_at?: string | null
+          full_name?: string | null
+          hourly_rate?: number | null
+          id?: string
+          rating?: number | null
+          skills?: string[] | null
+          total_earned?: number | null
+          updated_at?: string | null
+          username?: string | null
+          wallet_address?: string | null
+        }
+        Update: {
+          bio?: string | null
+          completed_projects?: number | null
+          created_at?: string | null
+          full_name?: string | null
+          hourly_rate?: number | null
+          id?: string
+          rating?: number | null
+          skills?: string[] | null
+          total_earned?: number | null
+          updated_at?: string | null
+          username?: string | null
+          wallet_address?: string | null
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           budget_usdc: number
           category: string
           client_id: string
+          completed_at: string | null
           created_at: string | null
           description: string
+          freelancer_id: string | null
           id: string
           required_skills: string[] | null
+          started_at: string | null
           status: string | null
           timeline: string
           title: string
@@ -32,10 +202,13 @@ export type Database = {
           budget_usdc: number
           category: string
           client_id: string
+          completed_at?: string | null
           created_at?: string | null
           description: string
+          freelancer_id?: string | null
           id?: string
           required_skills?: string[] | null
+          started_at?: string | null
           status?: string | null
           timeline: string
           title: string
@@ -45,16 +218,75 @@ export type Database = {
           budget_usdc?: number
           category?: string
           client_id?: string
+          completed_at?: string | null
           created_at?: string | null
           description?: string
+          freelancer_id?: string | null
           id?: string
           required_skills?: string[] | null
+          started_at?: string | null
           status?: string | null
           timeline?: string
           title?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_freelancer_id_fkey"
+            columns: ["freelancer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposals: {
+        Row: {
+          cover_letter: string
+          created_at: string | null
+          estimated_timeline: string
+          freelancer_id: string | null
+          id: string
+          milestones: Json | null
+          project_id: string | null
+          proposed_budget: number
+        }
+        Insert: {
+          cover_letter: string
+          created_at?: string | null
+          estimated_timeline: string
+          freelancer_id?: string | null
+          id?: string
+          milestones?: Json | null
+          project_id?: string | null
+          proposed_budget: number
+        }
+        Update: {
+          cover_letter?: string
+          created_at?: string | null
+          estimated_timeline?: string
+          freelancer_id?: string | null
+          id?: string
+          milestones?: Json | null
+          project_id?: string | null
+          proposed_budget?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_freelancer_id_fkey"
+            columns: ["freelancer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

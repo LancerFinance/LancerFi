@@ -146,6 +146,18 @@ export const db = {
     return data;
   },
 
+  async updateProject(id: string, updates: Partial<Project>) {
+    const { data, error } = await supabase
+      .from('projects')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
   async updateEscrow(id: string, updates: Partial<Escrow>) {
     const { data, error } = await supabase
       .from('escrows')
