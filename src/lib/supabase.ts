@@ -100,11 +100,7 @@ export const db = {
   async getProjects(filters?: { status?: string; category?: string }) {
     let query = supabase
       .from('projects')
-      .select(`
-        *,
-        client:profiles!client_id(*),
-        freelancer:profiles!freelancer_id(*)
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (filters?.status) {
@@ -122,11 +118,7 @@ export const db = {
   async getProject(id: string) {
     const { data, error } = await supabase
       .from('projects')
-      .select(`
-        *,
-        client:profiles!client_id(*),
-        freelancer:profiles!freelancer_id(*)
-      `)
+      .select('*')
       .eq('id', id)
       .single();
     
