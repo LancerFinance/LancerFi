@@ -96,23 +96,6 @@ export interface Proposal {
 export const db = {
   // Projects
   async createProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>) {
-    // Fallback to local storage if Supabase isn't configured yet
-    if (!isSupabaseConfigured) {
-      const now = new Date().toISOString();
-      const newProject: Project = {
-        id: (crypto as any).randomUUID ? (crypto as any).randomUUID() : Math.random().toString(36).slice(2),
-        created_at: now,
-        updated_at: now,
-        status: 'active',
-        ...project,
-      } as Project;
-
-      const existing = JSON.parse(localStorage.getItem('projects') || '[]');
-      existing.unshift(newProject);
-      localStorage.setItem('projects', JSON.stringify(existing));
-      return newProject;
-    }
-
     const { data, error } = await supabase
       .from('projects')
       .insert(project)
