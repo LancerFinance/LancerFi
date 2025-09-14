@@ -2,7 +2,8 @@ import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } f
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
 
 // Solana configuration
-export const SOLANA_NETWORK = process.env.NODE_ENV === 'production' ? 'mainnet-beta' : 'devnet';
+const MODE = import.meta.env.MODE || 'development';
+export const SOLANA_NETWORK = MODE === 'production' ? 'mainnet-beta' : 'devnet';
 export const RPC_ENDPOINT = SOLANA_NETWORK === 'mainnet-beta' 
   ? 'https://api.mainnet-beta.solana.com'
   : 'https://api.devnet.solana.com';
