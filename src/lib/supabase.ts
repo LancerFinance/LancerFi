@@ -1,16 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase as supabaseClient } from "@/integrations/supabase/client";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
-
-export const isSupabaseConfigured = !supabaseUrl.includes('placeholder') && !!supabaseAnonKey && !supabaseAnonKey.includes('placeholder');
-
-// Create a safe client that won't crash if env vars are missing
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: false
-  }
-});
+export const supabase = supabaseClient;
+export const isSupabaseConfigured = true;
 
 // Database types
 export interface Profile {
