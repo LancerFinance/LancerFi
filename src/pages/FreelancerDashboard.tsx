@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/useWallet";
 import { useEscrow } from "@/hooks/useEscrow";
 import { db, Project } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import WalletButton from "@/components/WalletButton";
 import { Clock, DollarSign, User, CheckCircle } from "lucide-react";
 
@@ -32,8 +33,13 @@ const FreelancerDashboard = () => {
 
   const loadAvailableProjects = async () => {
     try {
-      const availableProjects = await db.getProjects({ status: 'active' });
-      setProjects(availableProjects || []);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setProjects((data as unknown as Project[]) || []);
     } catch (error) {
       console.error('Error loading projects:', error);
       toast({
@@ -45,7 +51,6 @@ const FreelancerDashboard = () => {
       setLoading(false);
     }
   };
-
   const handleApplyToProject = async (project: Project) => {
     if (!isConnected || !address) {
       toast({
