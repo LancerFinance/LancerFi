@@ -45,8 +45,22 @@ export async function createEscrowAccount(
   const totalAmount = amount + platformFee;
   
   // Generate escrow account keypair
+  // Ensure projectId seed is <= 32 bytes (UUID -> 16 bytes hex)
+  const projectSeedHex = projectId.replace(/-/g, '');
+  let projectSeedBuffer: Buffer;
+  try {
+    // If projectId is a UUID, this yields 16 bytes
+    projectSeedBuffer = Buffer.from(projectSeedHex, 'hex');
+  } catch {
+    // Fallback: truncate utf8 bytes to 32 bytes
+    projectSeedBuffer = Buffer.from(projectId).slice(0, 32);
+  }
+  if (projectSeedBuffer.length > 32) {
+    projectSeedBuffer = projectSeedBuffer.slice(0, 32);
+  }
+
   const escrowAccount = PublicKey.findProgramAddressSync(
-    [Buffer.from('escrow'), clientWallet.toBuffer(), Buffer.from(projectId)],
+    [Buffer.from('escrow'), clientWallet.toBuffer(), projectSeedBuffer],
     new PublicKey('11111111111111111111111111111111') // Replace with actual program ID
   )[0];
 
