@@ -62,26 +62,41 @@ const FreelancerDashboard = () => {
     }
 
     try {
-      // Create freelancer profile if doesn't exist
-      await db.updateProfile(address, {
-        wallet_address: address,
-        username: `freelancer_${address.slice(-6)}`
-      });
+      // Create or get freelancer profile using wallet address as ID
+      const { data: existingProfile, error: profileCheckError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('wallet_address', address)
+        .single();
 
-      // Submit proposal
-      const proposalData = {
-        project_id: project.id,
-        freelancer_id: address,
-        cover_letter: proposal.cover_letter,
-        proposed_budget: parseFloat(proposal.proposed_budget),
-        estimated_timeline: proposal.estimated_timeline
-      };
+      let profileId;
+      if (existingProfile) {
+        profileId = existingProfile.id;
+      } else {
+        // Create new profile
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            wallet_address: address,
+            username: `freelancer_${address.slice(-6)}`
+          })
+          .select()
+          .single();
+        
+        if (createError) throw createError;
+        profileId = newProfile.id;
+      }
 
-      // For testing, automatically assign the project and create escrow
-      await db.updateProject(project.id, {
-        freelancer_id: address,
-        status: 'in_progress'
-      });
+      // Update project to assign freelancer
+      const { error: updateError } = await supabase
+        .from('projects')
+        .update({
+          freelancer_id: profileId,
+          status: 'in_progress'
+        })
+        .eq('id', project.id);
+
+      if (updateError) throw updateError;
 
       // Create escrow for the project
       const escrowId = await createProjectEscrow(project.id, project.budget_usdc);
