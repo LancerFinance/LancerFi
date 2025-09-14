@@ -60,7 +60,7 @@ const PostProject = () => {
     try {
       // Create project in database
       const project = await db.createProject({
-        client_id: 'temp-user-id', // Will be replaced with real auth user ID
+        client_id: address, // Wallet address as temporary client ID
         title: formData.title,
         description: formData.description,
         category: formData.category,

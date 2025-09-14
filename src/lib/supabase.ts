@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
 
+export const isSupabaseConfigured = !supabaseUrl.includes('placeholder') && !!supabaseAnonKey && !supabaseAnonKey.includes('placeholder');
+
 // Create a safe client that won't crash if env vars are missing
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -94,6 +96,23 @@ export interface Proposal {
 export const db = {
   // Projects
   async createProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>) {
+    // Fallback to local storage if Supabase isn't configured yet
+    if (!isSupabaseConfigured) {
+      const now = new Date().toISOString();
+      const newProject: Project = {
+        id: (crypto as any).randomUUID ? (crypto as any).randomUUID() : Math.random().toString(36).slice(2),
+        created_at: now,
+        updated_at: now,
+        status: 'active',
+        ...project,
+      } as Project;
+
+      const existing = JSON.parse(localStorage.getItem('projects') || '[]');
+      existing.unshift(newProject);
+      localStorage.setItem('projects', JSON.stringify(existing));
+      return newProject;
+    }
+
     const { data, error } = await supabase
       .from('projects')
       .insert(project)
