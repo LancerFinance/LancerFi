@@ -5,21 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Wallet, Shield, Loader2 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Wallet, Shield } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useState } from "react";
-import { useWallet } from "@/hooks/useWallet";
-import { useEscrow } from "@/hooks/useEscrow";
-import { db } from "@/lib/supabase";
 import { formatUSDC } from "@/lib/solana";
-import { useToast } from "@/hooks/use-toast";
 
 const PostProject = () => {
-  const navigate = useNavigate();
-  const { isConnected, address } = useWallet();
-  const { createProjectEscrow, isLoading: escrowLoading } = useEscrow();
-  const { toast } = useToast();
-
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -28,7 +19,6 @@ const PostProject = () => {
     timeline: '',
     skills: ''
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const platformFeePercent = 10;
   const budget = parseFloat(formData.budget) || 0;
@@ -39,59 +29,9 @@ const PostProject = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async () => {
-    if (!isConnected || !address) {
-      toast({
-        title: "Wallet Required",
-        description: "Please connect your wallet to post a project",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!formData.title || !formData.category || !formData.description || !formData.budget) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      // Create project in database
-      const project = await db.createProject({
-        client_id: address, // In production, use actual user ID from auth
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        required_skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
-        budget_usdc: budget,
-        timeline: formData.timeline,
-        status: 'active'
-      });
-
-      // Create escrow smart contract
-      const escrowId = await createProjectEscrow(project.id, budget);
-      
-      if (escrowId) {
-        toast({
-          title: "Project Posted Successfully!",
-          description: "Your project is now live with smart contract escrow protection",
-        });
-        navigate('/');
-      }
-    } catch (error) {
-      console.error('Error posting project:', error);
-      toast({
-        title: "Failed to Post Project",
-        description: "Please try again or contact support",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleSubmit = () => {
+    console.log('Project data:', formData);
+    alert('Project posting functionality will be available once Supabase is fully configured!');
   };
 
   return (
@@ -211,19 +151,9 @@ const PostProject = () => {
                     size="lg" 
                     className="w-full"
                     onClick={handleSubmit}
-                    disabled={!isConnected || isSubmitting || escrowLoading}
                   >
-                    {isSubmitting || escrowLoading ? (
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    ) : (
-                      <Wallet className="w-5 h-5 mr-2" />
-                    )}
-                    {isSubmitting || escrowLoading 
-                      ? 'Creating Escrow...' 
-                      : isConnected 
-                        ? 'Post Project & Setup Escrow'
-                        : 'Connect Wallet First'
-                    }
+                    <Wallet className="w-5 h-5 mr-2" />
+                    Post Project & Setup Escrow
                   </Button>
                 </CardContent>
               </Card>

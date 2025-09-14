@@ -177,10 +177,13 @@ export async function getUSDCBalance(walletAddress: PublicKey): Promise<number> 
 
 // Utility to format USDC amount
 export function formatUSDC(amount: number): string {
+  if (isNaN(amount) || amount === null || amount === undefined) {
+    return '$0.00';
+  }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
+    maximumFractionDigits: 2,
   }).format(amount);
 }
