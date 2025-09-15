@@ -138,42 +138,72 @@ export type Database = {
       }
       profiles: {
         Row: {
+          availability_status: string | null
           bio: string | null
+          certifications: string[] | null
           completed_projects: number | null
           created_at: string | null
+          education: string | null
+          experience_years: number | null
           full_name: string | null
           hourly_rate: number | null
           id: string
+          languages: string[] | null
+          location: string | null
+          portfolio_url: string | null
+          project_count: number | null
           rating: number | null
+          response_time: string | null
           skills: string[] | null
+          timezone: string | null
           total_earned: number | null
           updated_at: string | null
           username: string | null
           wallet_address: string | null
         }
         Insert: {
+          availability_status?: string | null
           bio?: string | null
+          certifications?: string[] | null
           completed_projects?: number | null
           created_at?: string | null
+          education?: string | null
+          experience_years?: number | null
           full_name?: string | null
           hourly_rate?: number | null
           id?: string
+          languages?: string[] | null
+          location?: string | null
+          portfolio_url?: string | null
+          project_count?: number | null
           rating?: number | null
+          response_time?: string | null
           skills?: string[] | null
+          timezone?: string | null
           total_earned?: number | null
           updated_at?: string | null
           username?: string | null
           wallet_address?: string | null
         }
         Update: {
+          availability_status?: string | null
           bio?: string | null
+          certifications?: string[] | null
           completed_projects?: number | null
           created_at?: string | null
+          education?: string | null
+          experience_years?: number | null
           full_name?: string | null
           hourly_rate?: number | null
           id?: string
+          languages?: string[] | null
+          location?: string | null
+          portfolio_url?: string | null
+          project_count?: number | null
           rating?: number | null
+          response_time?: string | null
           skills?: string[] | null
+          timezone?: string | null
           total_earned?: number | null
           updated_at?: string | null
           username?: string | null

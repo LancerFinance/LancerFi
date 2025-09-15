@@ -17,6 +17,17 @@ export interface Profile {
   completed_projects?: number;
   created_at: string;
   updated_at: string;
+  // Freelancer-specific fields
+  portfolio_url?: string;
+  experience_years?: number;
+  availability_status?: string;
+  languages?: string[];
+  education?: string;
+  certifications?: string[];
+  project_count?: number;
+  response_time?: string;
+  location?: string;
+  timezone?: string;
 }
 
 export interface Project {

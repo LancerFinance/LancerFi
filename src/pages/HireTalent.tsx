@@ -5,63 +5,87 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Star, MapPin, Wallet, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase, Profile } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 const HireTalent = () => {
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
+  const [freelancers, setFreelancers] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
   
   const categories = ["All Categories", "Developers", "Designers", "Marketers", "Auditors"];
-  
-  const talents = [
-    {
-      id: 1,
-      name: "Alex Chen",
-      title: "Full-Stack Web3 Developer",
-      location: "San Francisco, CA",
-      rating: 4.9,
-      reviews: 47,
-      hourlyRate: "$85-120",
-      skills: ["Solidity", "React", "Node.js", "DeFi"],
-      bio: "Experienced Web3 developer with 5+ years building DeFi protocols and dApps.",
-      avatar: "/placeholder.svg"
-    },
-    {
-      id: 2,
-      name: "Sarah Kim",
-      title: "Smart Contract Auditor",
-      location: "Austin, TX",
-      rating: 5.0,
-      reviews: 23,
-      hourlyRate: "$100-150",
-      skills: ["Solidity", "Security", "Auditing", "Foundry"],
-      bio: "Security-focused smart contract auditor with expertise in DeFi and NFT protocols.",
-      avatar: "/placeholder.svg"
-    },
-    {
-      id: 3,
-      name: "Marcus Johnson",
-      title: "Web3 UI/UX Designer",
-      location: "New York, NY",
-      rating: 4.8,
-      reviews: 31,
-      hourlyRate: "$70-95",
-      skills: ["Figma", "Web3 UX", "Prototyping", "Branding"],
-      bio: "Creative designer specializing in intuitive Web3 user experiences.",
-      avatar: "/placeholder.svg"
-    },
-    {
-      id: 4,
-      name: "Elena Rodriguez",
-      title: "Blockchain Marketing Expert",
-      location: "Miami, FL",
-      rating: 4.7,
-      reviews: 19,
-      hourlyRate: "$60-80",
-      skills: ["Marketing", "Community", "Content", "Growth"],
-      bio: "Growth marketer helping Web3 projects build engaged communities.",
-      avatar: "/placeholder.svg"
+
+  useEffect(() => {
+    loadFreelancers();
+  }, []);
+
+  const loadFreelancers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .not('skills', 'is', null)
+        .order('rating', { ascending: false });
+      
+      if (error) throw error;
+      setFreelancers(data || []);
+    } catch (error) {
+      console.error('Error loading freelancers:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load freelancers",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const getFreelancersByCategory = () => {
+    if (selectedCategory === "All Categories") return freelancers;
+    
+    const categoryKeywords: Record<string, string[]> = {
+      "Developers": ["Solidity", "React", "Node.js", "DeFi", "Web3.js", "JavaScript", "TypeScript", "Smart Contracts"],
+      "Designers": ["Figma", "Design", "UI", "UX", "Branding", "Prototyping"],
+      "Marketers": ["Marketing", "Community", "Growth", "Content", "Social Media"],
+      "Auditors": ["Security", "Auditing", "Solidity", "Smart Contract Security"]
+    };
+
+    const keywords = categoryKeywords[selectedCategory] || [];
+    return freelancers.filter(freelancer => 
+      freelancer.skills?.some(skill => 
+        keywords.some(keyword => 
+          skill.toLowerCase().includes(keyword.toLowerCase())
+        )
+      )
+    );
+  };
+
+  const filteredFreelancers = getFreelancersByCategory();
+
+  const getAvailabilityColor = (status?: string) => {
+    switch (status) {
+      case 'available': return 'text-web3-success';
+      case 'busy': return 'text-web3-warning'; 
+      default: return 'text-muted-foreground';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-8 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+            <p className="mt-4 text-muted-foreground">Loading freelancers...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -94,67 +118,73 @@ const HireTalent = () => {
 
         {/* Talent Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {talents.map((talent) => (
-            <Card key={talent.id} className="hover:shadow-lg transition-shadow duration-300 border-border bg-card">
+          {filteredFreelancers.map((freelancer) => (
+            <Card key={freelancer.id} className="hover:shadow-lg transition-shadow duration-300 border-border bg-card">
               <CardHeader className="pb-4">
                 <div className="flex items-start space-x-4">
                   <Avatar className="w-16 h-16">
-                    <AvatarImage src={talent.avatar} alt={talent.name} />
+                    <AvatarImage src="/placeholder.svg" alt={freelancer.full_name || 'Freelancer'} />
                     <AvatarFallback className="bg-web3-primary text-white font-semibold">
-                      {talent.name.split(' ').map(n => n[0]).join('')}
+                      {freelancer.full_name?.split(' ').map(n => n[0]).join('') || 'FL'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <CardTitle className="text-lg font-semibold text-foreground truncate">
-                      {talent.name}
+                      {freelancer.full_name || freelancer.username}
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mb-2">
-                      {talent.title}
+                      {freelancer.skills?.[0] && `${freelancer.skills[0]} Specialist`}
                     </p>
                     <div className="flex items-center text-xs text-muted-foreground">
                       <MapPin className="w-3 h-3 mr-1" />
-                      {talent.location}
+                      {freelancer.location || 'Remote'}
                     </div>
                   </div>
                 </div>
               </CardHeader>
               
               <CardContent className="space-y-4">
-                {/* Rating */}
+                {/* Rating and Availability */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-1">
                     <Star className="w-4 h-4 fill-web3-warning text-web3-warning" />
-                    <span className="font-medium text-foreground">{talent.rating}</span>
-                    <span className="text-sm text-muted-foreground">({talent.reviews})</span>
+                    <span className="font-medium text-foreground">{freelancer.rating || 0}</span>
+                    <span className="text-sm text-muted-foreground">({freelancer.completed_projects || 0})</span>
                   </div>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Clock className="w-4 h-4 mr-1" />
-                    {talent.hourlyRate}/hr
+                    ${freelancer.hourly_rate || 0}/hr
                   </div>
+                </div>
+
+                {/* Availability Status */}
+                <div className={`inline-flex items-center gap-2 text-xs ${getAvailabilityColor(freelancer.availability_status)}`}>
+                  <div className="w-2 h-2 rounded-full bg-current"></div>
+                  <span>{freelancer.availability_status === 'available' ? 'Available' : freelancer.availability_status === 'busy' ? 'Busy' : 'Available'}</span>
                 </div>
 
                 {/* Bio */}
                 <p className="text-sm text-muted-foreground line-clamp-2">
-                  {talent.bio}
+                  {freelancer.bio || 'Experienced Web3 professional ready to help with your project.'}
                 </p>
 
                 {/* Skills */}
                 <div className="flex flex-wrap gap-1">
-                  {talent.skills.slice(0, 3).map((skill) => (
-                    <Badge key={skill} variant="secondary" className="text-xs">
+                  {freelancer.skills?.slice(0, 3).map((skill, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs">
                       {skill}
                     </Badge>
-                  ))}
-                  {talent.skills.length > 3 && (
+                  )) || null}
+                  {freelancer.skills && freelancer.skills.length > 3 && (
                     <Badge variant="outline" className="text-xs">
-                      +{talent.skills.length - 3}
+                      +{freelancer.skills.length - 3}
                     </Badge>
                   )}
                 </div>
 
                 {/* Action Buttons */}
                 <div className="flex space-x-2 pt-2">
-                  <Link to="/freelancer" className="flex-1">
+                  <Link to={`/freelancer/${freelancer.id}`} className="flex-1">
                     <Button size="sm" variant="outline" className="w-full">
                       View Profile
                     </Button>
@@ -170,6 +200,13 @@ const HireTalent = () => {
             </Card>
           ))}
         </div>
+
+        {filteredFreelancers.length === 0 && !loading && (
+          <div className="text-center py-12">
+            <h3 className="text-xl font-semibold mb-2">No freelancers found</h3>
+            <p className="text-muted-foreground">Try selecting a different category or check back later.</p>
+          </div>
+        )}
 
         {/* Load More */}
         <div className="text-center mt-12">
