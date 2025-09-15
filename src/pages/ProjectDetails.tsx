@@ -22,6 +22,17 @@ import { db, Project, Escrow, Profile } from "@/lib/supabase";
 import { formatUSDC } from "@/lib/solana";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/useWallet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const ProjectDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +45,7 @@ const ProjectDetails = () => {
   const [client, setClient] = useState<Profile | null>(null);
   const [freelancer, setFreelancer] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -124,6 +136,44 @@ const ProjectDetails = () => {
 
   const isProjectOwner = address && project && project.client_id === address;
   const isAssignedFreelancer = address && project && project.freelancer_id && freelancer?.wallet_address === address;
+
+  const handleCompleteProject = async () => {
+    if (!project || !id) return;
+    
+    setCompleting(true);
+    try {
+      // Update project status to completed
+      await db.updateProject(id, {
+        status: 'completed',
+        completed_at: new Date().toISOString()
+      });
+
+      // Update escrow status to released if escrow exists
+      if (escrow) {
+        await db.updateEscrow(escrow.id, {
+          status: 'released',
+          released_at: new Date().toISOString()
+        });
+      }
+
+      toast({
+        title: "Project Completed!",
+        description: "Project has been marked as completed and escrow funds have been released.",
+      });
+
+      // Reload project details
+      await loadProjectDetails();
+    } catch (error) {
+      console.error('Error completing project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to complete project",
+        variant: "destructive"
+      });
+    } finally {
+      setCompleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -378,6 +428,44 @@ const ProjectDetails = () => {
                       <MessageSquare className="w-4 h-4 mr-2" />
                       Send Message
                     </Button>
+                    {project.status === 'in_progress' && (isProjectOwner || isAssignedFreelancer) && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="default" 
+                            size="sm" 
+                            className="w-full"
+                            disabled={completing}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Complete Project
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Complete Project</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to mark this project as completed? This will:
+                              <ul className="list-disc list-inside mt-2 space-y-1">
+                                <li>Update the project status to "Completed"</li>
+                                <li>Release the escrow funds to the freelancer</li>
+                                <li>Update the freelancer's earnings and project count</li>
+                              </ul>
+                              This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={handleCompleteProject}
+                              disabled={completing}
+                            >
+                              {completing ? "Completing..." : "Complete Project"}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                     {project.status === 'active' && isProjectOwner && !project.freelancer_id && (
                       <Link to={`/post-project?edit=${project.id}`} className="block">
                         <Button variant="outline" size="sm" className="w-full">
