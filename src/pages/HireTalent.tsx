@@ -189,7 +189,7 @@ const HireTalent = () => {
                       View Profile
                     </Button>
                   </Link>
-                  <Link to="/post-project" className="flex-1">
+                  <Link to={`/post-project?freelancer=${freelancer.id}`} className="flex-1">
                     <Button size="sm" variant="default" className="w-full">
                       <Wallet className="w-4 h-4 mr-1" />
                       Hire

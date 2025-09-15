@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
+import { Menu, X, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import WalletButton from "./WalletButton";
+import { useWallet } from "@/hooks/useWallet";
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { isConnected } = useWallet();
 
   return (
     <header className="bg-background/80 backdrop-blur-sm border-b border-border sticky top-0 z-50">
@@ -40,6 +42,14 @@ const Header = () => {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center space-x-4">
+            {isConnected && (
+              <Link to="/edit-profile">
+                <Button variant="ghost" className="text-muted-foreground">
+                  <User className="w-4 h-4 mr-2" />
+                  Edit Profile
+                </Button>
+              </Link>
+            )}
             <Link to="/freelancer">
               <Button variant="ghost" className="text-muted-foreground">
                 Find Work
@@ -97,6 +107,14 @@ const Header = () => {
                 FAQ
               </Link>
               <div className="flex flex-col space-y-2 pt-4">
+                {isConnected && (
+                  <Link to="/edit-profile">
+                    <Button variant="ghost" className="justify-start">
+                      <User className="w-4 h-4 mr-2" />
+                      Edit Profile
+                    </Button>
+                  </Link>
+                )}
                 <Link to="/freelancer">
                   <Button variant="ghost" className="justify-start">
                     Find Work
