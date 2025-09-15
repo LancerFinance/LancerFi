@@ -12,10 +12,11 @@ import { useWallet } from "@/hooks/useWallet";
 import { supabase, Profile } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
+import { validateProfile } from "@/lib/validation";
+import { useProfile } from "@/hooks/useProfile";
 
 const EditProfile = () => {
   const [loading, setLoading] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [formData, setFormData] = useState({
     full_name: '',
     username: '',
@@ -31,6 +32,7 @@ const EditProfile = () => {
     languages: [] as string[],
     certifications: [] as string[]
   });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [newSkill, setNewSkill] = useState('');
   const [newLanguage, setNewLanguage] = useState('');
   const [newCertification, setNewCertification] = useState('');
@@ -38,76 +40,44 @@ const EditProfile = () => {
   const { toast } = useToast();
   const { address, isConnected, isConnecting, connectWallet } = useWallet();
   const navigate = useNavigate();
+  const { profile, createOrUpdateProfile } = useProfile();
 
   useEffect(() => {
-    console.log('EditProfile useEffect - isConnected:', isConnected, 'address:', address);
-    // Only load profile when connected and we have an address
-    if (isConnected && address) {
-      loadProfile();
-    }
-  }, [address, isConnected]);
-
-  const loadProfile = async () => {
-    if (!address) {
-      console.log('No address available');
-      return;
-    }
-    
-    console.log('Loading profile for address:', address);
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('wallet_address', address);
-      
-      console.log('Profile query result:', { data, error });
-      
-      if (error && error.code !== 'PGRST116') throw error;
-      
-      if (data && data.length > 0) {
-        const profileData = data[0];
-        console.log('Found profile:', profileData);
-        setProfile(profileData);
-        setFormData({
-          full_name: profileData.full_name || '',
-          username: profileData.username || '',
-          bio: profileData.bio || '',
-          skills: profileData.skills || [],
-          hourly_rate: profileData.hourly_rate?.toString() || '',
-          portfolio_url: profileData.portfolio_url || '',
-          location: profileData.location || '',
-          education: profileData.education || '',
-          response_time: profileData.response_time || '< 24 hours',
-          availability_status: profileData.availability_status || 'available',
-          experience_years: profileData.experience_years?.toString() || '',
-          languages: profileData.languages || ['English'],
-          certifications: profileData.certifications || []
-        });
-      } else {
-        console.log('No profile found, creating empty form');
-        // No profile exists, keep empty form for new profile creation
-      }
-    } catch (error) {
-      console.error('Error loading profile:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load profile",
-        variant: "destructive"
+    // Load profile data when available
+    if (profile) {
+      setFormData({
+        full_name: profile.full_name || '',
+        username: profile.username || '',
+        bio: profile.bio || '',
+        skills: profile.skills || [],
+        hourly_rate: profile.hourly_rate?.toString() || '',
+        portfolio_url: profile.portfolio_url || '',
+        location: profile.location || '',
+        education: profile.education || '',
+        response_time: profile.response_time || '< 24 hours',
+        availability_status: profile.availability_status || 'available',
+        experience_years: profile.experience_years?.toString() || '',
+        languages: profile.languages || ['English'],
+        certifications: profile.certifications || []
       });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [profile]);
 
   const handleSave = async () => {
     if (!address) return;
 
-    // Validate required fields
-    if (!formData.full_name.trim() || !formData.username.trim() || !formData.bio.trim()) {
+    // Validate form using validation utility
+    const validationErrors = validateProfile(formData);
+    if (validationErrors.length > 0) {
+      const errorMap: Record<string, string> = {};
+      validationErrors.forEach(error => {
+        errorMap[error.field] = error.message;
+      });
+      setFormErrors(errorMap);
+      
       toast({
-        title: "Error",
-        description: "Please fill in all required fields",
+        title: "Validation Error",
+        description: "Please fix the errors below",
         variant: "destructive"
       });
       return;
@@ -115,9 +85,9 @@ const EditProfile = () => {
 
     try {
       setLoading(true);
+      setFormErrors({});
       
       const profileData = {
-        wallet_address: address,
         full_name: formData.full_name.trim(),
         username: formData.username.trim(),
         bio: formData.bio.trim(),
@@ -133,22 +103,7 @@ const EditProfile = () => {
         certifications: formData.certifications
       };
 
-      if (profile) {
-        // Update existing profile
-        const { error } = await supabase
-          .from('profiles')
-          .update(profileData)
-          .eq('id', profile.id);
-        
-        if (error) throw error;
-      } else {
-        // Create new profile
-        const { error } = await supabase
-          .from('profiles')
-          .insert(profileData);
-        
-        if (error) throw error;
-      }
+      await createOrUpdateProfile(profileData);
 
       toast({
         title: "Success",
@@ -254,24 +209,32 @@ const EditProfile = () => {
             <CardContent className="space-y-6">
               {/* Basic Information */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="full_name">Full Name *</Label>
-                  <Input
-                    id="full_name"
-                    value={formData.full_name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
-                    placeholder="Your full name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="username">Username *</Label>
-                  <Input
-                    id="username"
-                    value={formData.username}
-                    onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
-                    placeholder="Your username"
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="full_name">Full Name *</Label>
+                    <Input
+                      id="full_name"
+                      value={formData.full_name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
+                      placeholder="Your full name"
+                      className={formErrors.full_name ? "border-destructive" : ""}
+                    />
+                    {formErrors.full_name && (
+                      <p className="text-sm text-destructive mt-1">{formErrors.full_name}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="username">Username *</Label>
+                    <Input
+                      id="username"
+                      value={formData.username}
+                      onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                      placeholder="Your username"
+                      className={formErrors.username ? "border-destructive" : ""}
+                    />
+                    {formErrors.username && (
+                      <p className="text-sm text-destructive mt-1">{formErrors.username}</p>
+                    )}
+                  </div>
               </div>
 
               <div>
@@ -282,7 +245,11 @@ const EditProfile = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
                   placeholder="Tell clients about yourself and your expertise..."
                   rows={4}
+                  className={formErrors.bio ? "border-destructive" : ""}
                 />
+                {formErrors.bio && (
+                  <p className="text-sm text-destructive mt-1">{formErrors.bio}</p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
