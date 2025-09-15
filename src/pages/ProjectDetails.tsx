@@ -18,7 +18,7 @@ import {
   MessageSquare,
   Edit
 } from "lucide-react";
-import { db, Project, Escrow, Profile } from "@/lib/supabase";
+import { db, supabase, Project, Escrow, Profile } from "@/lib/supabase";
 import { formatUSDC } from "@/lib/solana";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/useWallet";
@@ -76,7 +76,12 @@ const ProjectDetails = () => {
       // Load client profile
       if (projectData.client_id) {
         try {
-          const clientData = await db.getProfile(projectData.client_id);
+          const { data: clientData, error: clientErr } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('wallet_address', projectData.client_id)
+            .maybeSingle();
+          if (clientErr) throw clientErr;
           setClient(clientData);
         } catch (error) {
           console.log('No client profile found');
@@ -228,11 +233,22 @@ const ProjectDetails = () => {
     setAssigningFreelancer(true);
     try {
       // First, try to get or create a profile for the current user
-      let userProfile;
+      let userProfile: Profile | null = null;
+      // Look up by wallet address
       try {
-        userProfile = await db.getProfile(address);
-      } catch (error) {
-        // Create a basic profile if none exists
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('wallet_address', address)
+          .maybeSingle();
+        if (error) throw error;
+        userProfile = data as Profile | null;
+      } catch (e) {
+        userProfile = null;
+      }
+
+      // Create a basic profile if none exists
+      if (!userProfile) {
         const profileData = {
           wallet_address: address,
           full_name: 'Test Freelancer',
@@ -243,8 +259,14 @@ const ProjectDetails = () => {
           availability_status: 'available' as const
         };
         
-        await db.updateProfile(address, profileData);
-        userProfile = await db.getProfile(address);
+        const { data: inserted, error: insertErr } = await supabase
+          .from('profiles')
+          .insert(profileData)
+          .select()
+          .single();
+        
+        if (insertErr) throw insertErr;
+        userProfile = inserted as Profile;
       }
 
       // Update project to assign the freelancer and change status
