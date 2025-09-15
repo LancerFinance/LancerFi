@@ -349,15 +349,19 @@ const ProjectDetails = () => {
               </div>
               {isProjectOwner && (
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Project
-                  </Button>
-                  {!project.freelancer_id && (
+                  <Link to={`/project/${id}/edit`}>
                     <Button variant="outline" size="sm">
-                      <MessageSquare className="w-4 h-4 mr-2" />
-                      View Proposals
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Project
                     </Button>
+                  </Link>
+                  {!project.freelancer_id && (
+                    <Link to={`/project/${id}/proposals`}>
+                      <Button variant="outline" size="sm">
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        View Proposals
+                      </Button>
+                    </Link>
                   )}
                 </div>
               )}
@@ -613,14 +617,14 @@ const ProjectDetails = () => {
                          </AlertDialogContent>
                        </AlertDialog>
                      )}
-                     {project.status === 'active' && isProjectOwner && !project.freelancer_id && (
-                       <Link to={`/post-project?edit=${project.id}`} className="block">
-                         <Button variant="outline" size="sm" className="w-full">
-                           <Edit className="w-4 h-4 mr-2" />
-                           Edit Project
-                         </Button>
-                       </Link>
-                     )}
+                      {project.status === 'active' && isProjectOwner && !project.freelancer_id && (
+                        <Link to={`/project/${project.id}/edit`} className="block">
+                          <Button variant="outline" size="sm" className="w-full">
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Project
+                          </Button>
+                        </Link>
+                      )}
                   </CardContent>
                 </Card>
               )}

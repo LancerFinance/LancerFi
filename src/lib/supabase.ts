@@ -352,16 +352,54 @@ export const db = {
     return data;
   },
 
-  async markMessageAsRead(messageId: string, walletAddress: string) {
+  // Proposals
+  async getProposals(projectId: string) {
     const { data, error } = await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('id', messageId)
-      .eq('recipient_id', walletAddress)
+      .from('proposals')
+      .select(`
+        *,
+        freelancer:freelancer_id (
+          id,
+          wallet_address,
+          full_name,
+          username,
+          bio,
+          skills,
+          hourly_rate,
+          total_earned,
+          rating,
+          completed_projects,
+          portfolio_url,
+          location
+        )
+      `)
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async createProposal(proposal: Omit<Proposal, 'id' | 'created_at'>) {
+    const { data, error } = await supabase
+      .from('proposals')
+      .insert(proposal)
       .select()
       .single();
     
     if (error) throw error;
     return data;
-  }
+  },
+
+  async updateProposal(id: string, updates: Partial<Proposal>) {
+    const { data, error } = await supabase
+      .from('proposals')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
 };
