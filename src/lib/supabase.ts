@@ -142,7 +142,7 @@ export const db = {
       .from('projects')
       .select('*')
       .eq('id', id)
-      .single();
+      .maybeSingle();
     
     if (error) throw error;
     return data;
@@ -207,7 +207,7 @@ export const db = {
       .from('escrows')
       .select('*')
       .eq('project_id', projectId)
-      .single();
+      .maybeSingle();
     
     if (error) throw error;
     return data;
@@ -218,7 +218,7 @@ export const db = {
       .from('escrows')
       .select('*')
       .eq('id', id)
-      .single();
+      .maybeSingle();
     if (error) throw error;
     return data;
   },
@@ -263,7 +263,7 @@ export const db = {
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
     
     if (error) throw error;
     return data;

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Filter, Search, Wallet } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { db, Project, Escrow } from "@/lib/supabase";
 import { formatUSDC } from "@/lib/solana";
@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 const ProjectDashboard = () => {
   const { isConnected, address } = useWallet();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [escrows, setEscrows] = useState<Record<string, Escrow>>({});
   const [loading, setLoading] = useState(true);
@@ -76,8 +77,7 @@ const ProjectDashboard = () => {
   };
 
   const handleViewProject = (projectId: string) => {
-    // Navigate to project detail page
-    console.log('View project:', projectId);
+    navigate(`/project/${projectId}`);
   };
 
   if (!isConnected) {

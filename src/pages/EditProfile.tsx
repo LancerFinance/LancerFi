@@ -40,7 +40,10 @@ const EditProfile = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('EditProfile useEffect - isConnected:', isConnected, 'address:', address);
+    
     if (!isConnected) {
+      console.log('Not connected, redirecting to home');
       navigate('/');
       return;
     }
@@ -48,36 +51,48 @@ const EditProfile = () => {
     if (address) {
       loadProfile();
     }
-  }, [address, isConnected]);
+  }, [address, isConnected, navigate]);
 
   const loadProfile = async () => {
+    if (!address) {
+      console.log('No address available');
+      return;
+    }
+    
+    console.log('Loading profile for address:', address);
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('wallet_address', address)
-        .maybeSingle();
+        .eq('wallet_address', address);
+      
+      console.log('Profile query result:', { data, error });
       
       if (error && error.code !== 'PGRST116') throw error;
       
-      if (data) {
-        setProfile(data);
+      if (data && data.length > 0) {
+        const profileData = data[0];
+        console.log('Found profile:', profileData);
+        setProfile(profileData);
         setFormData({
-          full_name: data.full_name || '',
-          username: data.username || '',
-          bio: data.bio || '',
-          skills: data.skills || [],
-          hourly_rate: data.hourly_rate?.toString() || '',
-          portfolio_url: data.portfolio_url || '',
-          location: data.location || '',
-          education: data.education || '',
-          response_time: data.response_time || '< 24 hours',
-          availability_status: data.availability_status || 'available',
-          experience_years: data.experience_years?.toString() || '',
-          languages: data.languages || ['English'],
-          certifications: data.certifications || []
+          full_name: profileData.full_name || '',
+          username: profileData.username || '',
+          bio: profileData.bio || '',
+          skills: profileData.skills || [],
+          hourly_rate: profileData.hourly_rate?.toString() || '',
+          portfolio_url: profileData.portfolio_url || '',
+          location: profileData.location || '',
+          education: profileData.education || '',
+          response_time: profileData.response_time || '< 24 hours',
+          availability_status: profileData.availability_status || 'available',
+          experience_years: profileData.experience_years?.toString() || '',
+          languages: profileData.languages || ['English'],
+          certifications: profileData.certifications || []
         });
+      } else {
+        console.log('No profile found, creating empty form');
+        // No profile exists, keep empty form for new profile creation
       }
     } catch (error) {
       console.error('Error loading profile:', error);

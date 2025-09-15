@@ -13,6 +13,7 @@ import FreelancerDashboard from "./pages/FreelancerDashboard";
 import FreelancerProfile from "./pages/FreelancerProfile";
 import CreateFreelancerProfile from "./pages/CreateFreelancerProfile";
 import EditProfile from "./pages/EditProfile";
+import ProjectDetails from "./pages/ProjectDetails";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
         <Route path="/freelancer/:id" element={<FreelancerProfile />} />
         <Route path="/create-freelancer-profile" element={<CreateFreelancerProfile />} />
         <Route path="/edit-profile" element={<EditProfile />} />
+        <Route path="/project/:id" element={<ProjectDetails />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
