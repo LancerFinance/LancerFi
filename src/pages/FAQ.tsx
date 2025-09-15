@@ -89,9 +89,11 @@ const FAQ = () => {
                 <p className="text-muted-foreground mb-6">
                   Our team is here to help you navigate the Web3 freelance ecosystem
                 </p>
-                <Button variant="default" size="lg">
-                  Contact Support
-                </Button>
+                <Link to="/post-project">
+                  <Button variant="default" size="lg">
+                    Post a Project
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </div>

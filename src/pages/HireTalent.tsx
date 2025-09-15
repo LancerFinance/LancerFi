@@ -4,8 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Star, MapPin, Wallet, Clock } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useState } from "react";
 
 const HireTalent = () => {
+  const [selectedCategory, setSelectedCategory] = useState("All Categories");
+  
+  const categories = ["All Categories", "Developers", "Designers", "Marketers", "Auditors"];
+  
   const talents = [
     {
       id: 1,
@@ -74,11 +80,16 @@ const HireTalent = () => {
 
         {/* Filters Section */}
         <div className="flex flex-wrap gap-4 mb-8 justify-center">
-          <Button variant="outline" size="sm">All Categories</Button>
-          <Button variant="outline" size="sm">Developers</Button>
-          <Button variant="outline" size="sm">Designers</Button>
-          <Button variant="outline" size="sm">Marketers</Button>
-          <Button variant="outline" size="sm">Auditors</Button>
+          {categories.map((category) => (
+            <Button
+              key={category}
+              variant={selectedCategory === category ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedCategory(category)}
+            >
+              {category}
+            </Button>
+          ))}
         </div>
 
         {/* Talent Grid */}
@@ -143,13 +154,17 @@ const HireTalent = () => {
 
                 {/* Action Buttons */}
                 <div className="flex space-x-2 pt-2">
-                  <Button size="sm" variant="outline" className="flex-1">
-                    View Profile
-                  </Button>
-                  <Button size="sm" variant="default" className="flex-1">
-                    <Wallet className="w-4 h-4 mr-1" />
-                    Hire
-                  </Button>
+                  <Link to="/freelancer" className="flex-1">
+                    <Button size="sm" variant="outline" className="w-full">
+                      View Profile
+                    </Button>
+                  </Link>
+                  <Link to="/post-project" className="flex-1">
+                    <Button size="sm" variant="default" className="w-full">
+                      <Wallet className="w-4 h-4 mr-1" />
+                      Hire
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
@@ -158,8 +173,12 @@ const HireTalent = () => {
 
         {/* Load More */}
         <div className="text-center mt-12">
-          <Button variant="outline" size="lg">
-            Load More Talent
+          <Button 
+            variant="outline" 
+            size="lg"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          >
+            Back to Top
           </Button>
         </div>
       </main>

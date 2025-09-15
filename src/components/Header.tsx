@@ -40,9 +40,11 @@ const Header = () => {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="ghost" className="text-muted-foreground">
-              Sign In
-            </Button>
+            <Link to="/freelancer">
+              <Button variant="ghost" className="text-muted-foreground">
+                Find Work
+              </Button>
+            </Link>
             <WalletButton className="animate-glow" />
           </div>
 
@@ -95,9 +97,11 @@ const Header = () => {
                 FAQ
               </Link>
               <div className="flex flex-col space-y-2 pt-4">
-                <Button variant="ghost" className="justify-start">
-                  Sign In
-                </Button>
+                <Link to="/freelancer">
+                  <Button variant="ghost" className="justify-start">
+                    Find Work
+                  </Button>
+                </Link>
                 <WalletButton variant="corporate" className="justify-start" />
               </div>
             </nav>
