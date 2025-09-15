@@ -14,13 +14,15 @@ import FreelancerProfile from "./pages/FreelancerProfile";
 import CreateFreelancerProfile from "./pages/CreateFreelancerProfile";
 import EditProfile from "./pages/EditProfile";
 import ProjectDetails from "./pages/ProjectDetails";
+import { WalletProvider } from "@/hooks/useWallet";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <Toaster />
-    <Sonner />
+    <WalletProvider>
+      <Toaster />
+      <Sonner />
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Index />} />
@@ -38,6 +40,7 @@ const App = () => (
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
+    </WalletProvider>
   </QueryClientProvider>
 );
 
