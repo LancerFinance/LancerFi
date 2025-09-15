@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Star, MapPin, Clock, Globe, DollarSign, Award, BookOpen, Languages, ExternalLink, MessageCircle, Briefcase } from "lucide-react";
+import { ArrowLeft, Star, MapPin, Clock, Globe, DollarSign, Award, BookOpen, Languages, ExternalLink, Briefcase } from "lucide-react";
 import { supabase, Profile } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { MessageDialog } from "@/components/MessageDialog";
 
 const FreelancerProfile = () => {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +32,17 @@ const FreelancerProfile = () => {
         .single();
 
       if (error) throw error;
+      
+      // Recalculate total_earned dynamically using our database function
+      if (data?.wallet_address) {
+        const { data: earnings, error: earningsError } = await supabase
+          .rpc('calculate_freelancer_earnings', { freelancer_wallet: data.wallet_address });
+        
+        if (!earningsError && earnings !== null) {
+          data.total_earned = earnings;
+        }
+      }
+      
       setProfile(data);
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -175,16 +187,17 @@ const FreelancerProfile = () => {
 
                   {/* Action Buttons */}
                   <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
-                    <Link to="/post-project">
+                    <Link to={`/post-project?freelancer=${profile.id}`}>
                       <Button size="lg" className="w-full sm:w-auto">
                         <Briefcase className="w-4 h-4 mr-2" />
                         Hire {profile.full_name?.split(' ')[0]}
                       </Button>
                     </Link>
-                    <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      Send Message
-                    </Button>
+                    <MessageDialog 
+                      recipientId={profile.wallet_address || ''}
+                      recipientName={profile.full_name || profile.username || 'Freelancer'}
+                      className="w-full sm:w-auto"
+                    />
                   </div>
                 </div>
               </div>

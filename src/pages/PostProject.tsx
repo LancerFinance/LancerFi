@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Wallet, Shield, Loader2 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useWallet } from "@/hooks/useWallet";
-import { db } from "@/lib/supabase";
+import { db, supabase } from "@/lib/supabase";
 import { formatUSDC } from "@/lib/solana";
 import { useToast } from "@/hooks/use-toast";
 
@@ -17,6 +18,8 @@ const PostProject = () => {
   const navigate = useNavigate();
   const { isConnected, address } = useWallet();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const preselectedFreelancerId = searchParams.get('freelancer');
   
   const [formData, setFormData] = useState({
     title: '',
@@ -27,6 +30,28 @@ const PostProject = () => {
     skills: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFreelancer, setSelectedFreelancer] = useState<any>(null);
+
+  useEffect(() => {
+    if (preselectedFreelancerId) {
+      loadFreelancer(preselectedFreelancerId);
+    }
+  }, [preselectedFreelancerId]);
+
+  const loadFreelancer = async (freelancerId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', freelancerId)
+        .single();
+
+      if (error) throw error;
+      setSelectedFreelancer(data);
+    } catch (error) {
+      console.error('Error loading freelancer:', error);
+    }
+  };
 
   const platformFeePercent = 10;
   const budget = parseFloat(formData.budget) || 0;
@@ -109,15 +134,44 @@ const PostProject = () => {
           </Button>
         </Link>
 
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-foreground">
-              Post Your Web3 Project
-            </h1>
-            <p className="text-xl text-muted-foreground">
-              Connect with verified Web3 talent and secure your project with smart contract escrow
-            </p>
-          </div>
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-12">
+              <h1 className="text-4xl md:text-5xl font-bold mb-6 text-foreground">
+                {selectedFreelancer 
+                  ? `Hire ${selectedFreelancer.full_name || selectedFreelancer.username}` 
+                  : 'Post Your Web3 Project'
+                }
+              </h1>
+              <p className="text-xl text-muted-foreground">
+                {selectedFreelancer 
+                  ? `Create a project to work with ${selectedFreelancer.full_name || selectedFreelancer.username}` 
+                  : 'Connect with verified Web3 talent and secure your project with smart contract escrow'
+                }
+              </p>
+            </div>
+
+            {selectedFreelancer && (
+              <Card className="mb-8 bg-gradient-card border-web3-primary/30">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-web3-primary rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      {selectedFreelancer.full_name?.split(' ').map((n: string) => n[0]).join('') || 'FL'}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">{selectedFreelancer.full_name || selectedFreelancer.username}</h3>
+                      <p className="text-muted-foreground">${selectedFreelancer.hourly_rate}/hr • {selectedFreelancer.location || 'Remote'}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {selectedFreelancer.skills?.slice(0, 3).map((skill: string, index: number) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Main Form */}

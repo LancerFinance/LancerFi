@@ -94,6 +94,17 @@ export interface Proposal {
   freelancer?: Profile;
 }
 
+export interface Message {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  subject?: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // Database functions
 export const db = {
   // Projects
@@ -245,6 +256,32 @@ export const db = {
       .from('profiles')
       .update(updates)
       .eq('id', userId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Messages
+  async getMessages(userId: string) {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async createMessage(message: Omit<Message, 'id' | 'created_at' | 'updated_at' | 'is_read'>) {
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        ...message,
+        is_read: false
+      })
       .select()
       .single();
     
