@@ -73,10 +73,21 @@ const CreateFreelancerProfile = () => {
       return;
     }
 
-    if (!formData.full_name || !formData.username || !formData.bio || !formData.hourly_rate) {
+    const missing: string[] = [];
+    const fullName = formData.full_name.trim();
+    const username = formData.username.trim();
+    const bio = formData.bio.trim();
+    const rate = parseFloat(formData.hourly_rate.toString());
+
+    if (!fullName) missing.push("Full Name");
+    if (!username) missing.push("Username");
+    if (!bio) missing.push("Bio");
+    if (Number.isNaN(rate) || rate <= 0) missing.push("Hourly Rate (> 0)");
+
+    if (missing.length > 0) {
       toast({
-        title: "Missing Information", 
-        description: "Please fill in all required fields",
+        title: "Missing Information",
+        description: `Please provide: ${missing.join(", ")}`,
         variant: "destructive",
       });
       return;
@@ -84,7 +95,7 @@ const CreateFreelancerProfile = () => {
 
     if (skills.length === 0) {
       toast({
-        title: "Skills Required", 
+        title: "Skills Required",
         description: "Please add at least one skill to your profile",
         variant: "destructive",
       });
@@ -115,11 +126,11 @@ const CreateFreelancerProfile = () => {
         .from('profiles')
         .insert({
           wallet_address: address,
-          username: formData.username,
-          full_name: formData.full_name,
-          bio: formData.bio,
+          username,
+          full_name: fullName,
+          bio,
           skills: skills,
-          hourly_rate: parseFloat(formData.hourly_rate),
+          hourly_rate: rate,
           experience_years: parseInt(formData.experience_years) || 0,
           portfolio_url: formData.portfolio_url || null,
           location: formData.location || null,

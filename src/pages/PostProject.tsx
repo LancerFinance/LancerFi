@@ -86,13 +86,14 @@ const PostProject = () => {
       // Create project in database
       const project = await db.createProject({
         client_id: address, // Wallet address as temporary client ID
-        title: formData.title,
-        description: formData.description,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
         category: formData.category,
         required_skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
         budget_usdc: budget,
         timeline: formData.timeline,
-        status: 'active'
+        status: selectedFreelancer ? 'in_progress' : 'active',
+        ...(selectedFreelancer ? { freelancer_id: selectedFreelancer.id } : {})
       });
 
       toast({
