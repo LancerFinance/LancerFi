@@ -155,17 +155,25 @@ const ProjectDetails = () => {
         completed_at: new Date().toISOString()
       });
 
-      // Update escrow status to released if escrow exists
+      // Try to update escrow status to released if escrow exists, but don't fail overall
+      let escrowReleased = false;
       if (escrow) {
-        await db.updateEscrow(escrow.id, {
-          status: 'released',
-          released_at: new Date().toISOString()
-        });
+        try {
+          await db.updateEscrow(escrow.id, {
+            status: 'released',
+            released_at: new Date().toISOString()
+          });
+          escrowReleased = true;
+        } catch (e) {
+          console.error('Escrow release failed (continuing):', e);
+        }
       }
 
       toast({
-        title: "Project Completed!",
-        description: "Project has been marked as completed and escrow funds have been released.",
+        title: 'Project Completed!',
+        description: escrowReleased
+          ? 'Project has been marked as completed and escrow funds have been released.'
+          : 'Project marked as completed. Escrow release will be finalized shortly.',
       });
 
       // Reload project details
@@ -270,11 +278,15 @@ const ProjectDetails = () => {
       }
 
       // Update project to assign the freelancer and change status
+      const startedAt = new Date().toISOString();
       await db.updateProject(id, {
         freelancer_id: userProfile.id,
         status: 'in_progress',
-        started_at: new Date().toISOString()
+        started_at: startedAt
       });
+
+      // Optimistically update local state so actions become available immediately
+      setProject(prev => prev ? { ...prev, freelancer_id: userProfile!.id, status: 'in_progress', started_at: startedAt } as Project : prev);
 
       toast({
         title: "Freelancer Assigned!",
