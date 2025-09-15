@@ -22,6 +22,8 @@ import { db, supabase, Project, Escrow, Profile } from "@/lib/supabase";
 import { formatUSDC } from "@/lib/solana";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/useWallet";
+import { useProfile } from "@/hooks/useProfile";
+import MessageDialog from "@/components/MessageDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +41,7 @@ const ProjectDetails = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isConnected, address } = useWallet();
+  const { ensureProfile } = useProfile();
   
   const [project, setProject] = useState<Project | null>(null);
   const [escrow, setEscrow] = useState<Escrow | null>(null);
@@ -73,22 +76,17 @@ const ProjectDetails = () => {
         // Escrow doesn't exist
       }
 
-      // Load client profile
+      // Load client profile by wallet address
       if (projectData.client_id) {
         try {
-          const { data: clientData, error: clientErr } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('wallet_address', projectData.client_id)
-            .maybeSingle();
-          if (clientErr) throw clientErr;
+          const clientData = await db.getProfileByWallet(projectData.client_id);
           setClient(clientData);
         } catch (error) {
           console.log('No client profile found');
         }
       }
 
-      // Load freelancer profile
+      // Load freelancer profile by ID
       if (projectData.freelancer_id) {
         try {
           const freelancerData = await db.getProfile(projectData.freelancer_id);
@@ -240,44 +238,17 @@ const ProjectDetails = () => {
     
     setAssigningFreelancer(true);
     try {
-      // First, try to get or create a profile for the current user
-      let userProfile: Profile | null = null;
-      // Look up by wallet address
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('wallet_address', address)
-          .maybeSingle();
-        if (error) throw error;
-        userProfile = data as Profile | null;
-      } catch (e) {
-        userProfile = null;
-      }
+      // Use the profile hook to ensure profile exists
+      const userProfile = await ensureProfile({
+        full_name: 'Test Freelancer',
+        username: `freelancer_${address.slice(0, 8)}`,
+        bio: 'Test freelancer profile for escrow testing',
+        skills: project.required_skills,
+        hourly_rate: 50,
+        availability_status: 'available'
+      });
 
-      // Create a basic profile if none exists
-      if (!userProfile) {
-        const profileData = {
-          wallet_address: address,
-          full_name: 'Test Freelancer',
-          username: `freelancer_${address.slice(0, 8)}`,
-          bio: 'Test freelancer profile for escrow testing',
-          skills: project.required_skills,
-          hourly_rate: 50,
-          availability_status: 'available' as const
-        };
-        
-        const { data: inserted, error: insertErr } = await supabase
-          .from('profiles')
-          .insert(profileData)
-          .select()
-          .single();
-        
-        if (insertErr) throw insertErr;
-        userProfile = inserted as Profile;
-      }
-
-      // Update project to assign the freelancer and change status
+      // Update project to assign the freelancer
       const startedAt = new Date().toISOString();
       await db.updateProject(id, {
         freelancer_id: userProfile.id,
@@ -285,16 +256,21 @@ const ProjectDetails = () => {
         started_at: startedAt
       });
 
-      // Optimistically update local state so actions become available immediately
-      setProject(prev => prev ? { ...prev, freelancer_id: userProfile!.id, status: 'in_progress', started_at: startedAt } as Project : prev);
+      // Optimistically update local state
+      setProject(prev => prev ? { 
+        ...prev, 
+        freelancer_id: userProfile.id, 
+        status: 'in_progress', 
+        started_at: startedAt 
+      } as Project : prev);
+      
+      setFreelancer(userProfile);
 
       toast({
         title: "Freelancer Assigned!",
         description: "You have been assigned as the freelancer for this project",
       });
 
-      // Reload project details
-      await loadProjectDetails();
     } catch (error) {
       console.error('Error assigning freelancer:', error);
       toast({
@@ -556,10 +532,20 @@ const ProjectDetails = () => {
                     <CardTitle>Actions</CardTitle>
                   </CardHeader>
                    <CardContent className="space-y-2">
-                     <Button variant="outline" size="sm" className="w-full">
-                       <MessageSquare className="w-4 h-4 mr-2" />
-                       Send Message
-                     </Button>
+                     {/* Replace non-functional button with working MessageDialog */}
+                     {(client?.wallet_address || freelancer?.wallet_address) && (
+                       <MessageDialog
+                         recipientId={isProjectOwner 
+                           ? freelancer?.wallet_address || ''
+                           : client?.wallet_address || project.client_id
+                         }
+                         recipientName={isProjectOwner 
+                           ? freelancer?.full_name || freelancer?.username || 'Freelancer'
+                           : client?.full_name || client?.username || 'Client'
+                         }
+                         projectTitle={project.title}
+                       />
+                     )}
 
                      {/* Test Escrow Creation */}
                      {isProjectOwner && !escrow && (

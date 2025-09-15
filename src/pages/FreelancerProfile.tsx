@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Star, MapPin, Clock, Globe, DollarSign, Award, BookOpen, Languages, ExternalLink, Briefcase } from "lucide-react";
 import { supabase, Profile } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { MessageDialog } from "@/components/MessageDialog";
+import MessageDialog from "@/components/MessageDialog";
 
 const FreelancerProfile = () => {
   const { id } = useParams<{ id: string }>();
@@ -196,7 +196,7 @@ const FreelancerProfile = () => {
                     <MessageDialog 
                       recipientId={profile.wallet_address || ''}
                       recipientName={profile.full_name || profile.username || 'Freelancer'}
-                      className="w-full sm:w-auto"
+                      triggerClassName="w-full sm:w-auto"
                     />
                   </div>
                 </div>

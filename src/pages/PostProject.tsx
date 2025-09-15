@@ -13,6 +13,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { db, supabase } from "@/lib/supabase";
 import { formatUSDC } from "@/lib/solana";
 import { useToast } from "@/hooks/use-toast";
+import { validateProject } from "@/lib/validation";
 
 const PostProject = () => {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ const PostProject = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFreelancer, setSelectedFreelancer] = useState<any>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (preselectedFreelancerId) {
@@ -72,16 +74,26 @@ const PostProject = () => {
       return;
     }
 
-    if (!formData.title || !formData.category || !formData.description || !formData.budget) {
+    // Validate form data
+    const validationErrors = validateProject(formData);
+    if (validationErrors.length > 0) {
+      const errorMap: Record<string, string> = {};
+      validationErrors.forEach(error => {
+        errorMap[error.field] = error.message;
+      });
+      setFormErrors(errorMap);
+      
       toast({
-        title: "Missing Information", 
-        description: "Please fill in all required fields",
+        title: "Validation Error", 
+        description: "Please fix the errors below",
         variant: "destructive",
       });
       return;
     }
 
+    setFormErrors({});
     setIsSubmitting(true);
+    
     try {
       // Create project in database
       const project = await db.createProject({
@@ -90,7 +102,7 @@ const PostProject = () => {
         description: formData.description.trim(),
         category: formData.category,
         required_skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
-        budget_usdc: budget,
+        budget_usdc: parseFloat(formData.budget),
         timeline: formData.timeline,
         status: selectedFreelancer ? 'in_progress' : 'active',
         ...(selectedFreelancer ? { freelancer_id: selectedFreelancer.id } : {})
@@ -115,7 +127,7 @@ const PostProject = () => {
       console.error('Error posting project:', error);
       toast({
         title: "Failed to Post Project",
-        description: "Please check your Supabase connection and try again",
+        description: "Please check your connection and try again",
         variant: "destructive",
       });
     } finally {
@@ -187,16 +199,19 @@ const PostProject = () => {
                     <Input 
                       id="title" 
                       placeholder="e.g., DeFi Trading Bot Development"
-                      className="bg-muted/50"
+                      className={`bg-muted/50 ${formErrors.title ? 'border-destructive' : ''}`}
                       value={formData.title}
                       onChange={(e) => handleInputChange('title', e.target.value)}
                     />
+                    {formErrors.title && (
+                      <p className="text-sm text-destructive">{formErrors.title}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="category">Category</Label>
                     <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
-                      <SelectTrigger className="bg-muted/50">
+                      <SelectTrigger className={`bg-muted/50 ${formErrors.category ? 'border-destructive' : ''}`}>
                         <SelectValue placeholder="Select project category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -210,6 +225,9 @@ const PostProject = () => {
                         <SelectItem value="design">UI/UX Design</SelectItem>
                       </SelectContent>
                     </Select>
+                    {formErrors.category && (
+                      <p className="text-sm text-destructive">{formErrors.category}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -218,10 +236,13 @@ const PostProject = () => {
                       id="description"
                       placeholder="Describe your project in detail. Include technical requirements, expected deliverables, and any specific technologies you want to use..."
                       rows={6}
-                      className="bg-muted/50"
+                      className={`bg-muted/50 ${formErrors.description ? 'border-destructive' : ''}`}
                       value={formData.description}
                       onChange={(e) => handleInputChange('description', e.target.value)}
                     />
+                    {formErrors.description && (
+                      <p className="text-sm text-destructive">{formErrors.description}</p>
+                    )}
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
@@ -231,10 +252,13 @@ const PostProject = () => {
                         id="budget" 
                         type="number"
                         placeholder="5000"
-                        className="bg-muted/50"
+                        className={`bg-muted/50 ${formErrors.budget ? 'border-destructive' : ''}`}
                         value={formData.budget}
                         onChange={(e) => handleInputChange('budget', e.target.value)}
                       />
+                      {formErrors.budget && (
+                        <p className="text-sm text-destructive">{formErrors.budget}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="timeline">Timeline</Label>
@@ -258,10 +282,13 @@ const PostProject = () => {
                     <Input 
                       id="skills" 
                       placeholder="Solidity, React, Web3.js, DeFi protocols..."
-                      className="bg-muted/50"
+                      className={`bg-muted/50 ${formErrors.skills ? 'border-destructive' : ''}`}
                       value={formData.skills}
                       onChange={(e) => handleInputChange('skills', e.target.value)}
                     />
+                    {formErrors.skills && (
+                      <p className="text-sm text-destructive">{formErrors.skills}</p>
+                    )}
                   </div>
 
                   <Button 

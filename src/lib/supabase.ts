@@ -271,6 +271,17 @@ export const db = {
     return data;
   },
 
+  async getProfileByWallet(walletAddress: string) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('wallet_address', walletAddress)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data;
+  },
+
   async updateProfile(userId: string, updates: Partial<Profile>) {
     const { data, error } = await supabase
       .from('profiles')
@@ -283,7 +294,34 @@ export const db = {
     return data;
   },
 
-  // Messages
+  async upsertProfileByWallet(walletAddress: string, profileData: Partial<Profile>) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .upsert({ 
+        ...profileData, 
+        wallet_address: walletAddress 
+      }, { 
+        onConflict: 'wallet_address' 
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Messages with proper user validation
+  async getMessagesForUser(walletAddress: string) {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`sender_id.eq.${walletAddress},recipient_id.eq.${walletAddress}`)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+
   async getMessages(userId: string) {
     const { data, error } = await supabase
       .from('messages')
@@ -295,13 +333,31 @@ export const db = {
     return data;
   },
 
-  async createMessage(message: Omit<Message, 'id' | 'created_at' | 'updated_at' | 'is_read'>) {
+  async createMessage(message: {
+    sender_id: string;
+    recipient_id: string;
+    subject?: string;
+    content: string;
+  }) {
     const { data, error } = await supabase
       .from('messages')
       .insert({
         ...message,
         is_read: false
       })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async markMessageAsRead(messageId: string, walletAddress: string) {
+    const { data, error } = await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('id', messageId)
+      .eq('recipient_id', walletAddress)
       .select()
       .single();
     
