@@ -1,13 +1,49 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Menu, X, User, MessageSquare } from "lucide-react";
 import { Link } from "react-router-dom";
 import WalletButton from "./WalletButton";
 import { useWallet } from "@/hooks/useWallet";
+import { db } from "@/lib/supabase";
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { isConnected } = useWallet();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const { isConnected, address } = useWallet();
+
+  useEffect(() => {
+    if (isConnected && address) {
+      checkUnreadMessages();
+      // Check for new messages every 30 seconds
+      const interval = setInterval(checkUnreadMessages, 30000);
+      
+      // Listen for message read events to update count immediately
+      const handleMessageRead = () => checkUnreadMessages();
+      window.addEventListener('messageRead', handleMessageRead);
+      
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('messageRead', handleMessageRead);
+      };
+    } else {
+      setUnreadCount(0);
+    }
+  }, [isConnected, address]);
+
+  const checkUnreadMessages = async () => {
+    if (!address) return;
+    
+    try {
+      const messages = await db.getMessagesForUser(address);
+      const unread = messages.filter(msg => 
+        msg.recipient_id === address && !msg.is_read
+      ).length;
+      setUnreadCount(unread);
+    } catch (error) {
+      console.error('Error checking unread messages:', error);
+    }
+  };
 
   return (
     <header className="bg-background/80 backdrop-blur-sm border-b border-border sticky top-0 z-50">
@@ -34,6 +70,14 @@ const Header = () => {
             </Link>
             <Link to="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
               Dashboard
+            </Link>
+            <Link to="/messages" className="text-muted-foreground hover:text-foreground transition-colors relative">
+              Messages
+              {unreadCount > 0 && (
+                <Badge className="absolute -top-2 -right-2 h-5 w-5 text-xs bg-destructive text-destructive-foreground p-0 flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Badge>
+              )}
             </Link>
             <Link to="/faq" className="text-muted-foreground hover:text-foreground transition-colors">
               FAQ
@@ -98,6 +142,19 @@ const Header = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Dashboard
+              </Link>
+              <Link 
+                to="/messages" 
+                className="text-muted-foreground hover:text-foreground transition-colors relative flex items-center"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Messages
+                {unreadCount > 0 && (
+                  <Badge className="ml-2 h-5 w-5 text-xs bg-destructive text-destructive-foreground p-0 flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Badge>
+                )}
               </Link>
               <Link 
                 to="/faq" 

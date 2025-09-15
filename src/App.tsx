@@ -16,6 +16,7 @@ import EditProfile from "./pages/EditProfile";
 import ProjectDetails from "./pages/ProjectDetails";
 import EditProject from "./pages/EditProject";
 import ViewProposals from "./pages/ViewProposals";
+import Messages from "./pages/Messages";
 import { WalletProvider } from "@/hooks/useWallet";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
         <Route path="/project/:id" element={<ProjectDetails />} />
         <Route path="/project/:id/edit" element={<EditProject />} />
         <Route path="/project/:id/proposals" element={<ViewProposals />} />
+        <Route path="/messages" element={<Messages />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
