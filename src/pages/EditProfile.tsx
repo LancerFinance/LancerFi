@@ -36,22 +36,16 @@ const EditProfile = () => {
   const [newCertification, setNewCertification] = useState('');
   
   const { toast } = useToast();
-  const { address, isConnected } = useWallet();
+  const { address, isConnected, isConnecting, connectWallet } = useWallet();
   const navigate = useNavigate();
 
   useEffect(() => {
     console.log('EditProfile useEffect - isConnected:', isConnected, 'address:', address);
-    
-    if (!isConnected) {
-      console.log('Not connected, redirecting to home');
-      navigate('/');
-      return;
-    }
-    
-    if (address) {
+    // Only load profile when connected and we have an address
+    if (isConnected && address) {
       loadProfile();
     }
-  }, [address, isConnected, navigate]);
+  }, [address, isConnected]);
 
   const loadProfile = async () => {
     if (!address) {
@@ -226,7 +220,20 @@ const EditProfile = () => {
   };
 
   if (!isConnected) {
-    return null;
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-16">
+          <div className="max-w-md mx-auto text-center">
+            <h1 className="text-3xl font-bold text-foreground mb-2">Connect your wallet</h1>
+            <p className="text-muted-foreground mb-6">Please connect your wallet to edit your profile.</p>
+            <Button onClick={connectWallet} disabled={isConnecting}>
+              {isConnecting ? "Connecting..." : "Connect Wallet"}
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (
