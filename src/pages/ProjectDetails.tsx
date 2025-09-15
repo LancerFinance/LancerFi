@@ -46,6 +46,8 @@ const ProjectDetails = () => {
   const [freelancer, setFreelancer] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
+  const [creatingEscrow, setCreatingEscrow] = useState(false);
+  const [assigningFreelancer, setAssigningFreelancer] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -172,6 +174,102 @@ const ProjectDetails = () => {
       });
     } finally {
       setCompleting(false);
+    }
+  };
+
+  // Test function to create an escrow for testing purposes
+  const handleCreateTestEscrow = async () => {
+    if (!project || !id || !address) return;
+    
+    setCreatingEscrow(true);
+    try {
+      const platformFee = project.budget_usdc * 0.05; // 5% platform fee
+      const totalLocked = project.budget_usdc + platformFee;
+
+      const escrowData = {
+        project_id: id,
+        client_wallet: address,
+        freelancer_wallet: freelancer?.wallet_address || null,
+        amount_usdc: project.budget_usdc,
+        platform_fee: platformFee,
+        total_locked: totalLocked,
+        status: 'funded' as const,
+        funded_at: new Date().toISOString(),
+        escrow_account: `test_escrow_${Date.now()}`, // Mock escrow account
+        transaction_signature: `test_tx_${Date.now()}`, // Mock transaction
+        solana_program_id: 'test_program_id'
+      };
+
+      await db.createEscrow(escrowData);
+
+      toast({
+        title: "Test Escrow Created!",
+        description: `Created test escrow with ${totalLocked} USDC (${project.budget_usdc} + ${platformFee} fee)`,
+      });
+
+      // Reload project details
+      await loadProjectDetails();
+    } catch (error) {
+      console.error('Error creating test escrow:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create test escrow",
+        variant: "destructive"
+      });
+    } finally {
+      setCreatingEscrow(false);
+    }
+  };
+
+  // Test function to assign current user as freelancer for testing
+  const handleAssignSelfAsFreelancer = async () => {
+    if (!project || !id || !address) return;
+    
+    setAssigningFreelancer(true);
+    try {
+      // First, try to get or create a profile for the current user
+      let userProfile;
+      try {
+        userProfile = await db.getProfile(address);
+      } catch (error) {
+        // Create a basic profile if none exists
+        const profileData = {
+          wallet_address: address,
+          full_name: 'Test Freelancer',
+          username: `freelancer_${address.slice(0, 8)}`,
+          bio: 'Test freelancer profile for escrow testing',
+          skills: project.required_skills,
+          hourly_rate: 50,
+          availability_status: 'available' as const
+        };
+        
+        await db.updateProfile(address, profileData);
+        userProfile = await db.getProfile(address);
+      }
+
+      // Update project to assign the freelancer and change status
+      await db.updateProject(id, {
+        freelancer_id: userProfile.id,
+        status: 'in_progress',
+        started_at: new Date().toISOString()
+      });
+
+      toast({
+        title: "Freelancer Assigned!",
+        description: "You have been assigned as the freelancer for this project",
+      });
+
+      // Reload project details
+      await loadProjectDetails();
+    } catch (error) {
+      console.error('Error assigning freelancer:', error);
+      toast({
+        title: "Error",
+        description: "Failed to assign freelancer",
+        variant: "destructive"
+      });
+    } finally {
+      setAssigningFreelancer(false);
     }
   };
 
@@ -423,57 +521,86 @@ const ProjectDetails = () => {
                   <CardHeader>
                     <CardTitle>Actions</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-2">
-                    <Button variant="outline" size="sm" className="w-full">
-                      <MessageSquare className="w-4 h-4 mr-2" />
-                      Send Message
-                    </Button>
-                    {project.status === 'in_progress' && (isProjectOwner || isAssignedFreelancer) && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button 
-                            variant="default" 
-                            size="sm" 
-                            className="w-full"
-                            disabled={completing}
-                          >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Complete Project
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Complete Project</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to mark this project as completed? This will:
-                              <ul className="list-disc list-inside mt-2 space-y-1">
-                                <li>Update the project status to "Completed"</li>
-                                <li>Release the escrow funds to the freelancer</li>
-                                <li>Update the freelancer's earnings and project count</li>
-                              </ul>
-                              This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={handleCompleteProject}
-                              disabled={completing}
-                            >
-                              {completing ? "Completing..." : "Complete Project"}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
-                    {project.status === 'active' && isProjectOwner && !project.freelancer_id && (
-                      <Link to={`/post-project?edit=${project.id}`} className="block">
-                        <Button variant="outline" size="sm" className="w-full">
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit Project
-                        </Button>
-                      </Link>
-                    )}
+                   <CardContent className="space-y-2">
+                     <Button variant="outline" size="sm" className="w-full">
+                       <MessageSquare className="w-4 h-4 mr-2" />
+                       Send Message
+                     </Button>
+
+                     {/* Test Escrow Creation */}
+                     {isProjectOwner && !escrow && (
+                       <Button 
+                         variant="secondary" 
+                         size="sm" 
+                         className="w-full"
+                         onClick={handleCreateTestEscrow}
+                         disabled={creatingEscrow}
+                       >
+                         <Shield className="w-4 h-4 mr-2" />
+                         {creatingEscrow ? "Creating..." : "Create Test Escrow"}
+                       </Button>
+                     )}
+
+                     {/* Test Freelancer Assignment */}
+                     {isProjectOwner && project.status === 'active' && !project.freelancer_id && (
+                       <Button 
+                         variant="secondary" 
+                         size="sm" 
+                         className="w-full"
+                         onClick={handleAssignSelfAsFreelancer}
+                         disabled={assigningFreelancer}
+                       >
+                         <User className="w-4 h-4 mr-2" />
+                         {assigningFreelancer ? "Assigning..." : "Assign Self as Freelancer"}
+                       </Button>
+                     )}
+
+                     {project.status === 'in_progress' && (isProjectOwner || isAssignedFreelancer) && (
+                       <AlertDialog>
+                         <AlertDialogTrigger asChild>
+                           <Button 
+                             variant="default" 
+                             size="sm" 
+                             className="w-full"
+                             disabled={completing}
+                           >
+                             <CheckCircle className="w-4 h-4 mr-2" />
+                             Complete Project
+                           </Button>
+                         </AlertDialogTrigger>
+                         <AlertDialogContent>
+                           <AlertDialogHeader>
+                             <AlertDialogTitle>Complete Project</AlertDialogTitle>
+                             <AlertDialogDescription>
+                               Are you sure you want to mark this project as completed? This will:
+                               <ul className="list-disc list-inside mt-2 space-y-1">
+                                 <li>Update the project status to "Completed"</li>
+                                 <li>Release the escrow funds to the freelancer</li>
+                                 <li>Update the freelancer's earnings and project count</li>
+                               </ul>
+                               This action cannot be undone.
+                             </AlertDialogDescription>
+                           </AlertDialogHeader>
+                           <AlertDialogFooter>
+                             <AlertDialogCancel>Cancel</AlertDialogCancel>
+                             <AlertDialogAction
+                               onClick={handleCompleteProject}
+                               disabled={completing}
+                             >
+                               {completing ? "Completing..." : "Complete Project"}
+                             </AlertDialogAction>
+                           </AlertDialogFooter>
+                         </AlertDialogContent>
+                       </AlertDialog>
+                     )}
+                     {project.status === 'active' && isProjectOwner && !project.freelancer_id && (
+                       <Link to={`/post-project?edit=${project.id}`} className="block">
+                         <Button variant="outline" size="sm" className="w-full">
+                           <Edit className="w-4 h-4 mr-2" />
+                           Edit Project
+                         </Button>
+                       </Link>
+                     )}
                   </CardContent>
                 </Card>
               )}
