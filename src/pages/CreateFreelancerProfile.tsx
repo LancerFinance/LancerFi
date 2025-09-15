@@ -27,7 +27,7 @@ const CreateFreelancerProfile = () => {
     portfolio_url: '',
     location: '',
     education: '',
-    response_time: '&lt; 24 hours',
+    response_time: '< 24 hours',
     availability_status: 'available'
   });
   
@@ -370,9 +370,9 @@ const CreateFreelancerProfile = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="&lt; 2 hours">&lt; 2 hours</SelectItem>
-                      <SelectItem value="&lt; 4 hours">&lt; 4 hours</SelectItem>
-                      <SelectItem value="&lt; 24 hours">&lt; 24 hours</SelectItem>
+                      <SelectItem value="< 2 hours">Under 2 hours</SelectItem>
+                      <SelectItem value="< 4 hours">Under 4 hours</SelectItem>
+                      <SelectItem value="< 24 hours">Under 24 hours</SelectItem>
                       <SelectItem value="1-3 days">1-3 days</SelectItem>
                     </SelectContent>
                   </Select>

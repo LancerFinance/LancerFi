@@ -161,9 +161,27 @@ export const db = {
   },
 
   async updateProject(id: string, updates: Partial<Project>) {
+    // Convert freelancer_id from string to uuid if needed
+    const processedUpdates = { ...updates };
+    
+    // If we're updating with a freelancer_id, ensure it's properly handled
+    if (processedUpdates.freelancer_id) {
+      // Verify the freelancer exists
+      const { data: freelancer, error: freelancerError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', processedUpdates.freelancer_id)
+        .single();
+      
+      if (freelancerError) {
+        console.warn('Freelancer not found:', freelancerError);
+        delete processedUpdates.freelancer_id;
+      }
+    }
+
     const { data, error } = await supabase
       .from('projects')
-      .update(updates)
+      .update(processedUpdates)
       .eq('id', id)
       .select()
       .single();

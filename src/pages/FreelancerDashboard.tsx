@@ -62,23 +62,29 @@ const FreelancerDashboard = () => {
     }
 
     try {
-      // Create or get freelancer profile using wallet address as ID
+      // Get or create freelancer profile using wallet address as ID
+      let profileId;
       const { data: existingProfile, error: profileCheckError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('wallet_address', address)
-        .single();
+        .eq('wallet_address', address);
 
-      let profileId;
-      if (existingProfile) {
-        profileId = existingProfile.id;
+      if (existingProfile && existingProfile.length > 0) {
+        profileId = existingProfile[0].id;
       } else {
         // Create new profile
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert({
             wallet_address: address,
-            username: `freelancer_${address.slice(-6)}`
+            username: `freelancer_${address.slice(-6)}`,
+            full_name: `Freelancer ${address.slice(-6)}`,
+            bio: 'Web3 freelancer ready for projects',
+            skills: ['Web3', 'Blockchain'],
+            hourly_rate: 50,
+            rating: 5.0,
+            completed_projects: 0,
+            total_earned: 0
           })
           .select()
           .single();
