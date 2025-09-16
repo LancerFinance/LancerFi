@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Shield, DollarSign, Zap, Globe, Award, Lock } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const ValueProposition = () => {
   const benefits = [
@@ -89,12 +90,12 @@ const ValueProposition = () => {
               and your reputation is permanently verifiable on-chain.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="bg-white text-web3-primary px-10 py-4 rounded-lg font-bold text-lg hover:bg-gray-50 transition-colors">
+              <Link to="/post-project" className="bg-white text-web3-primary px-10 py-4 rounded-lg font-bold text-lg hover:bg-gray-50 transition-colors" role="button" aria-label="Start Hiring Now">
                 Start Hiring Now
-              </button>
-              <button className="border-2 border-white/30 text-white px-10 py-4 rounded-lg font-bold text-lg hover:bg-white/10 transition-colors">
+              </Link>
+              <Link to="/hire-talent" className="border-2 border-white/30 text-white px-10 py-4 rounded-lg font-bold text-lg hover:bg-white/10 transition-colors" role="button" aria-label="Browse Talent">
                 Browse Talent
-              </button>
+              </Link>
             </div>
           </div>
         </div>
