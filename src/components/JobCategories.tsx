@@ -95,11 +95,6 @@ const JobCategories = () => {
           ))}
         </div>
 
-        <div className="text-center">
-          <Button size="lg" variant="corporate" className="px-8 py-3">
-            Explore All Categories
-          </Button>
-        </div>
       </div>
     </section>
   );

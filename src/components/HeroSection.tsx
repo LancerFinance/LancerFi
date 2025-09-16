@@ -27,13 +27,13 @@ const HeroSection = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
             <Link to="/post-project">
               <Button size="lg" variant="default" className="text-base px-10 py-4 font-semibold">
-                Post a Project
+                Start Hiring Now
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
             <Link to="/hire-talent">
               <Button size="lg" variant="outline" className="text-base px-10 py-4 font-semibold border-2">
-                Hire Talent
+                Browse Talent
                 <Users className="w-5 h-5 ml-2" />
               </Button>
             </Link>
