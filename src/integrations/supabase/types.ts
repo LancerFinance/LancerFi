@@ -357,7 +357,7 @@ export type Database = {
     }
     Functions: {
       calculate_freelancer_earnings: {
-        Args: { freelancer_wallet: string }
+        Args: { input_freelancer_wallet: string }
         Returns: number
       }
     }

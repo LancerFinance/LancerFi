@@ -36,10 +36,10 @@ const FreelancerProfile = () => {
       // Recalculate total_earned dynamically using our database function
       if (data?.wallet_address) {
         const { data: earnings, error: earningsError } = await supabase
-          .rpc('calculate_freelancer_earnings', { freelancer_wallet: data.wallet_address });
+          .rpc('calculate_freelancer_earnings', { input_freelancer_wallet: data.wallet_address });
         
         if (!earningsError && earnings !== null) {
-          data.total_earned = earnings;
+          data.total_earned = Number(earnings);
         }
       }
       
