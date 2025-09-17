@@ -23,36 +23,58 @@ const HireTalent = () => {
 
   const loadFreelancers = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*')
         .not('skills', 'is', null)
         .order('rating', { ascending: false });
       
       if (error) throw error;
-      
-      // Calculate total earned for each freelancer
-      const freelancersWithEarnings = await Promise.all(
-        (data || []).map(async (freelancer) => {
-          if (freelancer.wallet_address) {
-            try {
-              const { data: earnings, error: earningsError } = await supabase
-                .rpc('calculate_freelancer_earnings', { 
-                  input_freelancer_wallet: freelancer.wallet_address 
-                });
-              
-              if (!earningsError && earnings !== null) {
-                freelancer.total_earned = Number(earnings);
-              }
-            } catch (error) {
-              console.warn('Error calculating earnings for freelancer:', freelancer.id, error);
+
+      const freelancerList = profiles || [];
+      const freelancerIds = freelancerList.map((f) => f.id).filter(Boolean);
+
+      let earningsByFreelancer: Record<string, number> = {};
+
+      if (freelancerIds.length > 0) {
+        // Fetch projects assigned to these freelancers
+        const { data: projects, error: projErr } = await supabase
+          .from('projects')
+          .select('id, freelancer_id')
+          .in('freelancer_id', freelancerIds);
+        if (projErr) throw projErr;
+
+        const projectIds = (projects || []).map((p: any) => p.id);
+        const projectToFreelancer: Record<string, string> = {};
+        (projects || []).forEach((p: any) => {
+          if (p.id && p.freelancer_id) projectToFreelancer[p.id] = p.freelancer_id;
+        });
+
+        if (projectIds.length > 0) {
+          // Sum released escrows for those projects
+          const { data: escrows, error: escErr } = await supabase
+            .from('escrows')
+            .select('project_id, amount_usdc, status')
+            .in('project_id', projectIds)
+            .eq('status', 'released');
+          if (escErr) throw escErr;
+
+          earningsByFreelancer = (escrows || []).reduce((acc: Record<string, number>, e: any) => {
+            const fid = projectToFreelancer[e.project_id as string];
+            if (fid) {
+              acc[fid] = (acc[fid] || 0) + Number(e.amount_usdc || 0);
             }
-          }
-          return freelancer;
-        })
-      );
-      
-      setFreelancers(freelancersWithEarnings);
+            return acc;
+          }, {});
+        }
+      }
+
+      const withEarnings = freelancerList.map((f) => ({
+        ...f,
+        total_earned: earningsByFreelancer[f.id] ?? (f.total_earned ?? 0),
+      }));
+
+      setFreelancers(withEarnings);
     } catch (error) {
       console.error('Error loading freelancers:', error);
       toast({
@@ -64,7 +86,6 @@ const HireTalent = () => {
       setLoading(false);
     }
   };
-
   const getFreelancersByCategory = () => {
     if (selectedCategory === "All Categories") return freelancers;
     
