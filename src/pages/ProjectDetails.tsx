@@ -49,8 +49,6 @@ const ProjectDetails = () => {
   const [freelancer, setFreelancer] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
-  const [creatingEscrow, setCreatingEscrow] = useState(false);
-  const [assigningFreelancer, setAssigningFreelancer] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -188,100 +186,6 @@ const ProjectDetails = () => {
     }
   };
 
-  // Test function to create an escrow for testing purposes
-  const handleCreateTestEscrow = async () => {
-    if (!project || !id || !address) return;
-    
-    setCreatingEscrow(true);
-    try {
-      const platformFee = project.budget_usdc * 0.05; // 5% platform fee
-      const totalLocked = project.budget_usdc + platformFee;
-
-      const escrowData = {
-        project_id: id,
-        client_wallet: address,
-        freelancer_wallet: freelancer?.wallet_address || null,
-        amount_usdc: project.budget_usdc,
-        platform_fee: platformFee,
-        total_locked: totalLocked,
-        status: 'funded' as const,
-        funded_at: new Date().toISOString(),
-        escrow_account: `test_escrow_${Date.now()}`, // Mock escrow account
-        transaction_signature: `test_tx_${Date.now()}`, // Mock transaction
-        solana_program_id: 'test_program_id'
-      };
-
-      await db.createEscrow(escrowData);
-
-      toast({
-        title: "Test Escrow Created!",
-        description: `Created test escrow with ${totalLocked} USDC (${project.budget_usdc} + ${platformFee} fee)`,
-      });
-
-      // Reload project details
-      await loadProjectDetails();
-    } catch (error) {
-      console.error('Error creating test escrow:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create test escrow",
-        variant: "destructive"
-      });
-    } finally {
-      setCreatingEscrow(false);
-    }
-  };
-
-  // Test function to assign current user as freelancer for testing
-  const handleAssignSelfAsFreelancer = async () => {
-    if (!project || !id || !address) return;
-    
-    setAssigningFreelancer(true);
-    try {
-      // Use the profile hook to ensure profile exists
-      const userProfile = await ensureProfile({
-        full_name: 'Test Freelancer',
-        username: `freelancer_${address.slice(0, 8)}`,
-        bio: 'Test freelancer profile for escrow testing',
-        skills: project.required_skills,
-        hourly_rate: 50,
-        availability_status: 'available'
-      });
-
-      // Update project to assign the freelancer
-      const startedAt = new Date().toISOString();
-      await db.updateProject(id, {
-        freelancer_id: userProfile.id,
-        status: 'in_progress',
-        started_at: startedAt
-      });
-
-      // Optimistically update local state
-      setProject(prev => prev ? { 
-        ...prev, 
-        freelancer_id: userProfile.id, 
-        status: 'in_progress', 
-        started_at: startedAt 
-      } as Project : prev);
-      
-      setFreelancer(userProfile);
-
-      toast({
-        title: "Freelancer Assigned!",
-        description: "You have been assigned as the freelancer for this project",
-      });
-
-    } catch (error) {
-      console.error('Error assigning freelancer:', error);
-      toast({
-        title: "Error",
-        description: "Failed to assign freelancer",
-        variant: "destructive"
-      });
-    } finally {
-      setAssigningFreelancer(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -478,7 +382,7 @@ const ProjectDetails = () => {
                 <CardContent>
                   <div className="flex items-center gap-3">
                     <Avatar>
-                      <AvatarImage src="/placeholder.svg" />
+                      <AvatarImage src="" />
                       <AvatarFallback>
                         {client?.full_name?.split(' ').map(n => n[0]).join('') || 'CL'}
                       </AvatarFallback>
@@ -505,7 +409,7 @@ const ProjectDetails = () => {
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
                         <Avatar>
-                          <AvatarImage src="/placeholder.svg" />
+                          <AvatarImage src="" />
                           <AvatarFallback>
                             {freelancer.full_name?.split(' ').map(n => n[0]).join('') || 'FL'}
                           </AvatarFallback>
@@ -551,33 +455,6 @@ const ProjectDetails = () => {
                        />
                      )}
 
-                     {/* Test Escrow Creation */}
-                     {isProjectOwner && !escrow && (
-                       <Button 
-                         variant="secondary" 
-                         size="sm" 
-                         className="w-full"
-                         onClick={handleCreateTestEscrow}
-                         disabled={creatingEscrow}
-                       >
-                         <Shield className="w-4 h-4 mr-2" />
-                         {creatingEscrow ? "Creating..." : "Create Test Escrow"}
-                       </Button>
-                     )}
-
-                     {/* Test Freelancer Assignment */}
-                     {isProjectOwner && project.status === 'active' && !project.freelancer_id && (
-                       <Button 
-                         variant="secondary" 
-                         size="sm" 
-                         className="w-full"
-                         onClick={handleAssignSelfAsFreelancer}
-                         disabled={assigningFreelancer}
-                       >
-                         <User className="w-4 h-4 mr-2" />
-                         {assigningFreelancer ? "Assigning..." : "Assign Self as Freelancer"}
-                       </Button>
-                     )}
 
                      {project.status === 'in_progress' && (isProjectOwner || isAssignedFreelancer) && (
                        <AlertDialog>

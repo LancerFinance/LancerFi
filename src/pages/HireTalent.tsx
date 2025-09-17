@@ -123,7 +123,7 @@ const HireTalent = () => {
               <CardHeader className="pb-4">
                 <div className="flex items-start space-x-4">
                   <Avatar className="w-16 h-16">
-                    <AvatarImage src="/placeholder.svg" alt={freelancer.full_name || 'Freelancer'} />
+                    <AvatarImage src="" alt={freelancer.full_name || 'Freelancer'} />
                     <AvatarFallback className="bg-web3-primary text-white font-semibold">
                       {freelancer.full_name?.split(' ').map(n => n[0]).join('') || 'FL'}
                     </AvatarFallback>

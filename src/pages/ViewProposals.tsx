@@ -252,7 +252,7 @@ const ViewProposals = () => {
                       {/* Freelancer Info */}
                       <div className="flex items-start gap-4 lg:flex-1">
                         <Avatar className="w-12 h-12">
-                          <AvatarImage src="/placeholder.svg" />
+                          <AvatarImage src="" />
                           <AvatarFallback>
                             {proposal.freelancer?.full_name?.split(' ').map(n => n[0]).join('') || 'FL'}
                           </AvatarFallback>

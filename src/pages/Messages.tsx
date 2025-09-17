@@ -286,7 +286,7 @@ const Messages = () => {
                         <CardContent className="p-4">
                           <div className="flex items-start gap-4">
                             <Avatar className="w-10 h-10">
-                              <AvatarImage src="/placeholder.svg" />
+                              <AvatarImage src="" />
                               <AvatarFallback>
                                 {otherParty.name?.slice(0, 2).toUpperCase() || 'U'}
                               </AvatarFallback>
@@ -341,7 +341,7 @@ const Messages = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Avatar>
-                        <AvatarImage src="/placeholder.svg" />
+                        <AvatarImage src="" />
                         <AvatarFallback>
                           {(selectedMessage.sender_id === address 
                             ? selectedMessage.recipient_name 

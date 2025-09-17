@@ -132,7 +132,7 @@ const FreelancerProfile = () => {
                 {/* Profile Image & Basic Info */}
                 <div className="flex-shrink-0">
                   <Avatar className="w-32 h-32 mx-auto lg:mx-0">
-                    <AvatarImage src="/placeholder.svg" alt={profile.full_name || 'Freelancer'} />
+                    <AvatarImage src="" alt={profile.full_name || 'Freelancer'} />
                     <AvatarFallback className="bg-web3-primary text-white text-2xl">
                       {profile.full_name?.split(' ').map(n => n[0]).join('') || 'FL'}
                     </AvatarFallback>
@@ -280,7 +280,12 @@ const FreelancerProfile = () => {
                   <Separator />
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Success Rate</span>
-                    <span className="font-medium">95%</span>
+                    <span className="font-medium">
+                      {profile.completed_projects && profile.completed_projects > 0 
+                        ? `${Math.round((profile.completed_projects / (profile.completed_projects + Math.max(0, profile.project_count - profile.completed_projects)) * 100))}%`
+                        : 'N/A'
+                      }
+                    </span>
                   </div>
                 </CardContent>
               </Card>
