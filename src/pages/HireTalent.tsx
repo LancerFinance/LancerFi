@@ -30,7 +30,29 @@ const HireTalent = () => {
         .order('rating', { ascending: false });
       
       if (error) throw error;
-      setFreelancers(data || []);
+      
+      // Calculate total earned for each freelancer
+      const freelancersWithEarnings = await Promise.all(
+        (data || []).map(async (freelancer) => {
+          if (freelancer.wallet_address) {
+            try {
+              const { data: earnings, error: earningsError } = await supabase
+                .rpc('calculate_freelancer_earnings', { 
+                  input_freelancer_wallet: freelancer.wallet_address 
+                });
+              
+              if (!earningsError && earnings !== null) {
+                freelancer.total_earned = Number(earnings);
+              }
+            } catch (error) {
+              console.warn('Error calculating earnings for freelancer:', freelancer.id, error);
+            }
+          }
+          return freelancer;
+        })
+      );
+      
+      setFreelancers(freelancersWithEarnings);
     } catch (error) {
       console.error('Error loading freelancers:', error);
       toast({
@@ -144,7 +166,7 @@ const HireTalent = () => {
               </CardHeader>
               
               <CardContent className="space-y-4">
-                {/* Rating and Availability */}
+                {/* Rating and Stats */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-1">
                     <Star className="w-4 h-4 fill-web3-warning text-web3-warning" />
@@ -155,6 +177,14 @@ const HireTalent = () => {
                     <Clock className="w-4 h-4 mr-1" />
                     ${freelancer.hourly_rate || 0}/hr
                   </div>
+                </div>
+
+                {/* Total Earned */}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Total Earned:</span>
+                  <span className="font-medium text-web3-primary">
+                    ${freelancer.total_earned?.toLocaleString() || 0}
+                  </span>
                 </div>
 
                 {/* Availability Status */}
