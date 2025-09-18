@@ -33,32 +33,50 @@ const FreelancerProfile = () => {
 
       if (error) throw error;
       
-      // Calculate total earned directly from released escrows
+      // Calculate total earned directly from released escrows (same approach as HireTalent)
       let totalEarned = 0;
       if (data?.id) {
-        // Get projects assigned to this freelancer
+        // 1) Get projects assigned to this freelancer
         const { data: projects, error: projErr } = await supabase
           .from('projects')
-          .select('id')
+          .select('id, freelancer_id')
           .eq('freelancer_id', data.id);
         
-        if (!projErr && projects && projects.length > 0) {
-          const projectIds = projects.map(p => p.id);
-          
-          // Sum released escrows for those projects
+        if (projErr) {
+          console.warn('FreelancerProfile: projects fetch error', projErr);
+        }
+
+        const projectIds = (projects || []).map((p: any) => p.id);
+
+        if (projectIds.length > 0) {
+          // 2) Sum released escrows for those projects
           const { data: escrows, error: escErr } = await supabase
             .from('escrows')
-            .select('amount_usdc')
+            .select('project_id, amount_usdc, status')
             .in('project_id', projectIds)
             .eq('status', 'released');
             
-          if (!escErr && escrows) {
-            totalEarned = escrows.reduce((sum, e) => sum + Number(e.amount_usdc || 0), 0);
+          if (escErr) {
+            console.warn('FreelancerProfile: escrows fetch error', escErr);
           }
+
+          totalEarned = (escrows || []).reduce((sum: number, e: any) => sum + Number(e.amount_usdc || 0), 0);
+        } else if (data.wallet_address) {
+          // Fallback: if no projects tied by freelancer_id, sum by freelancer_wallet directly
+          const { data: escByWallet, error: escByWalletErr } = await supabase
+            .from('escrows')
+            .select('amount_usdc, status, freelancer_wallet')
+            .eq('freelancer_wallet', data.wallet_address)
+            .eq('status', 'released');
+          if (escByWalletErr) {
+            console.warn('FreelancerProfile: escrow by wallet error', escByWalletErr);
+          }
+          totalEarned = (escByWallet || []).reduce((sum: number, e: any) => sum + Number(e.amount_usdc || 0), 0);
         }
       }
       
       data.total_earned = totalEarned;
+      console.log('FreelancerProfile: computed totalEarned =', totalEarned, 'for profile', data?.id);
       setProfile(data);
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -71,7 +89,6 @@ const FreelancerProfile = () => {
       setLoading(false);
     }
   };
-
   const getAvailabilityColor = (status: string) => {
     switch (status) {
       case 'available': return 'text-web3-success';
