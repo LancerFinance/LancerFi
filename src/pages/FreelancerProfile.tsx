@@ -33,16 +33,32 @@ const FreelancerProfile = () => {
 
       if (error) throw error;
       
-      // Recalculate total_earned dynamically using our database function
-      if (data?.wallet_address) {
-        const { data: earnings, error: earningsError } = await supabase
-          .rpc('calculate_freelancer_earnings', { input_freelancer_wallet: data.wallet_address });
+      // Calculate total earned directly from released escrows
+      let totalEarned = 0;
+      if (data?.id) {
+        // Get projects assigned to this freelancer
+        const { data: projects, error: projErr } = await supabase
+          .from('projects')
+          .select('id')
+          .eq('freelancer_id', data.id);
         
-        if (!earningsError && earnings !== null) {
-          data.total_earned = Number(earnings);
+        if (!projErr && projects && projects.length > 0) {
+          const projectIds = projects.map(p => p.id);
+          
+          // Sum released escrows for those projects
+          const { data: escrows, error: escErr } = await supabase
+            .from('escrows')
+            .select('amount_usdc')
+            .in('project_id', projectIds)
+            .eq('status', 'released');
+            
+          if (!escErr && escrows) {
+            totalEarned = escrows.reduce((sum, e) => sum + Number(e.amount_usdc || 0), 0);
+          }
         }
       }
       
+      data.total_earned = totalEarned;
       setProfile(data);
     } catch (error) {
       console.error('Error loading profile:', error);
