@@ -12,6 +12,7 @@ import { formatUSDC } from "@/lib/solana";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const ProjectDashboard = () => {
   const { isConnected, address } = useWallet();
@@ -25,13 +26,24 @@ const ProjectDashboard = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
 
   useEffect(() => {
-    loadProjects();
-  }, []);
+    if (address) {
+      loadProjects();
+    }
+  }, [address]);
 
   const loadProjects = async () => {
+    if (!address) return;
+    
     try {
       setLoading(true);
-      const projectsData = await db.getProjects();
+      // Filter projects by connected wallet address (client_id)
+      const { data: projectsData, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('client_id', address)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
       setProjects(projectsData || []);
 
       // Load escrows for each project
