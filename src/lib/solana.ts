@@ -1,5 +1,6 @@
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
+import { ORIGIN_MINT, ORIGIN_DECIMALS, getUSDCToOriginRate, createUSDCToOriginSwap } from './origin-token';
 
 // Solana configuration
 const MODE = import.meta.env.MODE || 'development';
@@ -18,6 +19,9 @@ export const USDC_MINT = SOLANA_NETWORK === 'mainnet-beta'
 // Platform fee wallet - Production wallet address
 export const PLATFORM_WALLET = new PublicKey('DhVcKrZc5b8eVfvhMiVghKVfHkfxBJuNvxXpXfFHQVqg'); // Web3Lance platform wallet
 
+// Payment currencies
+export type PaymentCurrency = 'USDC' | 'ORIGIN';
+
 // Escrow program configuration
 export interface EscrowAccount {
   projectId: string;
@@ -25,6 +29,7 @@ export interface EscrowAccount {
   freelancerWallet: PublicKey | null;
   amount: number;
   platformFee: number;
+  currency: PaymentCurrency;
   isReleased: boolean;
   milestones: {
     id: string;
@@ -34,11 +39,12 @@ export interface EscrowAccount {
   }[];
 }
 
-// Create escrow account
+// Create escrow account with currency support
 export async function createEscrowAccount(
   clientWallet: PublicKey,
   projectId: string,
   amount: number,
+  currency: PaymentCurrency = 'ORIGIN',
   platformFeePercent: number = 10
 ): Promise<{ escrowAccount: PublicKey; transaction: Transaction }> {
   const platformFee = (amount * platformFeePercent) / 100;
@@ -80,47 +86,67 @@ export async function createEscrowAccount(
   return { escrowAccount, transaction };
 }
 
-// Fund escrow with USDC
-export async function fundEscrowWithUSDC(
+// Fund escrow with USDC or Origin (with conversion)
+export async function fundEscrowWithCurrency(
   clientWallet: PublicKey,
   escrowAccount: PublicKey,
-  amount: number
+  amount: number,
+  currency: PaymentCurrency,
+  convertFromUSDC: boolean = false
 ): Promise<Transaction> {
   const transaction = new Transaction();
   
-  // Get client's USDC token account
-  const clientUSDCAccount = await getAssociatedTokenAddress(
-    USDC_MINT,
+  if (convertFromUSDC && currency === 'ORIGIN') {
+    // Client pays USDC but we convert to Origin internally
+    // First create the swap transaction from USDC to Origin
+    const swapTxBase64 = await createUSDCToOriginSwap(clientWallet, amount);
+    const swapTx = Transaction.from(Buffer.from(swapTxBase64, 'base64'));
+    
+    // Add swap instructions to our transaction
+    for (const instruction of swapTx.instructions) {
+      transaction.add(instruction);
+    }
+    
+    return transaction;
+  }
+  
+  // Direct payment in specified currency
+  const tokenMint = currency === 'USDC' ? USDC_MINT : ORIGIN_MINT;
+  const decimals = currency === 'USDC' ? 6 : ORIGIN_DECIMALS;
+  
+  // Get client's token account
+  const clientTokenAccount = await getAssociatedTokenAddress(
+    tokenMint,
     clientWallet
   );
   
-  // Get escrow's USDC token account
-  const escrowUSDCAccount = await getAssociatedTokenAddress(
-    USDC_MINT,
+  // Get escrow's token account
+  const escrowTokenAccount = await getAssociatedTokenAddress(
+    tokenMint,
     escrowAccount
   );
   
   // Create escrow token account if it doesn't exist
   try {
-    await connection.getAccountInfo(escrowUSDCAccount);
+    await connection.getAccountInfo(escrowTokenAccount);
   } catch {
     transaction.add(
       createAssociatedTokenAccountInstruction(
         clientWallet,
-        escrowUSDCAccount,
+        escrowTokenAccount,
         escrowAccount,
-        USDC_MINT
+        tokenMint
       )
     );
   }
   
-  // Transfer USDC to escrow
+  // Transfer tokens to escrow
   transaction.add(
     createTransferInstruction(
-      clientUSDCAccount,
-      escrowUSDCAccount,
+      clientTokenAccount,
+      escrowTokenAccount,
       clientWallet,
-      amount * 1_000_000, // USDC has 6 decimals
+      amount * Math.pow(10, decimals),
       [],
       TOKEN_PROGRAM_ID
     )
@@ -129,48 +155,53 @@ export async function fundEscrowWithUSDC(
   return transaction;
 }
 
-// Release escrow payment
+// Release escrow payment (always in Origin tokens)
 export async function releaseEscrowPayment(
   clientWallet: PublicKey,
   freelancerWallet: PublicKey,
   escrowAccount: PublicKey,
-  amount: number
+  amount: number,
+  currency: PaymentCurrency = 'ORIGIN'
 ): Promise<Transaction> {
   const transaction = new Transaction();
   
-  // Get escrow's USDC token account
-  const escrowUSDCAccount = await getAssociatedTokenAddress(
-    USDC_MINT,
+  // Always release in Origin tokens (internal currency)
+  const tokenMint = ORIGIN_MINT;
+  const decimals = ORIGIN_DECIMALS;
+  
+  // Get escrow's token account
+  const escrowTokenAccount = await getAssociatedTokenAddress(
+    tokenMint,
     escrowAccount
   );
   
-  // Get freelancer's USDC token account
-  const freelancerUSDCAccount = await getAssociatedTokenAddress(
-    USDC_MINT,
+  // Get freelancer's token account
+  const freelancerTokenAccount = await getAssociatedTokenAddress(
+    tokenMint,
     freelancerWallet
   );
   
   // Create freelancer token account if it doesn't exist
   try {
-    await connection.getAccountInfo(freelancerUSDCAccount);
+    await connection.getAccountInfo(freelancerTokenAccount);
   } catch {
     transaction.add(
       createAssociatedTokenAccountInstruction(
         clientWallet,
-        freelancerUSDCAccount,
+        freelancerTokenAccount,
         freelancerWallet,
-        USDC_MINT
+        tokenMint
       )
     );
   }
   
-  // Transfer USDC from escrow to freelancer
+  // Transfer Origin tokens from escrow to freelancer
   transaction.add(
     createTransferInstruction(
-      escrowUSDCAccount,
-      freelancerUSDCAccount,
+      escrowTokenAccount,
+      freelancerTokenAccount,
       escrowAccount, // Escrow account as authority
-      amount * 1_000_000, // USDC has 6 decimals
+      amount * Math.pow(10, decimals),
       [],
       TOKEN_PROGRAM_ID
     )
@@ -191,7 +222,7 @@ export async function getUSDCBalance(walletAddress: PublicKey): Promise<number> 
   }
 }
 
-// Utility to format USDC amount
+// Utility to format currency amounts
 export function formatUSDC(amount: number): string {
   if (isNaN(amount) || amount === null || amount === undefined) {
     return '$0.00';
@@ -203,3 +234,10 @@ export function formatUSDC(amount: number): string {
     maximumFractionDigits: 2,
   }).format(amount);
 }
+
+// Legacy function kept for backward compatability
+export const fundEscrowWithUSDC = (
+  clientWallet: PublicKey,
+  escrowAccount: PublicKey,
+  amount: number
+) => fundEscrowWithCurrency(clientWallet, escrowAccount, amount, 'USDC', false);

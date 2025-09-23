@@ -11,9 +11,11 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { db, supabase } from "@/lib/supabase";
-import { formatUSDC } from "@/lib/solana";
+import { formatUSDC, PaymentCurrency } from "@/lib/solana";
+import { formatOrigin } from "@/lib/origin-token";
 import { useToast } from "@/hooks/use-toast";
 import { validateProject } from "@/lib/validation";
+import PaymentCurrencySelector from "@/components/PaymentCurrencySelector";
 
 const PostProject = () => {
   const navigate = useNavigate();
@@ -30,6 +32,7 @@ const PostProject = () => {
     timeline: '',
     skills: ''
   });
+  const [paymentCurrency, setPaymentCurrency] = useState<PaymentCurrency>('ORIGIN');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFreelancer, setSelectedFreelancer] = useState<any>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -110,7 +113,7 @@ const PostProject = () => {
 
       toast({
         title: "Project Posted Successfully!",
-        description: `Your project "${formData.title}" is now live with ${formatUSDC(totalEscrow)} USDC escrow`,
+        description: `Your project "${formData.title}" is now live with ${paymentCurrency === 'USDC' ? formatUSDC(totalEscrow) : formatOrigin(totalEscrow * 1000)} escrow`,
       });
       
       // Reset form
@@ -186,9 +189,9 @@ const PostProject = () => {
               </Card>
             )}
 
-          <div className="grid lg:grid-cols-3 gap-8">
+          <div className="grid lg:grid-cols-2 gap-8">
             {/* Main Form */}
-            <div className="lg:col-span-2">
+            <div className="space-y-6">
               <Card className="bg-gradient-card border-border/50">
                 <CardHeader>
                   <CardTitle className="text-2xl text-foreground">Project Details</CardTitle>
@@ -312,6 +315,15 @@ const PostProject = () => {
                   </Button>
                 </CardContent>
               </Card>
+
+              {/* Payment Currency Selection */}
+              {budget > 0 && (
+                <PaymentCurrencySelector
+                  amount={budget}
+                  selectedCurrency={paymentCurrency}
+                  onCurrencyChange={setPaymentCurrency}
+                />
+              )}
             </div>
 
             {/* Sidebar */}
@@ -346,16 +358,27 @@ const PostProject = () => {
                 <CardContent className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Project Budget</span>
-                    <span className="text-foreground">{formatUSDC(budget)}</span>
+                    <span className="text-foreground">
+                      {paymentCurrency === 'USDC' ? formatUSDC(budget) : formatOrigin(budget * 1000)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Platform Fee (10%)</span>
-                    <span className="text-foreground">{formatUSDC(platformFee)}</span>
+                    <span className="text-foreground">
+                      {paymentCurrency === 'USDC' ? formatUSDC(platformFee) : formatOrigin(platformFee * 1000)}
+                    </span>
                   </div>
                   <div className="border-t border-border pt-3 flex justify-between font-semibold">
-                    <span className="text-foreground">Total Escrow (USDC)</span>
-                    <span className="text-web3-primary">{formatUSDC(totalEscrow)}</span>
+                    <span className="text-foreground">Total Escrow</span>
+                    <span className="text-web3-primary">
+                      {paymentCurrency === 'USDC' ? formatUSDC(totalEscrow) : formatOrigin(totalEscrow * 1000)}
+                    </span>
                   </div>
+                  {paymentCurrency === 'USDC' && (
+                    <div className="text-xs text-muted-foreground pt-2 border-t border-border">
+                      * USDC will be converted to ORIGIN tokens internally
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

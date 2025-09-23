@@ -104,8 +104,8 @@ const FreelancerDashboard = () => {
 
       if (updateError) throw updateError;
 
-      // Create escrow for the project
-      const escrowId = await createProjectEscrow(project.id, project.budget_usdc);
+      // Create escrow for the project with default Origin currency
+      const escrowId = await createProjectEscrow(project.id, project.budget_usdc, 'ORIGIN');
       
       if (escrowId) {
         toast({

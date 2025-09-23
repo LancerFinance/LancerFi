@@ -1,13 +1,14 @@
 import { useState, useCallback } from 'react';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { useWallet } from './useWallet';
-import { createEscrowAccount, fundEscrowWithUSDC, releaseEscrowPayment, connection } from '@/lib/solana';
+import { createEscrowAccount, fundEscrowWithCurrency, releaseEscrowPayment, connection, PaymentCurrency } from '@/lib/solana';
+import { getConversionQuote, createUSDCToOriginSwap } from '@/lib/origin-token';
 import { db } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 
 interface UseEscrowReturn {
-  createProjectEscrow: (projectId: string, amount: number) => Promise<string | null>;
-  fundEscrow: (escrowId: string, amount: number) => Promise<boolean>;
+  createProjectEscrow: (projectId: string, amount: number, paymentCurrency: PaymentCurrency) => Promise<string | null>;
+  fundEscrow: (escrowId: string, amount: number, paymentCurrency: PaymentCurrency) => Promise<boolean>;
   releasePayment: (escrowId: string, milestoneId: string) => Promise<boolean>;
   isLoading: boolean;
 }
@@ -19,7 +20,8 @@ export const useEscrow = (): UseEscrowReturn => {
 
   const createProjectEscrow = useCallback(async (
     projectId: string, 
-    amount: number
+    amount: number,
+    paymentCurrency: PaymentCurrency = 'ORIGIN'
   ): Promise<string | null> => {
 
     const w: any = window as any;
@@ -48,14 +50,31 @@ export const useEscrow = (): UseEscrowReturn => {
     try {
       const clientWallet = new PublicKey(solAddress);
       const platformFeePercent = 10; // 10% platform fee
-      const platformFee = (amount * platformFeePercent) / 100;
-      const totalLocked = amount + platformFee;
+      
+      let finalAmount = amount;
+      let actualCurrency: PaymentCurrency = paymentCurrency;
+      
+      // If paying with USDC, convert to Origin for internal accounting
+      if (paymentCurrency === 'USDC') {
+        const conversionQuote = await getConversionQuote(amount);
+        finalAmount = conversionQuote.outputAmount;
+        actualCurrency = 'ORIGIN';
+        
+        toast({
+          title: "Currency Conversion",
+          description: `${amount} USDC will be converted to ~${finalAmount.toFixed(2)} ORIGIN tokens`,
+        });
+      }
+      
+      const platformFee = (finalAmount * platformFeePercent) / 100;
+      const totalLocked = finalAmount + platformFee;
 
-      // Create escrow account on Solana
+      // Create escrow account on Solana (always using Origin internally)
       const { escrowAccount, transaction } = await createEscrowAccount(
         clientWallet,
         projectId,
-        amount,
+        finalAmount,
+        'ORIGIN',
         platformFeePercent
       );
 
@@ -74,7 +93,7 @@ export const useEscrow = (): UseEscrowReturn => {
       const escrow = await db.createEscrow({
         project_id: projectId,
         client_wallet: solAddress,
-        amount_usdc: amount,
+        amount_usdc: finalAmount, // Store Origin amount for internal accounting
         platform_fee: platformFee,
         total_locked: totalLocked,
         escrow_account: escrowAccount.toString(),
@@ -84,7 +103,9 @@ export const useEscrow = (): UseEscrowReturn => {
 
       toast({
         title: "Escrow Created",
-        description: `Successfully locked ${amount} USDC in smart contract escrow`,
+        description: paymentCurrency === 'USDC' 
+          ? `Successfully created escrow with ${amount} USDC (converted to ${finalAmount.toFixed(2)} ORIGIN)`
+          : `Successfully locked ${amount} ORIGIN tokens in smart contract escrow`,
       });
 
       return escrow.id;
@@ -103,7 +124,8 @@ export const useEscrow = (): UseEscrowReturn => {
 
   const fundEscrow = useCallback(async (
     escrowId: string, 
-    amount: number
+    amount: number,
+    paymentCurrency: PaymentCurrency = 'ORIGIN'
   ): Promise<boolean> => {
     const w: any = window as any;
     const ph = w.solana;
@@ -137,8 +159,17 @@ export const useEscrow = (): UseEscrowReturn => {
       const clientWallet = new PublicKey(solAddress);
       const escrowAccount = new PublicKey(escrow.escrow_account);
 
-      // Create USDC transfer transaction
-      const transaction = await fundEscrowWithUSDC(clientWallet, escrowAccount, amount);
+      // Determine if we need to convert USDC to Origin
+      const convertFromUSDC = paymentCurrency === 'USDC';
+      
+      // Create funding transaction (with conversion if needed)
+      const transaction = await fundEscrowWithCurrency(
+        clientWallet, 
+        escrowAccount, 
+        amount, 
+        convertFromUSDC ? 'ORIGIN' : paymentCurrency,
+        convertFromUSDC
+      );
 
       // Get the latest blockhash
       const { blockhash } = await connection.getLatestBlockhash();
@@ -160,7 +191,9 @@ export const useEscrow = (): UseEscrowReturn => {
 
       toast({
         title: "Escrow Funded",
-        description: `Successfully funded escrow with ${amount} USDC`,
+        description: paymentCurrency === 'USDC' 
+          ? `Successfully funded escrow with ${amount} USDC (converted to ORIGIN)`
+          : `Successfully funded escrow with ${amount} ORIGIN tokens`,
       });
 
       return true;
@@ -217,12 +250,13 @@ export const useEscrow = (): UseEscrowReturn => {
       const freelancerWallet = new PublicKey(escrow.freelancer_wallet);
       const escrowAccount = new PublicKey(escrow.escrow_account);
 
-      // Create payment release transaction
+      // Create payment release transaction (always in Origin tokens)
       const transaction = await releaseEscrowPayment(
         clientWallet,
         freelancerWallet,
         escrowAccount,
-        targetMilestone.amount_usdc
+        targetMilestone.amount_usdc,
+        'ORIGIN'
       );
 
       // Get the latest blockhash
@@ -255,7 +289,7 @@ export const useEscrow = (): UseEscrowReturn => {
 
       toast({
         title: "Payment Released",
-        description: `Successfully released ${targetMilestone.amount_usdc} USDC to freelancer`,
+        description: `Successfully released ${targetMilestone.amount_usdc} ORIGIN tokens to freelancer`,
       });
 
       return true;
