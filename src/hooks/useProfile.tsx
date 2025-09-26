@@ -73,7 +73,7 @@ export const useProfile = () => {
         
         if (error) {
           console.error('Update profile error:', error);
-          throw new Error(`Failed to update profile: ${error.message}`);
+          throw error;
         }
         result = data;
       } else {
@@ -86,7 +86,7 @@ export const useProfile = () => {
         
         if (checkError && checkError.code !== 'PGRST116') {
           console.error('Check existing profile error:', checkError);
-          throw new Error(`Failed to check existing profile: ${checkError.message}`);
+          throw checkError;
         }
 
         if (existingProfile) {
@@ -100,7 +100,7 @@ export const useProfile = () => {
           
           if (error) {
             console.error('Update existing profile error:', error);
-            throw new Error(`Failed to update existing profile: ${error.message}`);
+            throw error;
           }
           result = data;
         } else {
@@ -113,10 +113,7 @@ export const useProfile = () => {
           
           if (error) {
             console.error('Insert profile error:', error);
-            if (error.code === '23505' && error.message.includes('profiles_wallet_address_key')) {
-              throw new Error('A profile already exists for this wallet address. Please refresh the page and try again.');
-            }
-            throw new Error(`Failed to create profile: ${error.message}`);
+            throw error;
           }
           result = data;
         }
@@ -133,7 +130,7 @@ export const useProfile = () => {
       }
       
       setError(errorMessage);
-      throw new Error(errorMessage);
+      throw err;
     } finally {
       setLoading(false);
     }

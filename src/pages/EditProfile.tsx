@@ -76,9 +76,11 @@ const EditProfile = () => {
       });
       setFormErrors(errorMap);
       
+      const details = validationErrors.map(err => `• ${err.message}`).join('\n');
+
       toast({
-        title: "Validation Error",
-        description: "Please fix the errors below",
+        title: `Validation errors (${validationErrors.length})`,
+        description: details,
         variant: "destructive"
       });
       return;
@@ -254,7 +256,11 @@ const EditProfile = () => {
                     value={formData.hourly_rate}
                     onChange={(e) => setFormData(prev => ({ ...prev, hourly_rate: e.target.value }))}
                     placeholder="50"
+                    className={formErrors.hourly_rate ? "border-destructive" : ""}
                   />
+                  {formErrors.hourly_rate && (
+                    <p className="text-sm text-destructive mt-1">{formErrors.hourly_rate}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="experience_years">Years of Experience</Label>
@@ -285,7 +291,11 @@ const EditProfile = () => {
                     value={formData.portfolio_url}
                     onChange={(e) => setFormData(prev => ({ ...prev, portfolio_url: e.target.value }))}
                     placeholder="https://yourportfolio.com"
+                    className={formErrors.portfolio_url ? "border-destructive" : ""}
                   />
+                  {formErrors.portfolio_url && (
+                    <p className="text-sm text-destructive mt-1">{formErrors.portfolio_url}</p>
+                  )}
                 </div>
               </div>
 
