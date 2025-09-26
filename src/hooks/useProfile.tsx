@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, Profile } from '@/lib/supabase';
 import { useWallet } from '@/hooks/useWallet';
+import { handleError } from '@/lib/error-handler';
 
 export const useProfile = () => {
   const { address, isConnected } = useWallet();
@@ -37,7 +38,8 @@ export const useProfile = () => {
       setProfile(data);
     } catch (err) {
       console.error('Error loading profile:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load profile');
+      const errorMessage = 'Failed to load your profile. Please refresh the page and try again.';
+      setError(errorMessage);
       setProfile(null);
     } finally {
       setLoading(false);
@@ -46,7 +48,7 @@ export const useProfile = () => {
 
   const createOrUpdateProfile = async (profileData: Partial<Profile>): Promise<Profile> => {
     if (!address) {
-      throw new Error('No wallet connected');
+      throw new Error('Please connect your wallet to save your profile');
     }
 
     setLoading(true);
@@ -69,25 +71,67 @@ export const useProfile = () => {
           .select()
           .single();
         
-        if (error) throw error;
+        if (error) {
+          console.error('Update profile error:', error);
+          throw new Error(`Failed to update profile: ${error.message}`);
+        }
         result = data;
       } else {
-        // Create new profile
-        const { data, error } = await supabase
+        // First check if profile already exists with this wallet
+        const { data: existingProfile, error: checkError } = await supabase
           .from('profiles')
-          .insert(dataWithWallet)
-          .select()
-          .single();
+          .select('id')
+          .eq('wallet_address', address)
+          .maybeSingle();
         
-        if (error) throw error;
-        result = data;
+        if (checkError && checkError.code !== 'PGRST116') {
+          console.error('Check existing profile error:', checkError);
+          throw new Error(`Failed to check existing profile: ${checkError.message}`);
+        }
+
+        if (existingProfile) {
+          // Profile exists, update it instead
+          const { data, error } = await supabase
+            .from('profiles')
+            .update(dataWithWallet)
+            .eq('wallet_address', address)
+            .select()
+            .single();
+          
+          if (error) {
+            console.error('Update existing profile error:', error);
+            throw new Error(`Failed to update existing profile: ${error.message}`);
+          }
+          result = data;
+        } else {
+          // Create new profile
+          const { data, error } = await supabase
+            .from('profiles')
+            .insert(dataWithWallet)
+            .select()
+            .single();
+          
+          if (error) {
+            console.error('Insert profile error:', error);
+            if (error.code === '23505' && error.message.includes('profiles_wallet_address_key')) {
+              throw new Error('A profile already exists for this wallet address. Please refresh the page and try again.');
+            }
+            throw new Error(`Failed to create profile: ${error.message}`);
+          }
+          result = data;
+        }
       }
 
       setProfile(result);
       return result;
     } catch (err) {
       console.error('Error saving profile:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save profile';
+      let errorMessage = 'An unexpected error occurred while saving your profile';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {

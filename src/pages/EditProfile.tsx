@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { validateProfile } from "@/lib/validation";
 import { useProfile } from "@/hooks/useProfile";
+import { handleError, handleSuccess } from "@/lib/error-handler";
 
 const EditProfile = () => {
   const [loading, setLoading] = useState(false);
@@ -105,19 +106,11 @@ const EditProfile = () => {
 
       await createOrUpdateProfile(profileData);
 
-      toast({
-        title: "Success",
-        description: "Profile updated successfully!",
-      });
+      handleSuccess("Profile Updated", "Your profile has been saved successfully!");
       
       navigate('/');
     } catch (error) {
-      console.error('Error saving profile:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save profile",
-        variant: "destructive"
-      });
+      handleError(error, "Profile Save Failed");
     } finally {
       setLoading(false);
     }
