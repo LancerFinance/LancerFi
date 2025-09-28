@@ -1,11 +1,13 @@
 /// <reference types="vite/client" />
 
 interface Window {
-  ethereum?: {
-    request: (args: { method: string; params?: any[] }) => Promise<any>;
-    send: (method: string, params?: any[]) => Promise<any>;
-    on: (eventName: string, callback: (...args: any[]) => void) => void;
-    removeListener: (eventName: string, callback: (...args: any[]) => void) => void;
-    isMetaMask?: boolean;
+  solana?: {
+    isPhantom?: boolean;
+    connect: () => Promise<{ publicKey: { toString: () => string } }>;
+    disconnect: () => void;
+    on: (event: string, callback: (...args: any[]) => void) => void;
+    removeAllListeners: (event: string) => void;
+    publicKey?: { toString: () => string };
+    isConnected?: boolean;
   };
 }

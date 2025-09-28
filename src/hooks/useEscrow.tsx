@@ -15,7 +15,7 @@ interface UseEscrowReturn {
 
 export const useEscrow = (): UseEscrowReturn => {
   const [isLoading, setIsLoading] = useState(false);
-  const { provider, address, chain } = useWallet();
+  const { provider, address } = useWallet();
   const { toast } = useToast();
 
   const createProjectEscrow = useCallback(async (
