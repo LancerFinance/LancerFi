@@ -49,7 +49,7 @@ const BrowseServices = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
   const [priceRange, setPriceRange] = useState([0, 10000]);
   const [sortBy, setSortBy] = useState('newest');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -61,7 +61,7 @@ const BrowseServices = () => {
 
   useEffect(() => {
     setSearchTerm(searchParams.get('search') || '');
-    setSelectedCategory(searchParams.get('category') || '');
+    setSelectedCategory(searchParams.get('category') || 'all');
   }, [searchParams]);
 
   const loadServices = async () => {
@@ -90,7 +90,7 @@ const BrowseServices = () => {
         skill.toLowerCase().includes(searchTerm.toLowerCase())
       );
     
-    const matchesCategory = !selectedCategory || service.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'all' || service.category === selectedCategory;
     const matchesPrice = service.budget_usdc >= priceRange[0] && service.budget_usdc <= priceRange[1];
     
     return matchesSearch && matchesCategory && matchesPrice;
@@ -153,7 +153,7 @@ const BrowseServices = () => {
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 {categories.map((category) => (
                   <SelectItem key={category} value={category}>
                     {category}
@@ -233,7 +233,7 @@ const BrowseServices = () => {
             <p className="text-muted-foreground">
               {filteredServices.length} services found
               {searchTerm && ` for "${searchTerm}"`}
-              {selectedCategory && ` in ${selectedCategory}`}
+              {selectedCategory && selectedCategory !== 'all' && ` in ${selectedCategory}`}
             </p>
           </div>
         </div>
@@ -244,7 +244,7 @@ const BrowseServices = () => {
             <p className="text-muted-foreground mb-4">No services found matching your criteria.</p>
             <Button onClick={() => {
               setSearchTerm('');
-              setSelectedCategory('');
+              setSelectedCategory('all');
               setPriceRange([0, 10000]);
             }}>
               Clear Filters
