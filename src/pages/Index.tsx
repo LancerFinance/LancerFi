@@ -1,19 +1,21 @@
 import Header from "@/components/Header";
-import HeroSection from "@/components/HeroSection";
+import SearchHero from "@/components/SearchHero";
+import FeaturedServices from "@/components/FeaturedServices";
+import CategoryGrid from "@/components/CategoryGrid";
+import TrustIndicators from "@/components/TrustIndicators";
 import HowItWorks from "@/components/HowItWorks";
-import JobCategories from "@/components/JobCategories";
 import ValueProposition from "@/components/ValueProposition";
-import Roadmap from "@/components/Roadmap";
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <HeroSection />
+      <SearchHero />
+      <TrustIndicators />
+      <FeaturedServices />
+      <CategoryGrid />
       <ValueProposition />
       <HowItWorks />
-      <JobCategories />
-      <Roadmap />
     </div>
   );
 };

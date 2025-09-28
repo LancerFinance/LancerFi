@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Menu, X, User, MessageSquare } from "lucide-react";
+import { Menu, X, User, MessageSquare, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import WalletButton from "./WalletButton";
 import { useWallet } from "@/hooks/useWallet";
@@ -62,6 +62,9 @@ const Header = () => {
             <Link to="/how-it-works" className="text-muted-foreground hover:text-foreground transition-colors">
               How It Works
             </Link>
+            <Link to="/browse-services" className="text-muted-foreground hover:text-foreground transition-colors">
+              Browse Services
+            </Link>
             <Link to="/hire-talent" className="text-muted-foreground hover:text-foreground transition-colors">
               Hire Talent
             </Link>
@@ -99,6 +102,12 @@ const Header = () => {
                 Find Work
               </Button>
             </Link>
+            <Link to="/post-project">
+              <Button variant="outline" className="text-primary border-primary hover:bg-primary hover:text-primary-foreground">
+                <Plus className="w-4 h-4 mr-2" />
+                Post Project
+              </Button>
+            </Link>
             <WalletButton className="animate-glow" />
           </div>
 
@@ -121,6 +130,13 @@ const Header = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 How It Works
+              </Link>
+              <Link 
+                to="/browse-services" 
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Browse Services
               </Link>
               <Link 
                 to="/hire-talent" 
@@ -175,6 +191,12 @@ const Header = () => {
                 <Link to="/freelancer">
                   <Button variant="ghost" className="justify-start">
                     Find Work
+                  </Button>
+                </Link>
+                <Link to="/post-project">
+                  <Button variant="outline" className="justify-start">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Post Project
                   </Button>
                 </Link>
                 <WalletButton variant="corporate" className="justify-start" />
