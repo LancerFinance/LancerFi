@@ -93,11 +93,15 @@ export const useEscrow = (): UseEscrowReturn => {
       const escrow = await db.createEscrow({
         project_id: projectId,
         client_wallet: solAddress,
+        freelancer_wallet: null,
         amount_usdc: finalAmount, // Store Origin amount for internal accounting
         platform_fee: platformFee,
         total_locked: totalLocked,
         escrow_account: escrowAccount.toString(),
         transaction_signature: signature,
+        solana_program_id: null,
+        funded_at: null,
+        released_at: null,
         status: 'funded'
       });
 

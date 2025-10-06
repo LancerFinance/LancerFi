@@ -108,7 +108,9 @@ const PostProject = () => {
         budget_usdc: parseFloat(formData.budget),
         timeline: formData.timeline,
         status: selectedFreelancer ? 'in_progress' : 'active',
-        ...(selectedFreelancer ? { freelancer_id: selectedFreelancer.id } : {})
+        started_at: null,
+        completed_at: null,
+        freelancer_id: selectedFreelancer?.id || null
       });
 
       toast({
