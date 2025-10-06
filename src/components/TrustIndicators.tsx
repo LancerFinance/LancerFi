@@ -25,17 +25,33 @@ const TrustIndicators = () => {
 
   const loadStatistics = async () => {
     try {
-      const [projects, profiles] = await Promise.all([
-        db.getProjects(),
-        // Get all profiles
-        db.getProjects().then(() => []) // For now, we'll use a placeholder
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // Get real data from database
+      const [projectsResult, profilesResult, escrowsResult] = await Promise.all([
+        supabase.from('projects').select('budget_usdc'),
+        supabase.from('profiles').select('id', { count: 'exact' }),
+        supabase.from('escrows').select('amount_usdc')
       ]);
 
-      const totalValue = projects.reduce((sum, project) => sum + (project.budget_usdc || 0), 0);
+      // Calculate total project value from projects
+      const totalProjectValue = projectsResult.data?.reduce(
+        (sum, project) => sum + (project.budget_usdc || 0), 
+        0
+      ) || 0;
+
+      // Calculate total escrow value
+      const totalEscrowValue = escrowsResult.data?.reduce(
+        (sum, escrow) => sum + (escrow.amount_usdc || 0), 
+        0
+      ) || 0;
+
+      // Use the larger value (escrows or projects)
+      const totalValue = Math.max(totalProjectValue, totalEscrowValue);
       
       setStats({
-        totalProjects: projects.length,
-        activeFreelancers: Math.floor(projects.length * 0.7), // Estimated
+        totalProjects: projectsResult.data?.length || 0,
+        activeFreelancers: profilesResult.count || 0,
         totalValue: totalValue,
         avgRating: 4.9
       });
