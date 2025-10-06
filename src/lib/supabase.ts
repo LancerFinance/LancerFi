@@ -1,27 +1,98 @@
 import { supabase as supabaseClient } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
 
 export const supabase = supabaseClient;
 export const isSupabaseConfigured = true;
 
-// Database types - using Supabase generated types
-export type Profile = Database['public']['Tables']['profiles']['Row'] & {
+// Database types
+export interface Profile {
+  id: string;
+  wallet_address?: string;
+  username?: string;
+  full_name?: string;
+  bio?: string;
+  skills?: string[];
+  hourly_rate?: number;
+  total_earned?: number;
+  rating?: number;
+  completed_projects?: number;
+  created_at: string;
+  updated_at: string;
+  // Freelancer-specific fields
+  portfolio_url?: string;
+  experience_years?: number;
+  availability_status?: string;
+  languages?: string[];
+  education?: string;
+  certifications?: string[];
+  project_count?: number;
+  response_time?: string;
+  location?: string;
+  timezone?: string;
+}
+
+export interface Project {
+  id: string;
+  client_id: string;
+  freelancer_id?: string;
+  title: string;
+  description: string;
+  category: string;
+  required_skills: string[];
+  budget_usdc: number;
+  timeline: string;
+  status: 'draft' | 'active' | 'in_progress' | 'completed' | 'disputed' | 'cancelled';
+  created_at: string;
+  updated_at: string;
+  started_at?: string;
+  completed_at?: string;
   client?: Profile;
   freelancer?: Profile;
-};
+}
 
-export type Project = Database['public']['Tables']['projects']['Row'] & {
-  client?: Profile;
+export interface Escrow {
+  id: string;
+  project_id: string;
+  client_wallet: string;
+  freelancer_wallet?: string;
+  amount_usdc: number;
+  platform_fee: number;
+  total_locked: number;
+  solana_program_id?: string;
+  escrow_account?: string;
+  transaction_signature?: string;
+  status: 'pending' | 'funded' | 'released' | 'disputed' | 'refunded';
+  created_at: string;
+  funded_at?: string;
+  released_at?: string;
+}
+
+export interface Milestone {
+  id: string;
+  project_id: string;
+  escrow_id: string;
+  title: string;
+  description?: string;
+  amount_usdc: number;
+  due_date?: string;
+  status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
+  submitted_at?: string;
+  approved_at?: string;
+  work_description?: string;
+  deliverable_urls?: string[];
+  created_at: string;
+}
+
+export interface Proposal {
+  id: string;
+  project_id: string;
+  freelancer_id: string;
+  cover_letter: string;
+  proposed_budget: number;
+  estimated_timeline: string;
+  milestones?: any;
+  created_at: string;
   freelancer?: Profile;
-};
-
-export type Escrow = Database['public']['Tables']['escrows']['Row'];
-
-export type Milestone = Database['public']['Tables']['milestones']['Row'];
-
-export type Proposal = Database['public']['Tables']['proposals']['Row'] & {
-  freelancer?: Partial<Profile>;
-};
+}
 
 export interface Message {
   id: string;
@@ -63,7 +134,7 @@ export const db = {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data as Project[];
+    return data;
   },
 
   async getProject(id: string) {
@@ -74,7 +145,7 @@ export const db = {
       .maybeSingle();
     
     if (error) throw error;
-    return data as Project | null;
+    return data;
   },
 
   // Escrows
@@ -141,7 +212,7 @@ export const db = {
       .maybeSingle();
     
     if (error) throw error;
-    return data as Escrow | null;
+    return data;
   },
 
   async getEscrowById(id: string) {
@@ -319,7 +390,7 @@ export const db = {
       .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return data as Proposal[];
+    return data;
   },
 
   async createProposal(proposal: Omit<Proposal, 'id' | 'created_at'>) {
