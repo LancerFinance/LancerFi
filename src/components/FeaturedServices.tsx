@@ -179,15 +179,6 @@ const FeaturedServices = () => {
           </div>
         )}
 
-        <div className="text-center mt-12">
-          <Button 
-            size="lg" 
-            onClick={() => navigate('/browse-services')}
-            className="bg-primary hover:bg-primary/90"
-          >
-            View All Services
-          </Button>
-        </div>
       </div>
     </section>
   );
