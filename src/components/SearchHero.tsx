@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { db } from "@/lib/supabase";
 
 const categories = [
   "Web Development",
@@ -21,7 +22,21 @@ const categories = [
 const SearchHero = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [activeServices, setActiveServices] = useState(0);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadActiveServices = async () => {
+      try {
+        const projects = await db.getProjects({ status: 'in_progress' });
+        setActiveServices(projects.length);
+      } catch (error) {
+        console.error("Error loading active services:", error);
+      }
+    };
+
+    loadActiveServices();
+  }, []);
 
   const handleSearch = () => {
     const params = new URLSearchParams();
@@ -119,7 +134,7 @@ const SearchHero = () => {
           {/* Trust Indicators */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16 text-center">
             <div className="space-y-2">
-              <div className="text-3xl font-bold text-yellow-400">500+</div>
+              <div className="text-3xl font-bold text-yellow-400">{activeServices}</div>
               <div className="text-sm text-gray-300">Active Services</div>
             </div>
             <div className="space-y-2">
