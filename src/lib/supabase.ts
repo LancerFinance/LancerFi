@@ -224,6 +224,17 @@ export const db = {
     if (error) throw error;
     return data;
   },
+
+  async getEscrows() {
+    const { data, error } = await supabase
+      .from('escrows')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+
   // Milestones
   async createMilestone(milestone: Omit<Milestone, 'id' | 'created_at'>) {
     const { data, error } = await supabase

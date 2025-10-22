@@ -25,13 +25,12 @@ const TrustIndicators = () => {
 
   const loadStatistics = async () => {
     try {
-      const [projects, profiles] = await Promise.all([
+      const [projects, escrows] = await Promise.all([
         db.getProjects(),
-        // Get all profiles
-        db.getProjects().then(() => []), // For now, we'll use a placeholder
+        db.getEscrows(),
       ]);
 
-      const totalValue = projects.reduce((sum, project) => sum + (project.budget_usdc || 0), 0);
+      const totalValue = escrows.reduce((sum, escrow) => sum + (escrow.total_locked || 0), 0);
 
       setStats({
         totalProjects: projects.length,
