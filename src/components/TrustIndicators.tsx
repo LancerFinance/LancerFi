@@ -15,7 +15,7 @@ const TrustIndicators = () => {
     totalProjects: 0,
     activeFreelancers: 0,
     totalValue: 0,
-    avgRating: 4.9
+    avgRating: 4.9,
   });
   const [loading, setLoading] = useState(true);
 
@@ -28,20 +28,20 @@ const TrustIndicators = () => {
       const [projects, profiles] = await Promise.all([
         db.getProjects(),
         // Get all profiles
-        db.getProjects().then(() => []) // For now, we'll use a placeholder
+        db.getProjects().then(() => []), // For now, we'll use a placeholder
       ]);
 
       // const totalValue = projects.reduce((sum, project) => sum + (project.budget_usdc || 0), 0);
-      const totalValue = (project.budget_usdc || 0), 0);
-      
+      const totalValue = project.budget_usdc;
+
       setStats({
         totalProjects: projects.length,
         activeFreelancers: Math.floor(projects.length * 0.7), // Estimated
         totalValue: totalValue,
-        avgRating: 4.9
+        avgRating: 4.9,
       });
     } catch (error) {
-      console.error('Error loading statistics:', error);
+      console.error("Error loading statistics:", error);
     } finally {
       setLoading(false);
     }
@@ -67,43 +67,43 @@ const TrustIndicators = () => {
       title: "Escrow Protected",
       description: "100% secure payments with blockchain escrow",
       value: "100%",
-      color: "from-green-500 to-green-600"
+      color: "from-green-500 to-green-600",
     },
     {
       icon: <Users className="w-8 h-8" />,
       title: "Active Freelancers",
       description: "Verified Web3 professionals",
       value: formatNumber(stats.activeFreelancers),
-      color: "from-blue-500 to-blue-600"
+      color: "from-blue-500 to-blue-600",
     },
     {
       icon: <DollarSign className="w-8 h-8" />,
       title: "Total Project Value",
       description: "Secured through our platform",
       value: formatCurrency(stats.totalValue),
-      color: "from-purple-500 to-purple-600"
+      color: "from-purple-500 to-purple-600",
     },
     {
       icon: <Star className="w-8 h-8" />,
       title: "Average Rating",
       description: "Client satisfaction score",
       value: stats.avgRating.toFixed(1),
-      color: "from-yellow-500 to-yellow-600"
+      color: "from-yellow-500 to-yellow-600",
     },
     {
       icon: <Clock className="w-8 h-8" />,
       title: "Fast Delivery",
       description: "Average project completion",
       value: "5-7 days",
-      color: "from-orange-500 to-orange-600"
+      color: "from-orange-500 to-orange-600",
     },
     {
       icon: <Zap className="w-8 h-8" />,
       title: "Quick Response",
       description: "Average freelancer response time",
       value: "< 2 hours",
-      color: "from-red-500 to-red-600"
-    }
+      color: "from-red-500 to-red-600",
+    },
   ];
 
   if (loading) {
@@ -134,26 +134,24 @@ const TrustIndicators = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
           {indicators.map((indicator, index) => (
-            <Card 
+            <Card
               key={index}
               className="group hover:shadow-glow transition-all duration-300 border-border/50 bg-card/80 backdrop-blur-sm hover:scale-105"
             >
               <CardContent className="p-6 text-center">
-                <div className={`w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br ${indicator.color} flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300`}>
+                <div
+                  className={`w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br ${indicator.color} flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300`}
+                >
                   {indicator.icon}
                 </div>
-                
+
                 <div className="text-2xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors">
                   {indicator.value}
                 </div>
-                
-                <h3 className="font-semibold text-sm mb-2">
-                  {indicator.title}
-                </h3>
-                
-                <p className="text-xs text-muted-foreground line-clamp-2">
-                  {indicator.description}
-                </p>
+
+                <h3 className="font-semibold text-sm mb-2">{indicator.title}</h3>
+
+                <p className="text-xs text-muted-foreground line-clamp-2">{indicator.description}</p>
               </CardContent>
             </Card>
           ))}
