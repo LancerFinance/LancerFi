@@ -31,7 +31,7 @@ const TrustIndicators = () => {
 
       setStats({
         totalProjects: projects.length,
-        activeFreelancers: Math.floor(profiles.length), // Estimated
+        activeFreelancers: profiles.length, // Estimated
         totalValue: totalValue,
         avgRating: 4.9,
       });
