@@ -26,7 +26,7 @@ const TrustIndicators = () => {
   const loadStatistics = async () => {
     try {
       const [projects, escrows, profiles] = await Promise.all([
-        db.getProjects(), 
+        db.getProjects({ status: 'in_progress' }), 
         db.getEscrows(), 
         db.getProfiles()
       ]);
