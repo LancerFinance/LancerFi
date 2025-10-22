@@ -25,13 +25,17 @@ const TrustIndicators = () => {
 
   const loadStatistics = async () => {
     try {
-      const [projects, escrows] = await Promise.all([db.getProjects(), db.getEscrows()]);
+      const [projects, escrows, profiles] = await Promise.all([
+        db.getProjects(), 
+        db.getEscrows(), 
+        db.getProfiles()
+      ]);
 
       const totalValue = escrows.reduce((sum, escrow) => sum + (escrow.total_locked || 0), 0);
 
       setStats({
         totalProjects: projects.length,
-        activeFreelancers: Math.floor(projects.length * 0.7), // Estimated
+        activeFreelancers: profiles.length,
         totalValue: totalValue,
         avgRating: 4.9,
       });
