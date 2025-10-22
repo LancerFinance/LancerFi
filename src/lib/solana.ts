@@ -17,7 +17,7 @@ export const USDC_MINT = SOLANA_NETWORK === 'mainnet-beta'
   : new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'); // Devnet USDC
 
 // Platform fee wallet - Production wallet address
-export const PLATFORM_WALLET = new PublicKey('DhVcKrZc5b8eVfvhMiVghKVfHkfxBJuNvxXpXfFHQVqg'); // Web3Lance platform wallet
+export const PLATFORM_WALLET = new PublicKey('DhVcKrZc5b8eVfvhMiVghKVfHkfxBJuNvxXpXfFHQVqg'); // LancerFi platform wallet
 
 // Payment currencies
 export type PaymentCurrency = 'USDC' | 'ORIGIN';
@@ -67,7 +67,7 @@ export async function createEscrowAccount(
 
   const escrowAccount = PublicKey.findProgramAddressSync(
     [Buffer.from('escrow'), clientWallet.toBuffer(), projectSeedBuffer],
-    new PublicKey('9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM') // Web3Lance escrow program ID
+    new PublicKey('9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM') // LancerFi escrow program ID
   )[0];
 
   const transaction = new Transaction();

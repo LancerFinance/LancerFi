@@ -27,7 +27,7 @@ Follow these steps:
 git clone https://github.com/Powerz98
 
 # Step 2: Navigate to the project directory.
-cd web3lance
+cd LancerFi
 
 # Step 3: Install the necessary dependencies.
 npm i

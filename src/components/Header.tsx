@@ -54,7 +54,7 @@ const Header = () => {
             <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-xs sm:text-sm">W3</span>
             </div>
-            <span className="text-lg sm:text-xl font-bold text-foreground hidden xs:block">Web3Lance</span>
+            <span className="text-lg sm:text-xl font-bold text-foreground hidden xs:block">LancerFi</span>
             <span className="text-lg sm:text-xl font-bold text-foreground xs:hidden">W3L</span>
           </Link>
 
