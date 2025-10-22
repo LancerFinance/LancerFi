@@ -5,19 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { db } from "@/lib/supabase";
-
-const categories = [
-  "Web Development",
-  "Smart Contracts", 
-  "DeFi Development",
-  "NFT Development",
-  "Blockchain Development",
-  "UI/UX Design",
-  "Mobile Development",
-  "Marketing",
-  "Content Writing",
-  "Data Analysis"
-];
+import { PROJECT_CATEGORIES } from "@/lib/categories";
 
 const SearchHero = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -93,9 +81,9 @@ const SearchHero = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
+                  {PROJECT_CATEGORIES.map((category) => (
+                    <SelectItem key={category.value} value={category.value}>
+                      {category.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
