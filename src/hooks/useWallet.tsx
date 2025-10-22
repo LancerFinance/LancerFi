@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback, useRef } from 'react';
 
 interface WalletState {
   address: string | null;
@@ -6,6 +6,8 @@ interface WalletState {
   isConnecting: boolean;
   provider: any | null;
 }
+
+const SESSION_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 interface WalletContextValue extends WalletState {
   connectWallet: () => Promise<void>;
@@ -22,6 +24,9 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     isConnecting: false,
     provider: null,
   });
+  
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
 
   // Optional auto-connect behind a user-controlled flag (disabled by default)
   useEffect(() => {
@@ -91,7 +96,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const disconnectWallet = () => {
+  const disconnectWallet = useCallback(() => {
     try {
       const w: any = window as any;
       if (w.solana?.disconnect) {
@@ -101,7 +106,60 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
     localStorage.removeItem('wallet_auto_connect');
     setWallet({ address: null, isConnected: false, isConnecting: false, provider: null });
-  };
+    
+    // Clear timeout on disconnect
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  // Reset activity timeout
+  const resetActivityTimeout = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Only set timeout if wallet is connected
+    if (wallet.isConnected) {
+      timeoutRef.current = setTimeout(() => {
+        console.log('Session timeout - disconnecting wallet');
+        disconnectWallet();
+      }, SESSION_TIMEOUT);
+    }
+  }, [wallet.isConnected, disconnectWallet]);
+
+  // Track user activity
+  useEffect(() => {
+    if (!wallet.isConnected) return;
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    const handleActivity = () => {
+      resetActivityTimeout();
+    };
+
+    // Add event listeners
+    events.forEach(event => {
+      window.addEventListener(event, handleActivity);
+    });
+
+    // Start initial timeout
+    resetActivityTimeout();
+
+    return () => {
+      // Cleanup event listeners
+      events.forEach(event => {
+        window.removeEventListener(event, handleActivity);
+      });
+      
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [wallet.isConnected, resetActivityTimeout]);
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
