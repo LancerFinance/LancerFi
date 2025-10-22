@@ -16,6 +16,7 @@ import { formatOrigin } from "@/lib/origin-token";
 import { useToast } from "@/hooks/use-toast";
 import { validateProject } from "@/lib/validation";
 import PaymentCurrencySelector from "@/components/PaymentCurrencySelector";
+import { PROJECT_CATEGORIES } from "@/lib/categories";
 
 const PostProject = () => {
   const navigate = useNavigate();
@@ -218,14 +219,11 @@ const PostProject = () => {
                         <SelectValue placeholder="Select project category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="smart-contracts">Smart Contracts</SelectItem>
-                        <SelectItem value="dapp-development">DApp Development</SelectItem>
-                        <SelectItem value="defi">DeFi Solutions</SelectItem>
-                        <SelectItem value="nft">NFT Development</SelectItem>
-                        <SelectItem value="blockchain">Blockchain Development</SelectItem>
-                        <SelectItem value="web3-frontend">Web3 Frontend</SelectItem>
-                        <SelectItem value="marketing">Web3 Marketing</SelectItem>
-                        <SelectItem value="design">UI/UX Design</SelectItem>
+                        {PROJECT_CATEGORIES.map((category) => (
+                          <SelectItem key={category.value} value={category.value}>
+                            {category.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     {formErrors.category && (
