@@ -31,7 +31,8 @@ const TrustIndicators = () => {
         db.getProjects().then(() => []) // For now, we'll use a placeholder
       ]);
 
-      const totalValue = projects.reduce((sum, project) => sum + (project.budget_usdc || 0), 0);
+      // const totalValue = projects.reduce((sum, project) => sum + (project.budget_usdc || 0), 0);
+      const totalValue = (project.budget_usdc || 0), 0);
       
       setStats({
         totalProjects: projects.length,
