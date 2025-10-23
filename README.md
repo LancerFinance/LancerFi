@@ -24,7 +24,7 @@ Follow these steps:
 
 ```sh
 # Step 1: Clone the repository using the project's Git URL.
-git clone https://github.com/Powerz98
+git clone https://github.com/Powerz98/LancerFi
 
 # Step 2: Navigate to the project directory.
 cd LancerFi
