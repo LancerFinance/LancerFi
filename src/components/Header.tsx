@@ -57,7 +57,7 @@ const Header = () => {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <img src="/lancer-logo.png" alt="LancerFi Logo" className="h-8 w-auto" />
+            <img src="/lancer-logo.png?v=2" alt="LancerFi Logo" className="h-8 w-auto" />
           </Link>
 
           {/* Navigation Links - Desktop */}
