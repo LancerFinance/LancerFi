@@ -1,6 +1,5 @@
 import Header from "@/components/Header";
-import AnnouncementBar from "@/components/AnnouncementBar";
-import SearchHero from "@/components/SearchHero";
+import HeroSection from "@/components/HeroSection";
 import FeaturedServices from "@/components/FeaturedServices";
 import CategoryGrid from "@/components/CategoryGrid";
 import TrustIndicators from "@/components/TrustIndicators";
@@ -10,9 +9,8 @@ import ValueProposition from "@/components/ValueProposition";
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
-      <AnnouncementBar />
       <Header />
-      <SearchHero />
+      <HeroSection />
       <TrustIndicators />
       <FeaturedServices />
       <CategoryGrid />

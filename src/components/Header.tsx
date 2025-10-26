@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Menu, X, User, MessageSquare, Plus } from "lucide-react";
+import { Menu, X, User, MessageSquare, Plus, Shield, Zap, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import WalletButton from "./WalletButton";
 import { useWallet } from "@/hooks/useWallet";
@@ -10,10 +10,10 @@ import { db } from "@/lib/supabase";
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const { isConnected, address } = useWallet();
+  const { isConnected, address: connectedAddress } = useWallet();
 
   useEffect(() => {
-    if (isConnected && address) {
+    if (isConnected && connectedAddress) {
       checkUnreadMessages();
       // Check for new messages every 30 seconds
       const interval = setInterval(checkUnreadMessages, 30000);
@@ -29,15 +29,15 @@ const Header = () => {
     } else {
       setUnreadCount(0);
     }
-  }, [isConnected, address]);
+  }, [isConnected, connectedAddress]);
 
   const checkUnreadMessages = async () => {
-    if (!address) return;
+    if (!connectedAddress) return;
     
     try {
-      const messages = await db.getMessagesForUser(address);
+      const messages = await db.getMessagesForUser(connectedAddress);
       const unread = messages.filter(msg => 
-        msg.recipient_id === address && !msg.is_read
+        msg.recipient_id === connectedAddress && !msg.is_read
       ).length;
       setUnreadCount(unread);
     } catch (error) {
@@ -46,110 +46,94 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-50 shadow-sm">
-      <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
-        <div className="flex items-center justify-between">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Top bar with announcement */}
+        <div className="flex items-center justify-between py-2 text-xs border-b border-border/50">
+          <span className="text-muted-foreground">Express delivery on everyday picks in select cities</span>
+        </div>
+
+        {/* Main header */}
+        <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2 flex-shrink-0">
-            <img src="/lancer-logo.png" alt="LancerFi" className="h-8 sm:h-10 w-auto" />
+          <Link to="/" className="flex items-center space-x-2">
+            <img src="/lancer-logo.png" alt="LancerFi Logo" className="h-8 w-auto" />
           </Link>
 
-          {/* Tablet Navigation */}
-          <nav className="hidden lg:flex items-center space-x-6 xl:space-x-8">
-            <Link to="/how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
-              How It Works
-            </Link>
-            <Link to="/browse-services" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
-              Browse Services
-            </Link>
-            <Link to="/hire-talent" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
-              Hire Talent
-            </Link>
-            <Link to="/freelancer" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
-              Find Work
-            </Link>
-            <Link to="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
-              Dashboard
-            </Link>
-            <Link to="/messages" className="text-sm text-muted-foreground hover:text-foreground transition-colors relative font-medium">
-              Messages
-              {unreadCount > 0 && (
-                <Badge className="absolute -top-2 -right-2 h-4 w-4 text-xs bg-destructive text-destructive-foreground p-0 flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </Badge>
-              )}
-            </Link>
-            <Link to="/faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
-              FAQ
-            </Link>
-          </nav>
-
-          {/* Compact Navigation for medium screens */}
-          <nav className="hidden md:flex lg:hidden items-center space-x-4">
-            <Link to="/browse-services" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+          {/* Navigation Links - Desktop */}
+          <nav className="hidden lg:flex items-center space-x-6 flex-1 justify-end">
+            <Link to="/browse-services" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
               Browse
             </Link>
-            <Link to="/hire-talent" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
-              Hire
+            <Link to="/post-project" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+              Post Project
             </Link>
-            <Link to="/messages" className="text-muted-foreground hover:text-foreground transition-colors relative text-sm">
-              <MessageSquare className="w-4 h-4" />
-              {unreadCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-3 w-3 text-xs bg-destructive text-destructive-foreground p-0 flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </Badge>
-              )}
+            <Link to="/hire-talent" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+              Find Talent
             </Link>
-          </nav>
-
-          {/* Desktop CTA */}
-          <div className="hidden lg:flex items-center space-x-3 xl:space-x-4">
-            {isConnected && (
-              <Link to="/edit-profile">
-                <Button variant="ghost" size="sm" className="text-muted-foreground">
-                  <User className="w-4 h-4 mr-2" />
-                  <span className="hidden xl:inline">Edit Profile</span>
-                  <span className="xl:hidden">Profile</span>
-                </Button>
-              </Link>
+            <Link to="/how-it-works" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+              How It Works
+            </Link>
+            <Link to="/faq" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+              Support
+            </Link>
+            {connectedAddress && (
+              <>
+                <Link to="/messages" className="text-sm font-medium text-foreground hover:text-primary transition-colors relative">
+                  Messages
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-2 bg-destructive text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {unreadCount}
+                    </span>
+                  )}
+                </Link>
+                <Link to="/edit-profile" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+                  Profile
+                </Link>
+              </>
             )}
-            <Link to="/freelancer">
-              <Button variant="ghost" size="sm" className="text-muted-foreground hidden xl:flex">
-                Find Work
-              </Button>
-            </Link>
-            <Link to="/post-project">
-              <Button variant="outline" size="sm" className="text-primary border-primary hover:bg-primary hover:text-primary-foreground">
-                <Plus className="w-4 h-4 mr-1 xl:mr-2" />
-                <span className="hidden sm:inline">Post</span>
-                <span className="hidden xl:inline"> Project</span>
-              </Button>
-            </Link>
-            <WalletButton className="animate-fade-in" />
-          </div>
-
-          {/* Tablet CTA */}
-          <div className="hidden md:flex lg:hidden items-center space-x-2">
-            <Link to="/post-project">
-              <Button variant="outline" size="sm" className="text-primary border-primary hover:bg-primary hover:text-primary-foreground">
-                <Plus className="w-4 h-4" />
-              </Button>
-            </Link>
-            <WalletButton variant="default" className="text-xs px-2" />
-          </div>
+            <WalletButton />
+          </nav>
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden text-foreground"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="lg:hidden p-2 text-foreground"
           >
-            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
           </button>
+        </div>
+
+        {/* Secondary Navigation Bar */}
+        <div className="hidden lg:flex items-center justify-between py-3 border-t border-border/50">
+          <div className="flex items-center space-x-6">
+            <Link to="/browse-services?category=blockchain" className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <Zap className="h-4 w-4" />
+              <span>Blockchain Dev</span>
+            </Link>
+            <Link to="/browse-services?category=smart-contracts" className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <Shield className="h-4 w-4" />
+              <span>Smart Contracts</span>
+            </Link>
+            <Link to="/browse-services?category=defi" className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <Users className="h-4 w-4" />
+              <span>DeFi</span>
+            </Link>
+            <Link to="/browse-services?category=nft" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              NFTs
+            </Link>
+            <Link to="/browse-services?category=web3-frontend" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Web3 Frontend
+            </Link>
+          </div>
+          <span className="text-sm text-muted-foreground">USDC payments • Near-zero fees</span>
         </div>
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-border pt-4 animate-in slide-in-from-top-2 duration-200">
+          <div className="lg:hidden pb-4 border-t border-border pt-4 animate-in slide-in-from-top-2 duration-200">
             <nav className="flex flex-col space-y-3">
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <Link to="/browse-services" className="p-3 rounded-lg bg-muted/50 text-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
