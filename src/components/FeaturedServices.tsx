@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Star, Clock, DollarSign } from "lucide-react";
@@ -78,22 +77,22 @@ const FeaturedServices = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12 fade-in">
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Featured Services</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-base text-muted-foreground max-w-2xl mx-auto">
             Discover top-rated Web3 services from our expert freelancers
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {services.map((service, index) => (
-            <Card 
+            <div
               key={service.id} 
-              className="group hover-lift cursor-pointer border-border bg-card hover:shadow-lg transition-all duration-300 fade-in"
+              className="group relative overflow-hidden rounded-2xl cursor-pointer hover-lift fade-in shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-border bg-gradient-to-br from-card to-secondary/20"
               style={{ animationDelay: `${index * 0.1}s` }}
               onClick={() => handleServiceClick(service.id)}
             >
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start mb-2">
-                  <Badge variant="secondary" className="text-xs bg-secondary text-secondary-foreground">
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-3">
+                  <Badge variant="secondary" className="text-xs bg-secondary/80 text-secondary-foreground border border-border">
                     {service.category}
                   </Badge>
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -101,17 +100,16 @@ const FeaturedServices = () => {
                     <span className="font-medium">{service.freelancer?.rating || 5.0}</span>
                   </div>
                 </div>
-                <CardTitle className="text-lg line-clamp-2 group-hover:text-primary transition-colors">
+                
+                <h3 className="text-lg font-bold line-clamp-2 group-hover:text-primary transition-colors mb-3">
                   {service.title}
-                </CardTitle>
-              </CardHeader>
-              
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground line-clamp-3">
+                </h3>
+
+                <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
                   {service.description}
                 </p>
                 
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1 mb-4">
                   {service.required_skills?.slice(0, 3).map((skill, index) => (
                     <Badge key={index} variant="outline" className="text-xs">
                       {skill}
@@ -125,7 +123,7 @@ const FeaturedServices = () => {
                 </div>
 
                 {service.freelancer && (
-                  <div className="flex items-center gap-3 pt-2 border-t border-border">
+                  <div className="flex items-center gap-3 pb-4 mb-4 border-b border-border">
                     <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                       <span className="text-sm font-medium text-primary">
                         {service.freelancer.full_name?.charAt(0) || 'F'}
@@ -140,7 +138,7 @@ const FeaturedServices = () => {
                   </div>
                 )}
 
-                <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
                     <span>{service.timeline}</span>
@@ -150,31 +148,24 @@ const FeaturedServices = () => {
                     <span>{service.budget_usdc}</span>
                   </div>
                 </div>
-
-                <Button 
-                  className="w-full mt-4 ripple" 
-                  variant="outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleServiceClick(service.id);
-                  }}
-                >
-                  View Details
-                </Button>
-              </CardContent>
-            </Card>
+              </div>
+              <div className="absolute bottom-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mb-12"></div>
+            </div>
           ))}
         </div>
 
         {services.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">No featured services available at the moment.</p>
-            <Button 
-              className="mt-4"
-              onClick={() => navigate('/browse-services')}
-            >
-              Browse All Services
-            </Button>
+            <div className="relative overflow-hidden rounded-2xl bg-card border border-border shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-12 max-w-md mx-auto">
+              <p className="text-muted-foreground mb-6">No featured services available at the moment.</p>
+              <Button 
+                className="ripple"
+                onClick={() => navigate('/browse-services')}
+              >
+                Browse All Services
+              </Button>
+              <div className="absolute bottom-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mb-16"></div>
+            </div>
           </div>
         )}
 

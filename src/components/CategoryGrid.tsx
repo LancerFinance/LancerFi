@@ -78,11 +78,11 @@ const CategoryGrid = () => {
   }
 
   return (
-    <section className="py-16 bg-secondary/30">
+    <section className="py-16 bg-background">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12 fade-in">
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Browse by Category</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-base text-muted-foreground max-w-2xl mx-auto">
             Explore services across different Web3 domains and find the expertise you need
           </p>
         </div>
@@ -91,18 +91,18 @@ const CategoryGrid = () => {
           {categories.map((category, index) => {
             const Icon = category.Icon;
             return (
-              <Card 
+              <div
                 key={category.value}
-                className="group hover-lift cursor-pointer border-border bg-card hover:shadow-lg transition-all duration-300 fade-in"
+                className="group relative overflow-hidden rounded-2xl cursor-pointer hover-lift fade-in shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-border bg-gradient-to-br from-card to-secondary/20"
                 style={{ animationDelay: `${index * 0.05}s` }}
                 onClick={() => handleCategoryClick(category.value)}
               >
-                <CardContent className="p-6 text-center">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground group-hover:scale-110 transition-transform duration-300">
+                <div className="p-8">
+                  <div className="w-16 h-16 mb-4 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground group-hover:scale-110 transition-transform duration-300 shadow-lg">
                     <Icon className="w-8 h-8" />
                   </div>
                   
-                  <h3 className="font-semibold text-lg mb-2 group-hover:text-primary transition-colors">
+                  <h3 className="font-bold text-xl mb-2 text-foreground group-hover:text-primary transition-colors">
                     {category.label}
                   </h3>
                   
@@ -110,11 +110,12 @@ const CategoryGrid = () => {
                     {category.description}
                   </p>
                   
-                  <Badge variant="secondary" className="text-xs bg-secondary text-secondary-foreground">
+                  <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-secondary/80 text-secondary-foreground border border-border">
                     {category.count} {category.count === 1 ? 'service' : 'services'}
-                  </Badge>
-                </CardContent>
-              </Card>
+                  </div>
+                </div>
+                <div className="absolute bottom-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mb-12"></div>
+              </div>
             );
           })}
         </div>

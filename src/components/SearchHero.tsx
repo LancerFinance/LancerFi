@@ -41,27 +41,22 @@ const SearchHero = () => {
   };
 
   return (
-    <section className="relative py-20 sm:py-24 bg-background overflow-hidden">
-      {/* Subtle pattern background */}
-      <div className="absolute inset-0 opacity-[0.03]" 
-           style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
-      </div>
-      
+    <section className="relative py-12 sm:py-16 bg-background overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12 fade-in">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground tracking-tight mb-6">
+          <div className="text-center mb-10 fade-in">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground tracking-tight mb-4">
               Find the perfect <span className="text-primary">Web3</span> service
             </h1>
             
-            <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto">
+            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
               Discover talented freelancers offering blockchain development, DeFi solutions, 
               NFT creation, and more with secure escrow payments
             </p>
           </div>
 
           {/* Search Bar */}
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-lg max-w-4xl mx-auto hover-lift">
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.12)] max-w-4xl mx-auto hover-lift mb-8">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
@@ -100,7 +95,7 @@ const SearchHero = () => {
           </div>
 
           {/* Popular Searches */}
-          <div className="mt-8 fade-in">
+          <div className="mb-12 fade-in">
             <p className="text-sm text-muted-foreground mb-4 text-center">Popular searches:</p>
             <div className="flex flex-wrap justify-center gap-3">
               {['Smart Contract Audit', 'DeFi Protocol', 'NFT Collection', 'Web3 Frontend', 'Solana Development'].map((term) => (
@@ -110,7 +105,7 @@ const SearchHero = () => {
                     setSearchTerm(term);
                     navigate(`/browse-services?search=${encodeURIComponent(term)}`);
                   }}
-                  className="px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-full text-sm transition-all duration-200 hover-lift border border-border"
+                  className="px-4 py-2 bg-card hover:bg-secondary/80 rounded-full text-sm transition-all duration-200 hover-lift border border-border shadow-sm"
                 >
                   {term}
                 </button>
@@ -118,19 +113,22 @@ const SearchHero = () => {
             </div>
           </div>
 
-          {/* Trust Indicators */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
-            <div className="text-center space-y-2 fade-in">
-              <div className="text-4xl font-bold text-foreground">{activeServices}</div>
-              <div className="text-sm text-muted-foreground">Active Services</div>
+          {/* 3D Card Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-card to-secondary/30 border border-border shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-8 hover-lift fade-in">
+              <div className="text-5xl font-bold text-foreground mb-2">{activeServices}</div>
+              <div className="text-sm text-muted-foreground font-medium">Active Services</div>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16"></div>
             </div>
-            <div className="text-center space-y-2 fade-in" style={{ animationDelay: '0.1s' }}>
-              <div className="text-4xl font-bold text-foreground">98%</div>
-              <div className="text-sm text-muted-foreground">Client Satisfaction</div>
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-card to-secondary/30 border border-border shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-8 hover-lift fade-in" style={{ animationDelay: '0.1s' }}>
+              <div className="text-5xl font-bold text-foreground mb-2">98%</div>
+              <div className="text-sm text-muted-foreground font-medium">Client Satisfaction</div>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16"></div>
             </div>
-            <div className="text-center space-y-2 fade-in" style={{ animationDelay: '0.2s' }}>
-              <div className="text-4xl font-bold text-foreground">24/7</div>
-              <div className="text-sm text-muted-foreground">Escrow Protection</div>
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-card to-secondary/30 border border-border shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-8 hover-lift fade-in" style={{ animationDelay: '0.2s' }}>
+              <div className="text-5xl font-bold text-foreground mb-2">24/7</div>
+              <div className="text-sm text-muted-foreground font-medium">Escrow Protection</div>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16"></div>
             </div>
           </div>
         </div>
