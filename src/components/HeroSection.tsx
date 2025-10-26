@@ -38,7 +38,7 @@ const HeroSection = () => {
               </Button>
             </Link>
             <Link to="/create-freelancer-profile">
-              <Button size="lg" variant="corporate" className="text-base px-10 py-4 font-semibold">
+              <Button size="lg" variant="default" className="text-base px-10 py-4 font-semibold">
                 Become a Freelancer
                 <Users className="w-5 h-5 ml-2" />
               </Button>

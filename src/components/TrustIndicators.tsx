@@ -122,43 +122,42 @@ const TrustIndicators = () => {
   }
 
   return (
-    <section className="py-20 bg-muted/30">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-foreground mb-4">Why Choose LancerFi?</h2>
+    <section className="py-16 bg-background">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12 fade-in">
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Why Choose LancerFi?</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Join thousands of satisfied clients who trust our platform for their Web3 projects
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {indicators.map((indicator, index) => (
             <Card
               key={index}
-              className="group hover:shadow-glow transition-all duration-300 border-border/50 bg-card/80 backdrop-blur-sm hover:scale-105"
+              className="group hover-lift border-border bg-card hover:shadow-lg transition-all duration-300 fade-in"
+              style={{ animationDelay: `${index * 0.1}s` }}
             >
               <CardContent className="p-6 text-center">
-                <div
-                  className={`w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br ${indicator.color} flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300`}
-                >
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground group-hover:scale-110 transition-transform duration-300">
                   {indicator.icon}
                 </div>
 
-                <div className="text-2xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors">
+                <div className="text-3xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors">
                   {indicator.value}
                 </div>
 
-                <h3 className="font-semibold text-sm mb-2">{indicator.title}</h3>
+                <h3 className="font-semibold text-base mb-2">{indicator.title}</h3>
 
-                <p className="text-xs text-muted-foreground line-clamp-2">{indicator.description}</p>
+                <p className="text-sm text-muted-foreground">{indicator.description}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <div className="text-center mt-12">
-          <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-card/50 px-4 py-2 rounded-full border border-border/50">
-            <Shield className="w-4 h-4 text-green-500" />
+        <div className="text-center mt-12 fade-in">
+          <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-secondary px-4 py-2 rounded-full border border-border">
+            <Shield className="w-4 h-4 text-foreground" />
             <span>All statistics updated in real-time from blockchain data</span>
           </div>
         </div>

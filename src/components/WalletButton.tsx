@@ -9,11 +9,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface WalletButtonProps {
-  variant?: "corporate" | "ghost" | "outline" | "default";
+  variant?: "default" | "ghost" | "outline";
   className?: string;
 }
 
-const WalletButton = ({ variant = "corporate", className }: WalletButtonProps) => {
+const WalletButton = ({ variant = "default", className }: WalletButtonProps) => {
   const { isConnected, isConnecting, address, connectWallet, disconnectWallet, formatAddress } = useWallet();
 
   if (isConnected && address) {

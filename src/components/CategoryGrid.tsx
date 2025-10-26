@@ -78,26 +78,27 @@ const CategoryGrid = () => {
   }
 
   return (
-    <section className="py-20 bg-background">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-foreground mb-4">Browse by Category</h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+    <section className="py-16 bg-secondary/30">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12 fade-in">
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Browse by Category</h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Explore services across different Web3 domains and find the expertise you need
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {categories.map((category) => {
+          {categories.map((category, index) => {
             const Icon = category.Icon;
             return (
               <Card 
                 key={category.value}
-                className="group hover:shadow-glow transition-all duration-300 cursor-pointer border-border/50 bg-card/80 backdrop-blur-sm hover:scale-105"
+                className="group hover-lift cursor-pointer border-border bg-card hover:shadow-lg transition-all duration-300 fade-in"
+                style={{ animationDelay: `${index * 0.05}s` }}
                 onClick={() => handleCategoryClick(category.value)}
               >
                 <CardContent className="p-6 text-center">
-                  <div className={`w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br ${category.color} flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300`}>
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground group-hover:scale-110 transition-transform duration-300">
                     <Icon className="w-8 h-8" />
                   </div>
                   
@@ -109,7 +110,7 @@ const CategoryGrid = () => {
                     {category.description}
                   </p>
                   
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-xs bg-secondary text-secondary-foreground">
                     {category.count} {category.count === 1 ? 'service' : 'services'}
                   </Badge>
                 </CardContent>
@@ -118,13 +119,13 @@ const CategoryGrid = () => {
           })}
         </div>
 
-        <div className="text-center mt-12">
+        <div className="text-center mt-12 fade-in">
           <p className="text-muted-foreground mb-4">
             Can't find what you're looking for?
           </p>
           <button
             onClick={() => navigate('/post-project')}
-            className="text-primary hover:text-primary/80 underline font-medium"
+            className="text-primary hover:text-primary/80 font-medium underline underline-offset-4 ripple"
           >
             Post a custom project
           </button>

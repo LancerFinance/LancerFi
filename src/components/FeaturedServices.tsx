@@ -74,30 +74,31 @@ const FeaturedServices = () => {
   }
 
   return (
-    <section className="py-20 bg-gradient-card">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-foreground mb-4">Featured Services</h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+    <section className="py-16 bg-background">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12 fade-in">
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Featured Services</h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Discover top-rated Web3 services from our expert freelancers
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {services.map((service) => (
+          {services.map((service, index) => (
             <Card 
               key={service.id} 
-              className="group hover:shadow-glow transition-all duration-300 cursor-pointer border-border/50 bg-card/80 backdrop-blur-sm"
+              className="group hover-lift cursor-pointer border-border bg-card hover:shadow-lg transition-all duration-300 fade-in"
+              style={{ animationDelay: `${index * 0.1}s` }}
               onClick={() => handleServiceClick(service.id)}
             >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start mb-2">
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-xs bg-secondary text-secondary-foreground">
                     {service.category}
                   </Badge>
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span>{service.freelancer?.rating || 5.0}</span>
+                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                    <span className="font-medium">{service.freelancer?.rating || 5.0}</span>
                   </div>
                 </div>
                 <CardTitle className="text-lg line-clamp-2 group-hover:text-primary transition-colors">
@@ -124,7 +125,7 @@ const FeaturedServices = () => {
                 </div>
 
                 {service.freelancer && (
-                  <div className="flex items-center gap-3 pt-2 border-t border-border/50">
+                  <div className="flex items-center gap-3 pt-2 border-t border-border">
                     <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                       <span className="text-sm font-medium text-primary">
                         {service.freelancer.full_name?.charAt(0) || 'F'}
@@ -140,20 +141,18 @@ const FeaturedServices = () => {
                 )}
 
                 <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>{service.timeline}</span>
-                    </div>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>{service.timeline}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-lg font-bold text-primary">
+                  <div className="flex items-center gap-1 text-lg font-bold text-foreground">
                     <DollarSign className="h-5 w-5" />
                     <span>{service.budget_usdc}</span>
                   </div>
                 </div>
 
                 <Button 
-                  className="w-full mt-4" 
+                  className="w-full mt-4 ripple" 
                   variant="outline"
                   onClick={(e) => {
                     e.stopPropagation();

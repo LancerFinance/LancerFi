@@ -46,36 +46,32 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-background/80 backdrop-blur-sm border-b border-border sticky top-0 z-50">
+    <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-50 shadow-sm">
       <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2 flex-shrink-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xs sm:text-sm">W3</span>
-            </div>
-            <span className="text-lg sm:text-xl font-bold text-foreground hidden xs:block">LancerFi</span>
-            <span className="text-lg sm:text-xl font-bold text-foreground xs:hidden">W3L</span>
+            <img src="/lancer-logo.png" alt="LancerFi" className="h-8 sm:h-10 w-auto" />
           </Link>
 
           {/* Tablet Navigation */}
           <nav className="hidden lg:flex items-center space-x-6 xl:space-x-8">
-            <Link to="/how-it-works" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+            <Link to="/how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
               How It Works
             </Link>
-            <Link to="/browse-services" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+            <Link to="/browse-services" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
               Browse Services
             </Link>
-            <Link to="/hire-talent" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+            <Link to="/hire-talent" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
               Hire Talent
             </Link>
-            <Link to="/freelancer" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+            <Link to="/freelancer" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
               Find Work
             </Link>
-            <Link to="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+            <Link to="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
               Dashboard
             </Link>
-            <Link to="/messages" className="text-muted-foreground hover:text-foreground transition-colors relative text-sm">
+            <Link to="/messages" className="text-sm text-muted-foreground hover:text-foreground transition-colors relative font-medium">
               Messages
               {unreadCount > 0 && (
                 <Badge className="absolute -top-2 -right-2 h-4 w-4 text-xs bg-destructive text-destructive-foreground p-0 flex items-center justify-center">
@@ -83,7 +79,7 @@ const Header = () => {
                 </Badge>
               )}
             </Link>
-            <Link to="/faq" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+            <Link to="/faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
               FAQ
             </Link>
           </nav>
@@ -129,7 +125,7 @@ const Header = () => {
                 <span className="hidden xl:inline"> Project</span>
               </Button>
             </Link>
-            <WalletButton className="animate-glow" />
+            <WalletButton className="animate-fade-in" />
           </div>
 
           {/* Tablet CTA */}
@@ -139,7 +135,7 @@ const Header = () => {
                 <Plus className="w-4 h-4" />
               </Button>
             </Link>
-            <WalletButton variant="corporate" className="text-xs px-2" />
+            <WalletButton variant="default" className="text-xs px-2" />
           </div>
 
           {/* Mobile Menu Button */}
@@ -223,7 +219,7 @@ const Header = () => {
                   </Button>
                 </Link>
                 <div className="pt-2">
-                  <WalletButton variant="corporate" className="w-full justify-start" />
+                  <WalletButton variant="default" className="w-full justify-start" />
                 </div>
               </div>
             </nav>
