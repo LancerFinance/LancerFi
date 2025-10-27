@@ -16,7 +16,7 @@ const HeroSection = () => {
   useEffect(() => {
     const loadActiveServices = async () => {
       try {
-        const projects = await db.getProjects({ status: 'in_progress' });
+        const projects = await db.getProjects({ status: "active" });
         setActiveServices(projects.length);
       } catch (error) {
         console.error("Error loading active services:", error);
@@ -28,14 +28,14 @@ const HeroSection = () => {
 
   const handleSearch = () => {
     const params = new URLSearchParams();
-    if (searchTerm) params.set('search', searchTerm);
-    if (selectedCategory && selectedCategory !== 'all') params.set('category', selectedCategory);
-    
+    if (searchTerm) params.set("search", searchTerm);
+    if (selectedCategory && selectedCategory !== "all") params.set("category", selectedCategory);
+
     navigate(`/browse-services?${params.toString()}`);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSearch();
     }
   };
@@ -67,16 +67,16 @@ const HeroSection = () => {
                 </h1>
 
                 <p className="text-lg text-muted-foreground leading-relaxed max-w-lg">
-                  Discover talented freelancers offering blockchain development, DeFi solutions, 
-                  NFT creation, and more with secure escrow payments
+                  Discover talented freelancers offering blockchain development, DeFi solutions, NFT creation, and more
+                  with secure escrow payments
                 </p>
 
                 {/* Filter Tags */}
                 <div className="flex flex-wrap gap-3">
                   <button
                     onClick={() => {
-                      setSelectedCategory('blockchain');
-                      navigate('/browse-services?category=blockchain');
+                      setSelectedCategory("blockchain");
+                      navigate("/browse-services?category=blockchain");
                     }}
                     className="px-4 py-2 bg-background hover:bg-secondary/80 rounded-full text-sm transition-all duration-200 hover-lift border border-border shadow-sm flex items-center gap-2"
                   >
@@ -85,8 +85,8 @@ const HeroSection = () => {
                   </button>
                   <button
                     onClick={() => {
-                      setSelectedCategory('smart-contracts');
-                      navigate('/browse-services?category=smart-contracts');
+                      setSelectedCategory("smart-contracts");
+                      navigate("/browse-services?category=smart-contracts");
                     }}
                     className="px-4 py-2 bg-background hover:bg-secondary/80 rounded-full text-sm transition-all duration-200 hover-lift border border-border shadow-sm flex items-center gap-2"
                   >
@@ -95,8 +95,8 @@ const HeroSection = () => {
                   </button>
                   <button
                     onClick={() => {
-                      setSelectedCategory('defi');
-                      navigate('/browse-services?category=defi');
+                      setSelectedCategory("defi");
+                      navigate("/browse-services?category=defi");
                     }}
                     className="px-4 py-2 bg-background hover:bg-secondary/80 rounded-full text-sm transition-all duration-200 hover-lift border border-border shadow-sm flex items-center gap-2"
                   >
@@ -118,7 +118,7 @@ const HeroSection = () => {
                         className="pl-10 h-12 text-base border-border bg-background"
                       />
                     </div>
-                    
+
                     <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                       <SelectTrigger className="md:w-48 h-12 border-border bg-background">
                         <SelectValue placeholder="Category" />
@@ -132,10 +132,10 @@ const HeroSection = () => {
                         ))}
                       </SelectContent>
                     </Select>
-                    
-                    <Button 
+
+                    <Button
                       onClick={handleSearch}
-                      size="lg" 
+                      size="lg"
                       className="h-12 px-8 bg-foreground hover:bg-foreground/90 text-background font-semibold ripple"
                     >
                       <Search className="h-5 w-5 mr-2" />
@@ -148,7 +148,13 @@ const HeroSection = () => {
                 <div>
                   <p className="text-sm text-muted-foreground mb-3">Popular:</p>
                   <div className="flex flex-wrap gap-2">
-                    {['Smart Contract Audit', 'DeFi Protocol', 'NFT Collection', 'Web3 Frontend', 'Solana Development'].map((term) => (
+                    {[
+                      "Smart Contract Audit",
+                      "DeFi Protocol",
+                      "NFT Collection",
+                      "Web3 Frontend",
+                      "Solana Development",
+                    ].map((term) => (
                       <button
                         key={term}
                         onClick={() => {
