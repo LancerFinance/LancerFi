@@ -70,7 +70,7 @@ const Header = () => {
               How It Works
             </Link>
             <Link to="/faq" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
-              Support
+              FAQs
             </Link>
             {connectedAddress && <>
                 <Link to="/messages" className="text-sm font-medium text-foreground hover:text-primary transition-colors relative">
