@@ -269,47 +269,50 @@ const FreelancerProfile = () => {
 
         <div className="max-w-6xl mx-auto">
           {/* Profile Photo and Header */}
-          <div className={`flex items-start gap-6 mb-8 relative ${profile.banner_url ? '-mt-32 z-10' : 'mt-6'}`}>
-            <Avatar className="h-32 w-32 border-4 border-background shadow-lg">
-              <AvatarImage src={profile.profile_photo_url || ''} />
-              <AvatarFallback className="text-3xl">
-                {profile.full_name?.split(' ').map(n => n[0]).join('') || profile.username?.[0]?.toUpperCase() || 'FL'}
-              </AvatarFallback>
-            </Avatar>
-            <div className={`flex-1 ${profile.banner_url ? 'mt-16' : ''}`}>
-              <div className="flex items-start justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold text-foreground mb-2">
-                    {profile.full_name || profile.username}
-                  </h1>
-                  <div className="flex items-center gap-4 text-muted-foreground mb-4">
-                    {profile.location && (
-                      <div className="flex items-center gap-1">
-                        <MapPin className="w-4 h-4" />
-                        {profile.location}
-                      </div>
-                    )}
-                    {profile.rating && (
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-accent-amber text-accent-amber" />
-                        {profile.rating.toFixed(1)}
-                      </div>
-                    )}
-                  </div>
+          <div className="relative mb-8">
+            {/* Avatar positioned over banner */}
+            <div className={`${profile.banner_url ? '-mt-16' : 'mt-6'} mb-6`}>
+              <Avatar className="h-32 w-32 border-4 border-background shadow-lg">
+                <AvatarImage src={profile.profile_photo_url || ''} />
+                <AvatarFallback className="text-3xl">
+                  {profile.full_name?.split(' ').map(n => n[0]).join('') || profile.username?.[0]?.toUpperCase() || 'FL'}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+            
+            {/* Name and buttons below banner */}
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="flex-1 min-w-[200px]">
+                <h1 className="text-3xl font-bold text-foreground mb-2">
+                  {profile.full_name || profile.username}
+                </h1>
+                <div className="flex items-center gap-4 text-muted-foreground flex-wrap">
+                  {profile.location && (
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      {profile.location}
+                    </div>
+                  )}
+                  {profile.rating && (
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 fill-accent-amber text-accent-amber" />
+                      {profile.rating.toFixed(1)}
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <Link to={`/post-project?freelancer=${profile.id}`}>
-                    <Button size="lg">
-                      <Briefcase className="w-4 h-4 mr-2" />
-                      Hire
-                    </Button>
-                  </Link>
-                  <MessageDialog
-                    recipientId={profile.wallet_address || ''}
-                    recipientName={profile.full_name || profile.username || 'Freelancer'}
-                    projectTitle=""
-                  />
-                </div>
+              </div>
+              <div className="flex gap-2">
+                <Link to={`/post-project?freelancer=${profile.id}`}>
+                  <Button size="lg">
+                    <Briefcase className="w-4 h-4 mr-2" />
+                    Hire
+                  </Button>
+                </Link>
+                <MessageDialog
+                  recipientId={profile.wallet_address || ''}
+                  recipientName={profile.full_name || profile.username || 'Freelancer'}
+                  projectTitle=""
+                />
               </div>
             </div>
           </div>
