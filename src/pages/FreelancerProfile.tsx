@@ -248,17 +248,6 @@ const FreelancerProfile = () => {
     <div className="min-h-screen bg-background">
       <Header />
       
-      {/* Banner Image */}
-      {profile.banner_url && (
-        <div className="w-full h-64 overflow-hidden">
-          <img 
-            src={profile.banner_url} 
-            alt="Profile banner" 
-            className="w-full h-full object-cover"
-          />
-        </div>
-      )}
-      
       <main className="container mx-auto px-4 py-8">
         <Link to="/hire-talent" className="inline-flex mb-6">
           <Button variant="ghost">
@@ -267,9 +256,20 @@ const FreelancerProfile = () => {
           </Button>
         </Link>
 
+        {/* Banner Image */}
+        {profile.banner_url && (
+          <div className="w-full -mx-4 h-64 overflow-hidden mb-6">
+            <img 
+              src={profile.banner_url} 
+              alt="Profile banner" 
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+
         <div className="max-w-6xl mx-auto">
           {/* Profile Photo and Header */}
-          <div className={`flex items-start gap-6 mb-8 relative ${profile.banner_url ? '-mt-20 z-10' : ''}`}>
+          <div className={`flex items-start gap-6 mb-8 relative ${profile.banner_url ? '-mt-32 z-10' : 'mt-6'}`}>
             <Avatar className="h-32 w-32 border-4 border-background shadow-lg">
               <AvatarImage src={profile.profile_photo_url || ''} />
               <AvatarFallback className="text-3xl">
