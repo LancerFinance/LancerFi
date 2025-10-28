@@ -47,7 +47,7 @@ const EditProfile = () => {
   const { toast } = useToast();
   const { address, isConnected, isConnecting, connectWallet } = useWallet();
   const navigate = useNavigate();
-  const { profile, createOrUpdateProfile } = useProfile();
+  const { profile, createOrUpdateProfile, loadProfile } = useProfile();
 
   useEffect(() => {
     // Load profile data when available
@@ -95,23 +95,31 @@ const EditProfile = () => {
       }
 
       // Upload new photo
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError, data: uploadData } = await supabase.storage
         .from('profile-photos')
         .upload(filePath, file, { upsert: true });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
 
       // Get public URL
       const { data } = supabase.storage
         .from('profile-photos')
         .getPublicUrl(filePath);
 
+      toast({
+        title: "Photo Uploaded",
+        description: "Profile photo uploaded successfully"
+      });
+
       return data.publicUrl;
     } catch (error) {
       console.error('Error uploading profile photo:', error);
       toast({
         title: "Upload Failed",
-        description: "Failed to upload profile photo",
+        description: error instanceof Error ? error.message : "Failed to upload profile photo",
         variant: "destructive"
       });
       return null;
@@ -143,23 +151,31 @@ const EditProfile = () => {
       }
 
       // Upload new banner
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError, data: uploadData } = await supabase.storage
         .from('profile-banners')
         .upload(filePath, file, { upsert: true });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
 
       // Get public URL
       const { data } = supabase.storage
         .from('profile-banners')
         .getPublicUrl(filePath);
 
+      toast({
+        title: "Banner Uploaded",
+        description: "Banner image uploaded successfully"
+      });
+
       return data.publicUrl;
     } catch (error) {
       console.error('Error uploading banner:', error);
       toast({
         title: "Upload Failed",
-        description: "Failed to upload banner image",
+        description: error instanceof Error ? error.message : "Failed to upload banner image",
         variant: "destructive"
       });
       return null;
@@ -233,6 +249,13 @@ const EditProfile = () => {
       await createOrUpdateProfile(profileData);
 
       handleSuccess("Profile Updated", "Your profile has been saved successfully!");
+
+      // Reload profile to get updated data
+      await loadProfile();
+      
+      // Clear file selections
+      setProfilePhotoFile(null);
+      setBannerFile(null);
       
       navigate('/');
     } catch (error) {
