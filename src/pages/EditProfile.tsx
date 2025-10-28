@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/useWallet";
 import { supabase, Profile } from "@/lib/supabase";
@@ -39,6 +39,10 @@ const EditProfile = () => {
   const [newSkill, setNewSkill] = useState('');
   const [newLanguage, setNewLanguage] = useState('');
   const [newCertification, setNewCertification] = useState('');
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   
   const { toast } = useToast();
   const { address, isConnected, isConnecting, connectWallet } = useWallet();
@@ -68,6 +72,102 @@ const EditProfile = () => {
     }
   }, [profile]);
 
+  const uploadProfilePhoto = async (file: File): Promise<string | null> => {
+    if (!address) return null;
+
+    try {
+      setUploadingPhoto(true);
+      
+      // Create unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${address}/profile-photo.${fileExt}`;
+      const filePath = fileName;
+
+      // Delete old photo if exists
+      const { data: existingFiles } = await supabase.storage
+        .from('profile-photos')
+        .list(address);
+
+      if (existingFiles && existingFiles.length > 0) {
+        await supabase.storage
+          .from('profile-photos')
+          .remove([`${address}/${existingFiles[0].name}`]);
+      }
+
+      // Upload new photo
+      const { error: uploadError } = await supabase.storage
+        .from('profile-photos')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data } = supabase.storage
+        .from('profile-photos')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Error uploading profile photo:', error);
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload profile photo",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const uploadBanner = async (file: File): Promise<string | null> => {
+    if (!address) return null;
+
+    try {
+      setUploadingBanner(true);
+      
+      // Create unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${address}/banner.${fileExt}`;
+      const filePath = fileName;
+
+      // Delete old banner if exists
+      const { data: existingFiles } = await supabase.storage
+        .from('profile-banners')
+        .list(address);
+
+      if (existingFiles && existingFiles.length > 0) {
+        await supabase.storage
+          .from('profile-banners')
+          .remove([`${address}/${existingFiles[0].name}`]);
+      }
+
+      // Upload new banner
+      const { error: uploadError } = await supabase.storage
+        .from('profile-banners')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data } = supabase.storage
+        .from('profile-banners')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Error uploading banner:', error);
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload banner image",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!address) return;
 
@@ -94,6 +194,24 @@ const EditProfile = () => {
       setLoading(true);
       setFormErrors({});
       
+      // Upload profile photo if selected
+      let profilePhotoUrl = formData.profile_photo_url;
+      if (profilePhotoFile) {
+        const uploadedUrl = await uploadProfilePhoto(profilePhotoFile);
+        if (uploadedUrl) {
+          profilePhotoUrl = uploadedUrl;
+        }
+      }
+
+      // Upload banner if selected
+      let bannerUrl = formData.banner_url;
+      if (bannerFile) {
+        const uploadedUrl = await uploadBanner(bannerFile);
+        if (uploadedUrl) {
+          bannerUrl = uploadedUrl;
+        }
+      }
+      
       const profileData = {
         full_name: formData.full_name.trim(),
         username: formData.username.trim(),
@@ -108,8 +226,8 @@ const EditProfile = () => {
         experience_years: parseInt(formData.experience_years) || 0,
         languages: formData.languages,
         certifications: formData.certifications,
-        banner_url: formData.banner_url.trim(),
-        profile_photo_url: formData.profile_photo_url.trim()
+        banner_url: bannerUrl,
+        profile_photo_url: profilePhotoUrl
       };
 
       await createOrUpdateProfile(profileData);
@@ -238,24 +356,80 @@ const EditProfile = () => {
                   </div>
               </div>
 
-              <div>
-                <Label htmlFor="profile_photo_url">Profile Photo URL</Label>
-                <Input
-                  id="profile_photo_url"
-                  value={formData.profile_photo_url}
-                  onChange={(e) => setFormData(prev => ({ ...prev, profile_photo_url: e.target.value }))}
-                  placeholder="https://example.com/photo.jpg"
-                />
+              <div className="space-y-2">
+                <Label htmlFor="profile_photo">Profile Photo</Label>
+                <div className="flex items-center gap-4">
+                  {formData.profile_photo_url && !profilePhotoFile && (
+                    <img 
+                      src={formData.profile_photo_url} 
+                      alt="Profile preview" 
+                      className="h-20 w-20 rounded-full object-cover"
+                    />
+                  )}
+                  {profilePhotoFile && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">{profilePhotoFile.name}</span>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setProfilePhotoFile(null)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                  <Input
+                    id="profile_photo"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setProfilePhotoFile(file);
+                    }}
+                    className="max-w-xs"
+                  />
+                  {uploadingPhoto && <Loader2 className="w-4 h-4 animate-spin" />}
+                </div>
+                <p className="text-xs text-muted-foreground">Upload a profile photo (JPG, PNG, max 5MB)</p>
               </div>
 
-              <div>
-                <Label htmlFor="banner_url">Banner Image URL</Label>
-                <Input
-                  id="banner_url"
-                  value={formData.banner_url}
-                  onChange={(e) => setFormData(prev => ({ ...prev, banner_url: e.target.value }))}
-                  placeholder="https://example.com/banner.jpg"
-                />
+              <div className="space-y-2">
+                <Label htmlFor="banner">Banner Image</Label>
+                <div className="flex items-center gap-4">
+                  {formData.banner_url && !bannerFile && (
+                    <img 
+                      src={formData.banner_url} 
+                      alt="Banner preview" 
+                      className="h-20 w-40 rounded object-cover"
+                    />
+                  )}
+                  {bannerFile && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">{bannerFile.name}</span>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setBannerFile(null)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                  <Input
+                    id="banner"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setBannerFile(file);
+                    }}
+                    className="max-w-xs"
+                  />
+                  {uploadingBanner && <Loader2 className="w-4 h-4 animate-spin" />}
+                </div>
+                <p className="text-xs text-muted-foreground">Upload a banner image (JPG, PNG, max 5MB)</p>
               </div>
 
               <div>
@@ -453,8 +627,18 @@ const EditProfile = () => {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <Button onClick={handleSave} disabled={loading}>
-                  {loading ? "Saving..." : "Save Changes"}
+                <Button 
+                  onClick={handleSave} 
+                  disabled={loading || uploadingPhoto || uploadingBanner}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
                 </Button>
                 <Button variant="outline" onClick={() => navigate('/')}>
                   Cancel
