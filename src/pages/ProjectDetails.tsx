@@ -303,6 +303,27 @@ const ProjectDetails = () => {
                 </CardContent>
               </Card>
 
+              {/* Project Images */}
+              {project.project_images && project.project_images.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Project Images</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      {project.project_images.map((img, index) => (
+                        <img 
+                          key={index}
+                          src={img} 
+                          alt={`Project image ${index + 1}`}
+                          className="w-full h-48 object-cover rounded-md"
+                        />
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Escrow Information */}
               {escrow && (
                 <Card>

@@ -31,7 +31,9 @@ const EditProfile = () => {
     availability_status: 'available',
     experience_years: '',
     languages: [] as string[],
-    certifications: [] as string[]
+    certifications: [] as string[],
+    banner_url: '',
+    profile_photo_url: ''
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [newSkill, setNewSkill] = useState('');
@@ -59,7 +61,9 @@ const EditProfile = () => {
         availability_status: profile.availability_status || 'available',
         experience_years: profile.experience_years?.toString() || '',
         languages: profile.languages || ['English'],
-        certifications: profile.certifications || []
+        certifications: profile.certifications || [],
+        banner_url: profile.banner_url || '',
+        profile_photo_url: profile.profile_photo_url || ''
       });
     }
   }, [profile]);
@@ -103,7 +107,9 @@ const EditProfile = () => {
         availability_status: formData.availability_status,
         experience_years: parseInt(formData.experience_years) || 0,
         languages: formData.languages,
-        certifications: formData.certifications
+        certifications: formData.certifications,
+        banner_url: formData.banner_url.trim(),
+        profile_photo_url: formData.profile_photo_url.trim()
       };
 
       await createOrUpdateProfile(profileData);
@@ -230,6 +236,26 @@ const EditProfile = () => {
                       <p className="text-sm text-destructive mt-1">{formErrors.username}</p>
                     )}
                   </div>
+              </div>
+
+              <div>
+                <Label htmlFor="profile_photo_url">Profile Photo URL</Label>
+                <Input
+                  id="profile_photo_url"
+                  value={formData.profile_photo_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, profile_photo_url: e.target.value }))}
+                  placeholder="https://example.com/photo.jpg"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="banner_url">Banner Image URL</Label>
+                <Input
+                  id="banner_url"
+                  value={formData.banner_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, banner_url: e.target.value }))}
+                  placeholder="https://example.com/banner.jpg"
+                />
               </div>
 
               <div>

@@ -28,6 +28,8 @@ export interface Profile {
   response_time?: string;
   location?: string;
   timezone?: string;
+  banner_url?: string;
+  profile_photo_url?: string;
 }
 
 export interface Project {
@@ -45,6 +47,7 @@ export interface Project {
   updated_at: string;
   started_at?: string;
   completed_at?: string;
+  project_images?: string[];
   client?: Profile;
   freelancer?: Profile;
 }

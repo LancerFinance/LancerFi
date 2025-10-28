@@ -172,6 +172,7 @@ export type Database = {
       profiles: {
         Row: {
           availability_status: string | null
+          banner_url: string | null
           bio: string | null
           certifications: string[] | null
           completed_projects: number | null
@@ -184,6 +185,7 @@ export type Database = {
           languages: string[] | null
           location: string | null
           portfolio_url: string | null
+          profile_photo_url: string | null
           project_count: number | null
           rating: number | null
           response_time: string | null
@@ -196,6 +198,7 @@ export type Database = {
         }
         Insert: {
           availability_status?: string | null
+          banner_url?: string | null
           bio?: string | null
           certifications?: string[] | null
           completed_projects?: number | null
@@ -208,6 +211,7 @@ export type Database = {
           languages?: string[] | null
           location?: string | null
           portfolio_url?: string | null
+          profile_photo_url?: string | null
           project_count?: number | null
           rating?: number | null
           response_time?: string | null
@@ -220,6 +224,7 @@ export type Database = {
         }
         Update: {
           availability_status?: string | null
+          banner_url?: string | null
           bio?: string | null
           certifications?: string[] | null
           completed_projects?: number | null
@@ -232,6 +237,7 @@ export type Database = {
           languages?: string[] | null
           location?: string | null
           portfolio_url?: string | null
+          profile_photo_url?: string | null
           project_count?: number | null
           rating?: number | null
           response_time?: string | null
@@ -254,6 +260,7 @@ export type Database = {
           description: string
           freelancer_id: string | null
           id: string
+          project_images: string[] | null
           required_skills: string[] | null
           started_at: string | null
           status: string | null
@@ -270,6 +277,7 @@ export type Database = {
           description: string
           freelancer_id?: string | null
           id?: string
+          project_images?: string[] | null
           required_skills?: string[] | null
           started_at?: string | null
           status?: string | null
@@ -286,6 +294,7 @@ export type Database = {
           description?: string
           freelancer_id?: string | null
           id?: string
+          project_images?: string[] | null
           required_skills?: string[] | null
           started_at?: string | null
           status?: string | null

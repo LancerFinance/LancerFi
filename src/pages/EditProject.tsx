@@ -29,7 +29,8 @@ const EditProject = () => {
     description: '',
     budget: '',
     timeline: '',
-    skills: ''
+    skills: '',
+    project_images: ''
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -85,7 +86,8 @@ const EditProject = () => {
         description: projectData.description,
         budget: projectData.budget_usdc.toString(),
         timeline: projectData.timeline,
-        skills: projectData.required_skills.join(', ')
+        skills: projectData.required_skills.join(', '),
+        project_images: projectData.project_images?.join(', ') || ''
       });
 
     } catch (error) {
@@ -140,6 +142,9 @@ const EditProject = () => {
         required_skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
         budget_usdc: parseFloat(formData.budget),
         timeline: formData.timeline,
+        project_images: formData.project_images 
+          ? formData.project_images.split(',').map(s => s.trim()).filter(Boolean)
+          : null,
       };
 
       await db.updateProject(id, updatedData);
@@ -322,6 +327,18 @@ const EditProject = () => {
                     {formErrors.skills && (
                       <p className="text-sm text-destructive">{formErrors.skills}</p>
                     )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="project_images">Project Images (Optional)</Label>
+                    <Input 
+                      id="project_images" 
+                      placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"
+                      className="bg-muted/50"
+                      value={formData.project_images}
+                      onChange={(e) => handleInputChange('project_images', e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Enter image URLs separated by commas</p>
                   </div>
 
                   <div className="flex gap-4 pt-4">

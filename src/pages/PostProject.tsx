@@ -31,7 +31,8 @@ const PostProject = () => {
     description: '',
     budget: '',
     timeline: '',
-    skills: ''
+    skills: '',
+    project_images: ''
   });
   const [paymentCurrency, setPaymentCurrency] = useState<PaymentCurrency>('ORIGIN');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -109,6 +110,9 @@ const PostProject = () => {
         budget_usdc: parseFloat(formData.budget),
         timeline: formData.timeline,
         status: selectedFreelancer ? 'in_progress' : 'active',
+        project_images: formData.project_images 
+          ? formData.project_images.split(',').map(s => s.trim()).filter(Boolean)
+          : null,
         ...(selectedFreelancer ? { freelancer_id: selectedFreelancer.id } : {})
       });
 
@@ -124,7 +128,8 @@ const PostProject = () => {
         description: '',
         budget: '',
         timeline: '',
-        skills: ''
+        skills: '',
+        project_images: ''
       });
       
     } catch (error) {
@@ -290,6 +295,18 @@ const PostProject = () => {
                     {formErrors.skills && (
                       <p className="text-sm text-destructive">{formErrors.skills}</p>
                     )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="project_images">Project Images (Optional)</Label>
+                    <Input 
+                      id="project_images" 
+                      placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"
+                      className="bg-muted/50"
+                      value={formData.project_images}
+                      onChange={(e) => handleInputChange('project_images', e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Enter image URLs separated by commas</p>
                   </div>
 
                   <Button 
