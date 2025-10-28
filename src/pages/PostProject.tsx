@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Wallet, Shield, Loader2 } from "lucide-react";
+import { ArrowLeft, Wallet, Shield, Loader2, Upload, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useWallet } from "@/hooks/useWallet";
@@ -31,13 +31,15 @@ const PostProject = () => {
     description: '',
     budget: '',
     timeline: '',
-    skills: '',
-    project_images: ''
+    skills: ''
   });
   const [paymentCurrency, setPaymentCurrency] = useState<PaymentCurrency>('ORIGIN');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFreelancer, setSelectedFreelancer] = useState<any>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [projectImage, setProjectImage] = useState<File | null>(null);
+  const [projectImagePreview, setProjectImagePreview] = useState<string>('');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     if (preselectedFreelancerId) {
@@ -69,6 +71,32 @@ const PostProject = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Image must be less than 5MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setProjectImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProjectImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setProjectImage(null);
+    setProjectImagePreview('');
+  };
+
   const handleSubmit = async () => {
     if (!isConnected || !address) {
       toast({
@@ -76,6 +104,17 @@ const PostProject = () => {
         description: "Please connect your wallet to post a project",
         variant: "destructive",
       });
+      return;
+    }
+
+    // Validate image is uploaded
+    if (!projectImage) {
+      toast({
+        title: "Image Required",
+        description: "Please upload a project image",
+        variant: "destructive"
+      });
+      setFormErrors({ ...formErrors, project_image: "Project image is required" });
       return;
     }
 
@@ -100,9 +139,29 @@ const PostProject = () => {
     setIsSubmitting(true);
     
     try {
+      // Upload project image
+      setUploadingImage(true);
+      const fileExt = projectImage.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError, data: uploadData } = await supabase.storage
+        .from('project-images')
+        .upload(filePath, projectImage);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('project-images')
+        .getPublicUrl(filePath);
+
+      setUploadingImage(false);
+
       // Create project in database
       const project = await db.createProject({
-        client_id: address, // Wallet address as temporary client ID
+        client_id: address,
         title: formData.title.trim(),
         description: formData.description.trim(),
         category: formData.category,
@@ -110,9 +169,7 @@ const PostProject = () => {
         budget_usdc: parseFloat(formData.budget),
         timeline: formData.timeline,
         status: selectedFreelancer ? 'in_progress' : 'active',
-        project_images: formData.project_images 
-          ? formData.project_images.split(',').map(s => s.trim()).filter(Boolean)
-          : null,
+        project_images: [publicUrl],
         ...(selectedFreelancer ? { freelancer_id: selectedFreelancer.id } : {})
       });
 
@@ -128,19 +185,21 @@ const PostProject = () => {
         description: '',
         budget: '',
         timeline: '',
-        skills: '',
-        project_images: ''
+        skills: ''
       });
+      setProjectImage(null);
+      setProjectImagePreview('');
       
     } catch (error) {
       console.error('Error posting project:', error);
       toast({
         title: "Failed to Post Project",
-        description: "Please check your connection and try again",
+        description: error instanceof Error ? error.message : "Please check your connection and try again",
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
+      setUploadingImage(false);
     }
   };
 
@@ -298,15 +357,46 @@ const PostProject = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="project_images">Project Images (Optional)</Label>
-                    <Input 
-                      id="project_images" 
-                      placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"
-                      className="bg-muted/50"
-                      value={formData.project_images}
-                      onChange={(e) => handleInputChange('project_images', e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">Enter image URLs separated by commas</p>
+                    <Label htmlFor="project_image">Project Image *</Label>
+                    {projectImagePreview ? (
+                      <div className="relative">
+                        <img 
+                          src={projectImagePreview} 
+                          alt="Project preview" 
+                          className="w-full h-48 object-cover rounded-lg"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2"
+                          onClick={removeImage}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <Input
+                          id="project_image"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className={`bg-muted/50 ${formErrors.project_image ? 'border-destructive' : ''}`}
+                        />
+                        <div className="mt-2 flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg bg-muted/50">
+                          <div className="text-center">
+                            <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
+                            <p className="mt-2 text-sm text-muted-foreground">Upload project image</p>
+                            <p className="text-xs text-muted-foreground">Max 5MB</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {formErrors.project_image && (
+                      <p className="text-sm text-destructive">{formErrors.project_image}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Upload an image that represents your project (required)</p>
                   </div>
 
                   <Button 

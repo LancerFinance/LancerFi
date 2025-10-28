@@ -23,6 +23,7 @@ interface ServiceDetails {
   created_at: string;
   client_id: string;
   freelancer_id?: string;
+  project_images?: string[];
   freelancer?: {
     id: string;
     full_name: string;
@@ -171,6 +172,16 @@ const ServiceDetails = () => {
                 <CardTitle className="text-2xl">{service.title}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Project Image */}
+                {service.project_images && service.project_images.length > 0 && (
+                  <div className="w-full">
+                    <img 
+                      src={service.project_images[0]} 
+                      alt={service.title}
+                      className="w-full h-64 object-cover rounded-lg"
+                    />
+                  </div>
+                )}
                 <div>
                   <h3 className="font-semibold mb-3">Project Description</h3>
                   <p className="text-muted-foreground leading-relaxed">
