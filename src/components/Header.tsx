@@ -54,6 +54,9 @@ const Header = () => {
 
           {/* Navigation Links - Desktop */}
           <nav className="hidden lg:flex items-center space-x-6 flex-1 justify-end">
+            <Link to="/dashboard" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+              Dashboard
+            </Link>
             <Link to="/browse-services" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
               Browse
             </Link>
