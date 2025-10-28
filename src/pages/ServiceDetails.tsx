@@ -103,7 +103,22 @@ const ServiceDetails = () => {
       return;
     }
     
-    navigate(`/post-project?preselectedFreelancerId=${service?.freelancer_id}`);
+    if (service?.freelancer_id) {
+      navigate(`/post-project?preselectedFreelancerId=${service.freelancer_id}`);
+    }
+  };
+
+  const handleSubmitProposal = () => {
+    if (!isConnected) {
+      toast({
+        title: "Connect Wallet",
+        description: "Please connect your wallet to submit a proposal",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    navigate(`/view-proposals/${service?.id}`);
   };
 
   if (loading) {
@@ -219,6 +234,27 @@ const ServiceDetails = () => {
               </CardContent>
             </Card>
 
+            {/* Open for Proposals */}
+            {!service.freelancer && (
+              <Card className="border-accent-blue bg-accent-blue/5">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Award className="h-5 w-5 text-accent-blue" />
+                    Open for Proposals
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    This project is actively seeking talented freelancers. Submit your proposal to be considered for this opportunity.
+                  </p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Shield className="h-4 w-4 text-accent-green" />
+                    <span className="text-muted-foreground">Payments protected by escrow</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Freelancer Info */}
             {service.freelancer && (
               <Card>
@@ -310,23 +346,35 @@ const ServiceDetails = () => {
                 <Separator />
 
                 <div className="space-y-3">
-                  <Button 
-                    className="w-full"
-                    onClick={handleHire}
-                    disabled={!service.freelancer}
-                  >
-                    {service.freelancer ? 'Hire Now' : 'Service Unavailable'}
-                  </Button>
-                  
-                  {service.freelancer && (
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={handleContact}
-                    >
-                      <MessageCircle className="h-4 w-4 mr-2" />
-                      Contact Freelancer
-                    </Button>
+                  {service.freelancer ? (
+                    <>
+                      <Button 
+                        className="w-full"
+                        onClick={handleHire}
+                      >
+                        Hire Now
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={handleContact}
+                      >
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Contact Freelancer
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button 
+                        className="w-full"
+                        onClick={handleSubmitProposal}
+                      >
+                        Submit Proposal
+                      </Button>
+                      <p className="text-xs text-center text-muted-foreground">
+                        Pitch your skills and win this project
+                      </p>
+                    </>
                   )}
                 </div>
 
