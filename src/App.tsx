@@ -16,6 +16,7 @@ import EditProfile from "./pages/EditProfile";
 import ProjectDetails from "./pages/ProjectDetails";
 import EditProject from "./pages/EditProject";
 import ViewProposals from "./pages/ViewProposals";
+import SubmitProposal from "./pages/SubmitProposal";
 import Messages from "./pages/Messages";
 import BrowseServices from "./pages/BrowseServices";
 import ServiceDetails from "./pages/ServiceDetails";
@@ -43,6 +44,7 @@ const App = () => (
         <Route path="/project/:id" element={<ProjectDetails />} />
         <Route path="/project/:id/edit" element={<EditProject />} />
         <Route path="/project/:id/proposals" element={<ViewProposals />} />
+        <Route path="/project/:projectId/submit-proposal" element={<SubmitProposal />} />
         <Route path="/messages" element={<Messages />} />
         <Route path="/browse-services" element={<BrowseServices />} />
         <Route path="/service/:id" element={<ServiceDetails />} />

@@ -118,7 +118,7 @@ const ServiceDetails = () => {
       return;
     }
     
-    navigate(`/view-proposals/${service?.id}`);
+    navigate(`/project/${service?.id}/submit-proposal`);
   };
 
   if (loading) {
