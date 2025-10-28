@@ -9,9 +9,10 @@ interface ProjectCardProps {
   project: Project;
   escrow?: Escrow;
   onViewProject: (id: string) => void;
+  proposalCount?: number;
 }
 
-const ProjectCard = ({ project, escrow, onViewProject }: ProjectCardProps) => {
+const ProjectCard = ({ project, escrow, onViewProject, proposalCount = 0 }: ProjectCardProps) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-web3-success/10 text-web3-success';
@@ -112,7 +113,21 @@ const ProjectCard = ({ project, escrow, onViewProject }: ProjectCardProps) => {
           )}
         </div>
 
-        <Button 
+        {/* Proposal notification */}
+        {!project.freelancer_id && proposalCount > 0 && (
+          <div className="bg-accent-amber/10 border border-accent-amber/20 rounded-lg p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-accent-amber">
+                {proposalCount} New Proposal{proposalCount > 1 ? 's' : ''}
+              </span>
+              <Badge className="bg-accent-amber text-white">
+                {proposalCount}
+              </Badge>
+            </div>
+          </div>
+        )}
+
+        <Button
           variant="outline" 
           className="w-full"
           onClick={() => onViewProject(project.id)}

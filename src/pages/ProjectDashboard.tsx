@@ -20,6 +20,7 @@ const ProjectDashboard = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [escrows, setEscrows] = useState<Record<string, Escrow>>({});
+  const [proposalCounts, setProposalCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -48,6 +49,8 @@ const ProjectDashboard = () => {
 
       // Load escrows for each project
       const escrowData: Record<string, Escrow> = {};
+      const proposalCountData: Record<string, number> = {};
+      
       for (const project of projectsData || []) {
         try {
           const escrow = await db.getEscrow(project.id);
@@ -57,8 +60,25 @@ const ProjectDashboard = () => {
         } catch (error) {
           // Escrow doesn't exist for this project
         }
+
+        // Load proposal count for projects without freelancers
+        if (!project.freelancer_id) {
+          try {
+            const { data: proposals, error } = await supabase
+              .from('proposals')
+              .select('id', { count: 'exact' })
+              .eq('project_id', project.id);
+            
+            if (!error && proposals) {
+              proposalCountData[project.id] = proposals.length;
+            }
+          } catch (error) {
+            console.log('Error loading proposal count:', error);
+          }
+        }
       }
       setEscrows(escrowData);
+      setProposalCounts(proposalCountData);
     } catch (error) {
       console.error('Error loading projects:', error);
       toast({
@@ -236,6 +256,7 @@ const ProjectDashboard = () => {
                 key={project.id}
                 project={project}
                 escrow={escrows[project.id]}
+                proposalCount={proposalCounts[project.id]}
                 onViewProject={handleViewProject}
               />
             ))}

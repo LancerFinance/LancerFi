@@ -49,6 +49,7 @@ const ProjectDetails = () => {
   const [freelancer, setFreelancer] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
+  const [proposalCount, setProposalCount] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -91,6 +92,20 @@ const ProjectDetails = () => {
           setFreelancer(freelancerData);
         } catch (error) {
           console.log('No freelancer profile found');
+        }
+      } else {
+        // Load proposal count if no freelancer assigned
+        try {
+          const { data: proposals, error } = await supabase
+            .from('proposals')
+            .select('id', { count: 'exact' })
+            .eq('project_id', id);
+          
+          if (!error && proposals) {
+            setProposalCount(proposals.length);
+          }
+        } catch (error) {
+          console.log('Error loading proposal count:', error);
         }
       }
 
@@ -261,9 +276,14 @@ const ProjectDetails = () => {
                   </Link>
                   {!project.freelancer_id && (
                     <Link to={`/project/${id}/proposals`}>
-                      <Button variant="outline" size="sm">
+                      <Button variant="default" size="sm" className="relative">
                         <MessageSquare className="w-4 h-4 mr-2" />
                         View Proposals
+                        {proposalCount > 0 && (
+                          <Badge className="ml-2 bg-accent-amber text-white">
+                            {proposalCount}
+                          </Badge>
+                        )}
                       </Button>
                     </Link>
                   )}
