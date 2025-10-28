@@ -6,22 +6,22 @@ import { Link } from "react-router-dom";
 import WalletButton from "./WalletButton";
 import { useWallet } from "@/hooks/useWallet";
 import { db } from "@/lib/supabase";
-
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const { isConnected, address: connectedAddress } = useWallet();
-
+  const {
+    isConnected,
+    address: connectedAddress
+  } = useWallet();
   useEffect(() => {
     if (isConnected && connectedAddress) {
       checkUnreadMessages();
       // Check for new messages every 30 seconds
       const interval = setInterval(checkUnreadMessages, 30000);
-      
+
       // Listen for message read events to update count immediately
       const handleMessageRead = () => checkUnreadMessages();
       window.addEventListener('messageRead', handleMessageRead);
-      
       return () => {
         clearInterval(interval);
         window.removeEventListener('messageRead', handleMessageRead);
@@ -30,28 +30,20 @@ const Header = () => {
       setUnreadCount(0);
     }
   }, [isConnected, connectedAddress]);
-
   const checkUnreadMessages = async () => {
     if (!connectedAddress) return;
-    
     try {
       const messages = await db.getMessagesForUser(connectedAddress);
-      const unread = messages.filter(msg => 
-        msg.recipient_id === connectedAddress && !msg.is_read
-      ).length;
+      const unread = messages.filter(msg => msg.recipient_id === connectedAddress && !msg.is_read).length;
       setUnreadCount(unread);
     } catch (error) {
       console.error('Error checking unread messages:', error);
     }
   };
-
-  return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+  return <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top bar with announcement */}
-        <div className="flex items-center justify-between py-2 text-xs border-b border-border/50">
-          <span className="text-muted-foreground">Express delivery on everyday picks in select cities</span>
-        </div>
+        
 
         {/* Main header */}
         <div className="flex h-16 items-center justify-between">
@@ -77,29 +69,22 @@ const Header = () => {
             <Link to="/faq" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
               Support
             </Link>
-            {connectedAddress && (
-              <>
+            {connectedAddress && <>
                 <Link to="/messages" className="text-sm font-medium text-foreground hover:text-primary transition-colors relative">
                   Messages
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-2 bg-destructive text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {unreadCount > 0 && <span className="absolute -top-1 -right-2 bg-destructive text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
                       {unreadCount}
-                    </span>
-                  )}
+                    </span>}
                 </Link>
                 <Link to="/edit-profile" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
                   Profile
                 </Link>
-              </>
-            )}
+              </>}
             <WalletButton />
           </nav>
 
           {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-2 text-foreground"
-          >
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="lg:hidden p-2 text-foreground">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
@@ -132,8 +117,7 @@ const Header = () => {
         </div>
 
         {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="lg:hidden pb-4 border-t border-border pt-4 animate-in slide-in-from-top-2 duration-200">
+        {isMobileMenuOpen && <div className="lg:hidden pb-4 border-t border-border pt-4 animate-in slide-in-from-top-2 duration-200">
             <nav className="flex flex-col space-y-3">
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <Link to="/browse-services" className="p-3 rounded-lg bg-muted/50 text-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
@@ -144,58 +128,34 @@ const Header = () => {
                 </Link>
               </div>
               <div className="space-y-2">
-                <Link 
-                  to="/how-it-works" 
-                  className="block py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
+                <Link to="/how-it-works" className="block py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm" onClick={() => setIsMobileMenuOpen(false)}>
                   How It Works
                 </Link>
-                <Link 
-                  to="/freelancer" 
-                  className="block py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
+                <Link to="/freelancer" className="block py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm" onClick={() => setIsMobileMenuOpen(false)}>
                   Find Work
                 </Link>
-                <Link 
-                  to="/dashboard" 
-                  className="block py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
+                <Link to="/dashboard" className="block py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm" onClick={() => setIsMobileMenuOpen(false)}>
                   Dashboard
                 </Link>
-                <Link 
-                  to="/messages" 
-                  className="flex items-center py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
+                <Link to="/messages" className="flex items-center py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm" onClick={() => setIsMobileMenuOpen(false)}>
                   <MessageSquare className="w-4 h-4 mr-2" />
                   Messages
-                  {unreadCount > 0 && (
-                    <Badge className="ml-auto h-5 w-5 text-xs bg-destructive text-destructive-foreground p-0 flex items-center justify-center">
+                  {unreadCount > 0 && <Badge className="ml-auto h-5 w-5 text-xs bg-destructive text-destructive-foreground p-0 flex items-center justify-center">
                       {unreadCount > 9 ? '9+' : unreadCount}
-                    </Badge>
-                  )}
+                    </Badge>}
                 </Link>
-                <Link 
-                  to="/faq" 
-                  className="block py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
+                <Link to="/faq" className="block py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm" onClick={() => setIsMobileMenuOpen(false)}>
                   FAQ
                 </Link>
               </div>
               
               <div className="border-t border-border pt-4 mt-4 space-y-2">
-                {isConnected && (
-                  <Link to="/edit-profile" onClick={() => setIsMobileMenuOpen(false)}>
+                {isConnected && <Link to="/edit-profile" onClick={() => setIsMobileMenuOpen(false)}>
                     <Button variant="ghost" size="sm" className="w-full justify-start">
                       <User className="w-4 h-4 mr-2" />
                       Edit Profile
                     </Button>
-                  </Link>
-                )}
+                  </Link>}
                 <Link to="/post-project" onClick={() => setIsMobileMenuOpen(false)}>
                   <Button variant="outline" size="sm" className="w-full justify-start">
                     <Plus className="w-4 h-4 mr-2" />
@@ -207,11 +167,8 @@ const Header = () => {
                 </div>
               </div>
             </nav>
-          </div>
-        )}
+          </div>}
       </div>
-    </header>
-  );
+    </header>;
 };
-
 export default Header;
