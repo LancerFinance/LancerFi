@@ -269,14 +269,14 @@ const FreelancerProfile = () => {
 
         <div className="max-w-6xl mx-auto">
           {/* Profile Photo and Header */}
-          <div className="flex items-start gap-6 mb-8 -mt-20 relative z-10">
+          <div className={`flex items-start gap-6 mb-8 relative ${profile.banner_url ? '-mt-20 z-10' : ''}`}>
             <Avatar className="h-32 w-32 border-4 border-background shadow-lg">
               <AvatarImage src={profile.profile_photo_url || ''} />
               <AvatarFallback className="text-3xl">
                 {profile.full_name?.split(' ').map(n => n[0]).join('') || profile.username?.[0]?.toUpperCase() || 'FL'}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1 mt-16">
+            <div className={`flex-1 ${profile.banner_url ? 'mt-16' : ''}`}>
               <div className="flex items-start justify-between">
                 <div>
                   <h1 className="text-3xl font-bold text-foreground mb-2">
