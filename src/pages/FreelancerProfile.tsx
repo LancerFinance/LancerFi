@@ -75,10 +75,10 @@ const PastWorksSection = ({ freelancerId }: { freelancerId: string }) => {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <ImageIcon className="w-5 h-5 text-web3-primary" />
+            <ImageIcon className="w-5 h-5 text-primary" />
             Past Works
           </CardTitle>
         </CardHeader>
@@ -94,10 +94,10 @@ const PastWorksSection = ({ freelancerId }: { freelancerId: string }) => {
   }
 
   return (
-    <Card>
+    <Card className="border-border bg-card">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <ImageIcon className="w-5 h-5 text-web3-primary" />
+          <ImageIcon className="w-5 h-5 text-primary" />
           Past Works ({projects.length})
         </CardTitle>
       </CardHeader>
@@ -106,7 +106,7 @@ const PastWorksSection = ({ freelancerId }: { freelancerId: string }) => {
           {projects.map((project) => (
             <div key={project.id} className="space-y-2">
               <Link to={`/project/${project.id}`}>
-                <h4 className="font-semibold hover:text-web3-primary transition-colors">
+                <h4 className="font-semibold hover:text-primary transition-colors">
                   {project.title}
                 </h4>
               </Link>
@@ -190,8 +190,8 @@ const FreelancerProfile = () => {
 
   const getAvailabilityColor = (status: string) => {
     switch (status) {
-      case 'available': return 'text-web3-success';
-      case 'busy': return 'text-web3-warning';
+      case 'available': return 'text-accent-green';
+      case 'busy': return 'text-accent-amber';
       default: return 'text-muted-foreground';
     }
   };
@@ -291,7 +291,7 @@ const FreelancerProfile = () => {
                     )}
                     {profile.rating && (
                       <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-web3-warning text-web3-warning" />
+                        <Star className="w-4 h-4 fill-accent-amber text-accent-amber" />
                         {profile.rating.toFixed(1)}
                       </div>
                     )}
@@ -299,7 +299,7 @@ const FreelancerProfile = () => {
                 </div>
                 <div className="flex gap-2">
                   <Link to={`/post-project?freelancer=${profile.id}`}>
-                    <Button size="lg" className="bg-web3-primary hover:bg-web3-primary/90">
+                    <Button size="lg">
                       <Briefcase className="w-4 h-4 mr-2" />
                       Hire
                     </Button>
@@ -318,7 +318,7 @@ const FreelancerProfile = () => {
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               {/* About */}
-              <Card>
+              <Card className="border-border bg-card">
                 <CardHeader>
                   <CardTitle>About</CardTitle>
                 </CardHeader>
@@ -330,7 +330,7 @@ const FreelancerProfile = () => {
               </Card>
 
               {/* Skills */}
-              <Card>
+              <Card className="border-border bg-card">
                 <CardHeader>
                   <CardTitle>Skills & Expertise</CardTitle>
                 </CardHeader>
@@ -347,10 +347,10 @@ const FreelancerProfile = () => {
 
               {/* Education */}
               {profile.education && (
-                <Card>
+                <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <GraduationCap className="w-5 h-5 text-web3-primary" />
+                      <GraduationCap className="w-5 h-5 text-primary" />
                       Education
                     </CardTitle>
                   </CardHeader>
@@ -369,7 +369,7 @@ const FreelancerProfile = () => {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Stats Card */}
-              <Card className="bg-gradient-card border-web3-primary/30">
+              <Card className="border-border bg-card">
                 <CardContent className="p-6 space-y-4">
                   <div className={`inline-flex items-center gap-2 ${getAvailabilityColor(profile.availability_status || 'available')}`}>
                     <div className="w-2 h-2 rounded-full bg-current"></div>
@@ -379,7 +379,7 @@ const FreelancerProfile = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-web3-warning text-web3-warning" />
+                        <Star className="w-4 h-4 fill-accent-amber text-accent-amber" />
                         <span className="font-bold">{profile.rating || 0}</span>
                       </div>
                       <span className="text-xs text-muted-foreground">Rating</span>
@@ -401,10 +401,10 @@ const FreelancerProfile = () => {
               </Card>
 
               {/* Experience */}
-              <Card>
+              <Card className="border-border bg-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Award className="w-5 h-5 text-web3-primary" />
+                    <Award className="w-5 h-5 text-primary" />
                     Experience
                   </CardTitle>
                 </CardHeader>
@@ -426,10 +426,10 @@ const FreelancerProfile = () => {
 
               {/* Languages */}
               {profile.languages && profile.languages.length > 0 && (
-                <Card>
+                <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Languages className="w-5 h-5 text-web3-primary" />
+                      <Languages className="w-5 h-5 text-primary" />
                       Languages
                     </CardTitle>
                   </CardHeader>
@@ -447,7 +447,7 @@ const FreelancerProfile = () => {
 
               {/* Certifications */}
               {profile.certifications && profile.certifications.length > 0 && (
-                <Card>
+                <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle>Certifications</CardTitle>
                   </CardHeader>
