@@ -169,51 +169,53 @@ const CategoryGrid = () => {
 
         {/* Sticky Filter & Sort Bar */}
         <div className="sticky top-14 z-10 mb-6">
-          <div className="rounded-full border border-border bg-card/70 backdrop-blur-md px-3 py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
-            <div className="flex flex-wrap items-center gap-2">
-              {[
-                { key: "all", label: "All" },
-                { key: "trending", label: "Trending" },
-                { key: "most", label: "Most Active" },
-                { key: "new", label: "New" },
-                { key: "high", label: "High Value" }
-              ].map((f) => (
-                <button
-                  key={f.key}
-                  onClick={() => setActiveFilter(f.key as any)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-sm font-medium transition-colors motion-safe:duration-200",
-                    activeFilter === f.key
-                      ? "bg-gradient-to-r from-violet-500 to-indigo-500 text-white"
-                      : "bg-muted text-foreground hover:bg-muted/80"
-                  )}
-                  aria-pressed={activeFilter === f.key}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              {[
-                { key: "activity", label: "Activity" },
-                { key: "price", label: "Price" },
-                { key: "completion", label: "Completion Rate" },
-                { key: "delivery", label: "Delivery Time" }
-              ].map((s) => (
-                <button
-                  key={s.key}
-                  onClick={() => setSortBy(s.key as any)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-sm font-medium transition-colors motion-safe:duration-200",
-                    sortBy === s.key
-                      ? "bg-background border border-border"
-                      : "bg-muted text-foreground hover:bg-muted/80"
-                  )}
-                  aria-pressed={sortBy === s.key}
-                >
-                  {s.label}
-                </button>
-              ))}
+          <div className="rounded-full border border-border bg-card/70 backdrop-blur-md px-3 py-2 shadow-[0_8px_30px_rgb(0,0,0,0.06)] overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { key: "all", label: "All" },
+                  { key: "trending", label: "Trending" },
+                  { key: "most", label: "Most Active" },
+                  { key: "new", label: "New" },
+                  { key: "high", label: "High Value" }
+                ].map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => setActiveFilter(f.key as any)}
+                    className={cn(
+                      "px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors motion-safe:duration-200 min-h-[32px] flex items-center justify-center whitespace-nowrap",
+                      activeFilter === f.key
+                        ? "bg-gradient-to-r from-violet-500 to-indigo-500 text-white"
+                        : "bg-muted text-foreground hover:bg-muted/80"
+                    )}
+                    aria-pressed={activeFilter === f.key}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { key: "activity", label: "Activity" },
+                  { key: "price", label: "Price" },
+                  { key: "completion", label: "Completion" },
+                  { key: "delivery", label: "Delivery" }
+                ].map((s) => (
+                  <button
+                    key={s.key}
+                    onClick={() => setSortBy(s.key as any)}
+                    className={cn(
+                      "px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors motion-safe:duration-200 min-h-[32px] flex items-center justify-center whitespace-nowrap",
+                      sortBy === s.key
+                        ? "bg-background border border-border"
+                        : "bg-muted text-foreground hover:bg-muted/80"
+                    )}
+                    aria-pressed={sortBy === s.key}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

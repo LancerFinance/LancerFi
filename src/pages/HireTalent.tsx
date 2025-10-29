@@ -146,13 +146,14 @@ const HireTalent = () => {
         </div>
 
         {/* Filters Section */}
-        <div className="flex flex-wrap gap-4 mb-8 justify-center">
+        <div className="flex flex-wrap gap-2 sm:gap-4 mb-8 justify-center">
           {categories.map((category) => (
             <Button
               key={category}
               variant={selectedCategory === category ? "default" : "outline"}
               size="sm"
               onClick={() => setSelectedCategory(category)}
+              className="text-xs sm:text-sm px-3 py-2 h-10 min-w-fit"
             >
               {category}
             </Button>

@@ -276,7 +276,7 @@ const PostProject = () => {
               </Card>
             )}
 
-          <div className="grid lg:grid-cols-2 gap-8">
+          <div className="grid lg:grid-cols-2 gap-6 lg:gap-8">
             {/* Main Form */}
             <div className="space-y-6">
               <Card className="bg-gradient-card border-border/50">
@@ -289,7 +289,7 @@ const PostProject = () => {
                     <Input 
                       id="title" 
                       placeholder="e.g., DeFi Trading Bot Development"
-                      className={`bg-muted/50 ${formErrors.title ? 'border-destructive' : ''}`}
+                      className={`bg-muted/50 h-12 text-base ${formErrors.title ? 'border-destructive' : ''}`}
                       value={formData.title}
                       onChange={(e) => handleInputChange('title', e.target.value)}
                     />
@@ -323,7 +323,7 @@ const PostProject = () => {
                       id="description"
                       placeholder="Describe your project in detail. Include technical requirements, expected deliverables, and any specific technologies you want to use..."
                       rows={6}
-                      className={`bg-muted/50 ${formErrors.description ? 'border-destructive' : ''}`}
+                      className={`bg-muted/50 text-base ${formErrors.description ? 'border-destructive' : ''}`}
                       value={formData.description}
                       onChange={(e) => handleInputChange('description', e.target.value)}
                     />
