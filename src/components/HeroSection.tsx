@@ -6,10 +6,7 @@ import { Search, Shield, Zap, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { db } from "@/lib/supabase";
 import { PROJECT_CATEGORIES } from "@/lib/categories";
-import smartContractsImg from "@/assets/services/smart-contracts.jpg";
-import defiImg from "@/assets/services/defi.jpg";
-import nftImg from "@/assets/services/nft.jpg";
-import dappImg from "@/assets/services/dapp.jpg";
+import { InteractiveImageAccordion } from "@/components/ui/interactive-image-accordion";
 
 const HeroSection = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -174,63 +171,9 @@ const HeroSection = () => {
                 </div>
               </div>
 
-              {/* Right - Service Photos Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="group relative overflow-hidden rounded-2xl cursor-pointer hover-lift shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
-                  <div className="aspect-square relative">
-                    <img
-                      src={smartContractsImg}
-                      alt="Smart Contracts"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity"></div>
-                    <div className="absolute bottom-0 left-0 right-0 p-4">
-                      <h3 className="text-white font-bold text-sm">Smart Contracts</h3>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="group relative overflow-hidden rounded-2xl cursor-pointer hover-lift shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
-                  <div className="aspect-square relative">
-                    <img
-                      src={defiImg}
-                      alt="DeFi Solutions"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity"></div>
-                    <div className="absolute bottom-0 left-0 right-0 p-4">
-                      <h3 className="text-white font-bold text-sm">DeFi Solutions</h3>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="group relative overflow-hidden rounded-2xl cursor-pointer hover-lift shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
-                  <div className="aspect-square relative">
-                    <img
-                      src={nftImg}
-                      alt="NFT Development"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity"></div>
-                    <div className="absolute bottom-0 left-0 right-0 p-4">
-                      <h3 className="text-white font-bold text-sm">NFT Development</h3>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="group relative overflow-hidden rounded-2xl cursor-pointer hover-lift shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
-                  <div className="aspect-square relative">
-                    <img
-                      src={dappImg}
-                      alt="DApp Development"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity"></div>
-                    <div className="absolute bottom-0 left-0 right-0 p-4">
-                      <h3 className="text-white font-bold text-sm">DApp Development</h3>
-                    </div>
-                  </div>
-                </div>
+              {/* Right - Interactive Image Accordion */}
+              <div className="hidden lg:block">
+                <InteractiveImageAccordion />
               </div>
             </div>
           </div>
