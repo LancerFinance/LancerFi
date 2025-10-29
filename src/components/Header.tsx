@@ -96,26 +96,7 @@ const Header = () => {
 
         {/* Secondary Navigation Bar */}
         <div className="hidden lg:flex items-center justify-between py-3 border-t border-border/50">
-          <div className="flex items-center space-x-6">
-            <Link to="/browse-services?category=blockchain" className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <Zap className="h-4 w-4" />
-              <span>Blockchain Dev</span>
-            </Link>
-            <Link to="/browse-services?category=smart-contracts" className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <Shield className="h-4 w-4" />
-              <span>Smart Contracts</span>
-            </Link>
-            <Link to="/browse-services?category=defi" className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <Users className="h-4 w-4" />
-              <span>DeFi</span>
-            </Link>
-            <Link to="/browse-services?category=nft" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              NFTs
-            </Link>
-            <Link to="/browse-services?category=web3-frontend" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Web3 Frontend
-            </Link>
-          </div>
+          
           <span className="text-sm text-muted-foreground">USDC payments • Near-zero fees</span>
         </div>
 
