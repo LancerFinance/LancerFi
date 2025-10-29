@@ -258,7 +258,7 @@ const FreelancerProfile = () => {
 
         {/* Banner Image */}
         {profile.banner_url && (
-          <div className="w-full -mx-4 h-64 overflow-hidden mb-6">
+          <div className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] h-64 overflow-hidden mb-6">
             <img 
               src={profile.banner_url} 
               alt="Profile banner" 
