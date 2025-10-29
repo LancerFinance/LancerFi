@@ -172,7 +172,7 @@ const HeroSection = () => {
               </div>
 
               {/* Right - Interactive Image Accordion */}
-              <div className="hidden lg:block">
+              <div className="w-full">
                 <InteractiveImageAccordion />
               </div>
             </div>

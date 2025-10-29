@@ -33,9 +33,10 @@ const AccordionItem = ({ item, isActive, onMouseEnter }: {
   return (
     <div
       className={`
-        relative h-[450px] rounded-2xl overflow-hidden cursor-pointer
+        relative rounded-2xl overflow-hidden cursor-pointer
         transition-all duration-700 ease-in-out
-        ${isActive ? 'w-[400px]' : 'w-[60px]'}
+        h-[300px] sm:h-[400px] lg:h-[450px]
+        ${isActive ? 'w-[200px] sm:w-[280px] lg:w-[400px]' : 'w-[40px] sm:w-[50px] lg:w-[60px]'}
       `}
       onMouseEnter={onMouseEnter}
     >
@@ -56,12 +57,13 @@ const AccordionItem = ({ item, isActive, onMouseEnter }: {
       {/* Caption Text */}
       <span
         className={`
-          absolute text-white text-lg font-semibold whitespace-nowrap
+          absolute text-white font-semibold whitespace-nowrap
           transition-all duration-300 ease-in-out
+          text-sm sm:text-base lg:text-lg
           ${
             isActive
-              ? 'bottom-6 left-1/2 -translate-x-1/2 rotate-0'
-              : 'w-auto text-left bottom-24 left-1/2 -translate-x-1/2 rotate-90'
+              ? 'bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 rotate-0'
+              : 'w-auto text-left bottom-16 sm:bottom-20 lg:bottom-24 left-1/2 -translate-x-1/2 rotate-90'
           }
         `}
       >
@@ -80,7 +82,7 @@ export function InteractiveImageAccordion() {
   };
 
   return (
-    <div className="flex flex-row items-center justify-center gap-4 overflow-x-auto p-4">
+    <div className="flex flex-row items-center justify-center gap-2 sm:gap-3 lg:gap-4 overflow-x-auto p-2 sm:p-4">
       {accordionItems.map((item, index) => (
         <AccordionItem
           key={item.id}
