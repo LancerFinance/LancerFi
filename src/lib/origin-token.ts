@@ -2,7 +2,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
 import { connection } from './solana';
 
-// Origin Token Configuration (Pump.fun token)
+// Internal Token Configuration (labeled as Solana in UI)
 export const ORIGIN_MINT = new PublicKey('7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU'); // Origin token mint from Pump.fun
 export const ORIGIN_DECIMALS = 9; // Standard SPL token decimals
 
@@ -151,10 +151,10 @@ export async function createUSDCToOriginSwap(
   }
 }
 
-// Format Origin token amount
+// Format token amount (displayed as SOLANA)
 export function formatOrigin(amount: number): string {
   if (isNaN(amount) || amount === null || amount === undefined) {
-    return '0 ORIGIN';
+    return '0 SOLANA';
   }
   
   // Format with appropriate decimals based on amount size
@@ -169,17 +169,17 @@ export function formatOrigin(amount: number): string {
     formatted = amount.toFixed(6);
   }
   
-  return `${formatted} ORIGIN`;
+  return `${formatted} SOLANA`;
 }
 
-// Validate Origin token address
+// Validate token amount
 export function validateOriginAmount(amount: number, balance: number): { isValid: boolean; error?: string } {
   if (isNaN(amount) || amount <= 0) {
     return { isValid: false, error: 'Please enter a valid amount' };
   }
   
   if (amount > balance) {
-    return { isValid: false, error: 'Insufficient Origin token balance' };
+    return { isValid: false, error: 'Insufficient Solana token balance' };
   }
   
   return { isValid: true };
@@ -190,7 +190,7 @@ export function calculateOriginFee(originAmount: number, feePercent: number = 10
   return (originAmount * feePercent) / 100;
 }
 
-// Get current market data for Origin token
+// Get current market data (display only)
 export async function getOriginMarketData(): Promise<{
   price_usdc: number;
   volume_24h: number;
@@ -201,13 +201,13 @@ export async function getOriginMarketData(): Promise<{
     // This would typically call a price API like CoinGecko, Jupiter, or Pump.fun API
     // For now, returning mock data - replace with actual API calls
     return {
-      price_usdc: 0.001, // Example: 1 ORIGIN = 0.001 USDC
+      price_usdc: 0.001, // Example placeholder
       volume_24h: 50000,
       market_cap: 1000000,
       price_change_24h: 2.5 // 2.5% increase
     };
   } catch (error) {
-    console.error('Error fetching Origin market data:', error);
+    console.error('Error fetching Solana market data:', error);
     return {
       price_usdc: 0.001,
       volume_24h: 0,

@@ -1,13 +1,17 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Menu, X, User, MessageSquare, Plus, Shield, Zap, Users } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import WalletButton from "./WalletButton";
 import { useWallet } from "@/hooks/useWallet";
 import { db } from "@/lib/supabase";
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
   const {
     isConnected,
@@ -52,8 +56,23 @@ const Header = () => {
             <img src="/lancer-logo.png?v=2" alt="LancerFi Logo" className="h-8 w-auto" />
           </Link>
 
+          {/* Header Search (desktop) */}
+          <div className="hidden lg:flex flex-1 mx-8">
+            <div className="relative w-full max-w-2xl">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/browse-services?search=${encodeURIComponent(searchTerm)}`); }}
+                placeholder="Search services"
+                className="pl-9 h-10 rounded-full bg-muted/60 hover:bg-muted/80 border-border"
+                aria-label="Search services"
+              />
+            </div>
+          </div>
+
           {/* Navigation Links - Desktop */}
-          <nav className="hidden lg:flex items-center space-x-6 flex-1 justify-end">
+          <nav className="hidden lg:flex items-center space-x-6 justify-end">
             <Link to="/dashboard" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
               Dashboard
             </Link>
@@ -103,6 +122,18 @@ const Header = () => {
         {/* Mobile Menu */}
         {isMobileMenuOpen && <div className="lg:hidden pb-4 border-t border-border pt-4 animate-in slide-in-from-top-2 duration-200">
             <nav className="flex flex-col space-y-3">
+              {/* Mobile search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { setIsMobileMenuOpen(false); navigate(`/browse-services?search=${encodeURIComponent(searchTerm)}`); } }}
+                  placeholder="Search services"
+                  className="pl-9 h-10 rounded-full bg-muted/60 border-border"
+                  aria-label="Search services"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <Link to="/browse-services" className="p-3 rounded-lg bg-muted/50 text-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
                   Browse Services

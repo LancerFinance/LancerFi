@@ -4,9 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Info, TrendingUp, ArrowRight, Loader2 } from "lucide-react";
-import { PaymentCurrency } from "@/lib/solana";
-import { getConversionQuote, formatOrigin, getOriginMarketData } from "@/lib/origin-token";
-import { formatUSDC } from "@/lib/solana";
+import { PaymentCurrency, formatUSDC, formatSOL } from "@/lib/solana";
+import { getSolanaPrice, convertUSDToSOL } from "@/lib/solana-price";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface PaymentCurrencySelectorProps {
@@ -22,48 +21,42 @@ const PaymentCurrencySelector = ({
   onCurrencyChange, 
   className 
 }: PaymentCurrencySelectorProps) => {
-  const [conversionQuote, setConversionQuote] = useState<any>(null);
-  const [marketData, setMarketData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [solPrice, setSolPrice] = useState<number | null>(null);
+  const [solAmount, setSolAmount] = useState<number | null>(null);
 
   useEffect(() => {
     if (amount > 0) {
-      loadConversionData();
+      loadSolanaPrice();
     }
   }, [amount]);
 
-  const loadConversionData = async () => {
-    if (amount <= 0) return;
-    
+  const loadSolanaPrice = async () => {
     setLoading(true);
     try {
-      const [quote, market] = await Promise.all([
-        getConversionQuote(amount),
-        getOriginMarketData()
-      ]);
-      
-      setConversionQuote(quote);
-      setMarketData(market);
+      const priceData = await getSolanaPrice();
+      setSolPrice(priceData.price_usd);
+      const convertedAmount = await convertUSDToSOL(amount);
+      setSolAmount(convertedAmount);
     } catch (error) {
-      console.error('Error loading conversion data:', error);
+      console.error('Error loading SOL price:', error);
+      setSolPrice(100); // Fallback price
+      setSolAmount(amount / 100); // Fallback conversion
     } finally {
       setLoading(false);
     }
   };
 
-  const getOriginEquivalent = () => {
-    if (!conversionQuote) return 0;
-    return conversionQuote.outputAmount || (amount * 1000); // Fallback rate
-  };
-
-  const getUSDCEquivalent = () => {
-    if (!marketData) return amount;
-    return getOriginEquivalent() * marketData.price_usdc;
-  };
+  const getSolEquivalent = () => solAmount || (amount / (solPrice || 100));
+  const getUSDCEquivalent = () => amount;
 
   const platformFeePercent = 10;
   const platformFee = (amount * platformFeePercent) / 100;
   const totalAmount = amount + platformFee;
+  
+  // SOL calculations
+  const solPlatformFee = getSolEquivalent() * 0.1;
+  const solTotalAmount = getSolEquivalent() + solPlatformFee;
 
   return (
     <Card className={`bg-gradient-card border-border/50 ${className}`}>
@@ -100,20 +93,20 @@ const PaymentCurrencySelector = ({
             </div>
           </Button>
 
-          {/* Origin Option */}
+          {/* Solana Option */}
           <Button
-            variant={selectedCurrency === 'ORIGIN' ? 'default' : 'outline'}
-            onClick={() => onCurrencyChange('ORIGIN')}
+            variant={selectedCurrency === 'SOLANA' ? 'default' : 'outline'}
+            onClick={() => onCurrencyChange('SOLANA')}
             className="h-auto p-4 flex flex-col items-start space-y-2"
           >
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-web3-primary rounded-full flex items-center justify-center text-white text-xs font-bold">
-                  O
+                <div className="w-6 h-6 bg-black rounded-full flex items-center justify-center text-white text-xs font-bold">
+                  S
                 </div>
-                <span className="font-semibold">Pay with ORIGIN</span>
+                <span className="font-semibold">Pay with SOLANA</span>
               </div>
-              {selectedCurrency === 'ORIGIN' && (
+              {selectedCurrency === 'SOLANA' && (
                 <Badge variant="secondary" className="text-xs">Selected</Badge>
               )}
             </div>
@@ -125,9 +118,9 @@ const PaymentCurrencySelector = ({
                 </div>
               ) : (
                 <>
-                  <div>Amount: {formatOrigin(getOriginEquivalent())}</div>
-                  <div>+ Platform Fee: {formatOrigin(getOriginEquivalent() * 0.1)}</div>
-                  <div className="font-medium">Total: {formatOrigin(getOriginEquivalent() * 1.1)}</div>
+                  <div>Amount: {formatSOL(getSolEquivalent())}</div>
+                  <div>+ Platform Fee: {formatSOL(solPlatformFee)}</div>
+                  <div className="font-medium">Total: {formatSOL(solTotalAmount)}</div>
                 </>
               )}
             </div>
@@ -135,62 +128,22 @@ const PaymentCurrencySelector = ({
         </div>
 
         {/* Conversion Information */}
-        {selectedCurrency === 'USDC' && conversionQuote && (
-          <Alert className="bg-web3-secondary/10 border-web3-secondary/30">
-            <Info className="w-4 h-4" />
-            <AlertDescription>
-              <div className="space-y-2">
-                <div className="font-medium text-foreground">Automatic Conversion</div>
-                <div className="text-sm text-muted-foreground">
-                  Your {formatUSDC(amount)} USDC payment will be automatically converted to ~{formatOrigin(getOriginEquivalent())} tokens behind the scenes.
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>Conversion rate: 1 USDC ≈ {formatOrigin(conversionQuote.outputAmount || 1000)}</span>
-                  {conversionQuote.priceImpact > 0 && (
-                    <span>• Price impact: {conversionQuote.priceImpact.toFixed(2)}%</span>
-                  )}
-                </div>
-              </div>
-            </AlertDescription>
-          </Alert>
+        {false && (
+          <></>
         )}
 
         {/* Market Data */}
-        {marketData && (
-          <div className="space-y-3">
-            <Separator />
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <div className="text-muted-foreground">ORIGIN Price</div>
-                <div className="font-medium">{formatUSDC(marketData.price_usdc)}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">24h Change</div>
-                <div className={`font-medium ${marketData.price_change_24h >= 0 ? 'text-web3-success' : 'text-destructive'}`}>
-                  {marketData.price_change_24h >= 0 ? '+' : ''}{marketData.price_change_24h.toFixed(2)}%
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {false && <></>}
 
         {/* Benefits Section */}
         <div className="space-y-3">
           <Separator />
           <div className="text-sm space-y-2">
-            <div className="font-medium text-foreground">Why Origin Integration?</div>
+            <div className="font-medium text-foreground">Payment Options</div>
             <ul className="space-y-1 text-muted-foreground text-xs">
               <li className="flex items-start gap-2">
                 <div className="w-1 h-1 bg-web3-primary rounded-full mt-2"></div>
-                <span>All payments generate trading volume for ORIGIN token</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <div className="w-1 h-1 bg-web3-primary rounded-full mt-2"></div>
-                <span>Platform fees collected in ORIGIN support token ecosystem</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <div className="w-1 h-1 bg-web3-primary rounded-full mt-2"></div>
-                <span>Freelancers receive ORIGIN tokens with potential upside</span>
+                <span>Pay directly with USDC or SOLANA</span>
               </li>
             </ul>
           </div>
@@ -205,25 +158,25 @@ const PaymentCurrencySelector = ({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Project Budget</span>
                 <span className="text-foreground">
-                  {selectedCurrency === 'USDC' ? formatUSDC(amount) : formatOrigin(getOriginEquivalent())}
+                  {selectedCurrency === 'USDC' ? formatUSDC(amount) : formatSOL(getSolEquivalent())}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Platform Fee (10%)</span>
                 <span className="text-foreground">
-                  {selectedCurrency === 'USDC' ? formatUSDC(platformFee) : formatOrigin(getOriginEquivalent() * 0.1)}
+                  {selectedCurrency === 'USDC' ? formatUSDC(platformFee) : formatSOL(solPlatformFee)}
                 </span>
               </div>
               <Separator className="my-2" />
               <div className="flex justify-between font-semibold">
                 <span className="text-foreground">Total Payment</span>
                 <span className="text-web3-primary">
-                  {selectedCurrency === 'USDC' ? formatUSDC(totalAmount) : formatOrigin(getOriginEquivalent() * 1.1)}
+                  {selectedCurrency === 'USDC' ? formatUSDC(totalAmount) : formatSOL(solTotalAmount)}
                 </span>
               </div>
-              {selectedCurrency === 'USDC' && (
+              {selectedCurrency === 'SOLANA' && solPrice && (
                 <div className="text-xs text-muted-foreground mt-1">
-                  (Converted to ~{formatOrigin(getOriginEquivalent() * 1.1)} internally)
+                  (Based on current SOL price: ${solPrice.toFixed(2)})
                 </div>
               )}
             </div>

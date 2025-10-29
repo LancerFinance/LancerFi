@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { PROJECT_CATEGORIES } from "@/lib/categories";
 
 const ProjectDashboard = () => {
   const { isConnected, address } = useWallet();
@@ -279,14 +280,9 @@ const ProjectDashboard = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="smart-contracts">Smart Contracts</SelectItem>
-                  <SelectItem value="dapp-development">DApp Development</SelectItem>
-                  <SelectItem value="defi">DeFi Solutions</SelectItem>
-                  <SelectItem value="nft">NFT Development</SelectItem>
-                  <SelectItem value="blockchain">Blockchain Development</SelectItem>
-                  <SelectItem value="web3-frontend">Web3 Frontend</SelectItem>
-                  <SelectItem value="marketing">Web3 Marketing</SelectItem>
-                  <SelectItem value="design">UI/UX Design</SelectItem>
+                  {PROJECT_CATEGORIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

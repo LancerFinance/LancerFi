@@ -1,6 +1,6 @@
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
-import { ORIGIN_MINT, ORIGIN_DECIMALS, getUSDCToOriginRate, createUSDCToOriginSwap } from './origin-token';
+import { ORIGIN_MINT, ORIGIN_DECIMALS } from './origin-token';
 
 // Solana configuration
 const MODE = import.meta.env.MODE || 'development';
@@ -20,7 +20,11 @@ export const USDC_MINT = SOLANA_NETWORK === 'mainnet-beta'
 export const PLATFORM_WALLET = new PublicKey('DhVcKrZc5b8eVfvhMiVghKVfHkfxBJuNvxXpXfFHQVqg'); // LancerFi platform wallet
 
 // Payment currencies
-export type PaymentCurrency = 'USDC' | 'ORIGIN';
+export type PaymentCurrency = 'USDC' | 'SOLANA';
+
+// SOL token configuration
+export const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112'); // Wrapped SOL
+export const SOL_DECIMALS = 9;
 
 // Escrow program configuration
 export interface EscrowAccount {
@@ -44,7 +48,7 @@ export async function createEscrowAccount(
   clientWallet: PublicKey,
   projectId: string,
   amount: number,
-  currency: PaymentCurrency = 'ORIGIN',
+  currency: PaymentCurrency = 'SOLANA',
   platformFeePercent: number = 10
 ): Promise<{ escrowAccount: PublicKey; transaction: Transaction }> {
   const platformFee = (amount * platformFeePercent) / 100;
@@ -86,33 +90,18 @@ export async function createEscrowAccount(
   return { escrowAccount, transaction };
 }
 
-// Fund escrow with USDC or Origin (with conversion)
+// Fund escrow with USDC or Solana (label), internally same logic
 export async function fundEscrowWithCurrency(
   clientWallet: PublicKey,
   escrowAccount: PublicKey,
   amount: number,
-  currency: PaymentCurrency,
-  convertFromUSDC: boolean = false
+  currency: PaymentCurrency
 ): Promise<Transaction> {
   const transaction = new Transaction();
   
-  if (convertFromUSDC && currency === 'ORIGIN') {
-    // Client pays USDC but we convert to Origin internally
-    // First create the swap transaction from USDC to Origin
-    const swapTxBase64 = await createUSDCToOriginSwap(clientWallet, amount);
-    const swapTx = Transaction.from(Buffer.from(swapTxBase64, 'base64'));
-    
-    // Add swap instructions to our transaction
-    for (const instruction of swapTx.instructions) {
-      transaction.add(instruction);
-    }
-    
-    return transaction;
-  }
-  
   // Direct payment in specified currency
-  const tokenMint = currency === 'USDC' ? USDC_MINT : ORIGIN_MINT;
-  const decimals = currency === 'USDC' ? 6 : ORIGIN_DECIMALS;
+  const tokenMint = currency === 'USDC' ? USDC_MINT : SOL_MINT;
+  const decimals = currency === 'USDC' ? 6 : SOL_DECIMALS;
   
   // Get client's token account
   const clientTokenAccount = await getAssociatedTokenAddress(
@@ -155,19 +144,19 @@ export async function fundEscrowWithCurrency(
   return transaction;
 }
 
-// Release escrow payment (always in Origin tokens)
+// Release escrow payment (always in internal token)
 export async function releaseEscrowPayment(
   clientWallet: PublicKey,
   freelancerWallet: PublicKey,
   escrowAccount: PublicKey,
   amount: number,
-  currency: PaymentCurrency = 'ORIGIN'
+  currency: PaymentCurrency = 'SOLANA'
 ): Promise<Transaction> {
   const transaction = new Transaction();
   
-  // Always release in Origin tokens (internal currency)
-  const tokenMint = ORIGIN_MINT;
-  const decimals = ORIGIN_DECIMALS;
+  // Release in the same currency as funded
+  const tokenMint = currency === 'USDC' ? USDC_MINT : SOL_MINT;
+  const decimals = currency === 'USDC' ? 6 : SOL_DECIMALS;
   
   // Get escrow's token account
   const escrowTokenAccount = await getAssociatedTokenAddress(
@@ -195,7 +184,7 @@ export async function releaseEscrowPayment(
     );
   }
   
-  // Transfer Origin tokens from escrow to freelancer
+  // Transfer tokens from escrow to freelancer
   transaction.add(
     createTransferInstruction(
       escrowTokenAccount,
@@ -233,6 +222,17 @@ export function formatUSDC(amount: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+// Utility to format SOL amounts
+export function formatSOL(amount: number): string {
+  if (isNaN(amount) || amount === null || amount === undefined) {
+    return '0 SOL';
+  }
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  }).format(amount) + ' SOL';
 }
 
 // Legacy function kept for backward compatability

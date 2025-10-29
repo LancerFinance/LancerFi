@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Star, MapPin, Wallet, Clock } from "lucide-react";
+import { Star, MapPin, Wallet, Clock, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase, Profile } from "@/lib/supabase";
@@ -165,10 +165,18 @@ const HireTalent = () => {
             <Card key={freelancer.id} className="hover:shadow-lg transition-shadow duration-300 border-border bg-card">
               <CardHeader className="pb-4">
                 <div className="flex items-start space-x-4">
-                  <Avatar className="w-16 h-16">
-                    <AvatarImage src="" alt={freelancer.full_name || 'Freelancer'} />
-                    <AvatarFallback className="bg-web3-primary text-white font-semibold">
-                      {freelancer.full_name?.split(' ').map(n => n[0]).join('') || 'FL'}
+                  <Avatar className="w-16 h-16 border-2 border-background shadow-lg flex-shrink-0">
+                    <AvatarImage 
+                      src={freelancer.profile_photo_url || ''} 
+                      alt={freelancer.full_name || freelancer.username || 'Freelancer'} 
+                    />
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
+                      {(freelancer.full_name || freelancer.username || 'F')
+                        .split(' ')
+                        .map(n => n[0])
+                        .join('')
+                        .slice(0, 2)
+                        .toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">

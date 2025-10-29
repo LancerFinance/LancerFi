@@ -11,8 +11,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { db, supabase } from "@/lib/supabase";
-import { formatUSDC, PaymentCurrency } from "@/lib/solana";
-import { formatOrigin } from "@/lib/origin-token";
+import { formatUSDC, formatSOL, PaymentCurrency } from "@/lib/solana";
+import { getSolanaPrice, convertUSDToSOL } from "@/lib/solana-price";
 import { useToast } from "@/hooks/use-toast";
 import { validateProject } from "@/lib/validation";
 import PaymentCurrencySelector from "@/components/PaymentCurrencySelector";
@@ -33,19 +33,41 @@ const PostProject = () => {
     timeline: '',
     skills: ''
   });
-  const [paymentCurrency, setPaymentCurrency] = useState<PaymentCurrency>('ORIGIN');
+  const [paymentCurrency, setPaymentCurrency] = useState<PaymentCurrency>('SOLANA');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFreelancer, setSelectedFreelancer] = useState<any>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [projectImage, setProjectImage] = useState<File | null>(null);
   const [projectImagePreview, setProjectImagePreview] = useState<string>('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [solPrice, setSolPrice] = useState<number | null>(null);
+  const [solAmount, setSolAmount] = useState<number | null>(null);
 
   useEffect(() => {
     if (preselectedFreelancerId) {
       loadFreelancer(preselectedFreelancerId);
     }
   }, [preselectedFreelancerId]);
+
+  // Load SOL price when budget changes
+  useEffect(() => {
+    if (formData.budget && parseFloat(formData.budget) > 0) {
+      loadSolanaPrice();
+    }
+  }, [formData.budget]);
+
+  const loadSolanaPrice = async () => {
+    try {
+      const priceData = await getSolanaPrice();
+      setSolPrice(priceData.price_usd);
+      const convertedAmount = await convertUSDToSOL(parseFloat(formData.budget));
+      setSolAmount(convertedAmount);
+    } catch (error) {
+      console.error('Error loading SOL price:', error);
+      setSolPrice(100); // Fallback price
+      setSolAmount(parseFloat(formData.budget) / 100); // Fallback conversion
+    }
+  };
 
   const loadFreelancer = async (freelancerId: string) => {
     try {
@@ -175,7 +197,7 @@ const PostProject = () => {
 
       toast({
         title: "Project Posted Successfully!",
-        description: `Your project "${formData.title}" is now live with ${paymentCurrency === 'USDC' ? formatUSDC(totalEscrow) : formatOrigin(totalEscrow * 1000)} escrow`,
+        description: `Your project "${formData.title}" is now live with ${paymentCurrency === 'USDC' ? formatUSDC(totalEscrow) : formatSOL(solAmount || totalEscrow / (solPrice || 100))} escrow`,
       });
       
       // Reset form
@@ -312,7 +334,7 @@ const PostProject = () => {
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="budget">Budget (USDC)</Label>
+                      <Label htmlFor="budget">Budget (USD)</Label>
                       <Input 
                         id="budget" 
                         type="number"
@@ -464,24 +486,24 @@ const PostProject = () => {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Project Budget</span>
                     <span className="text-foreground">
-                      {paymentCurrency === 'USDC' ? formatUSDC(budget) : formatOrigin(budget * 1000)}
+                      {paymentCurrency === 'USDC' ? formatUSDC(budget) : formatSOL(solAmount || budget / (solPrice || 100))}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Platform Fee (10%)</span>
                     <span className="text-foreground">
-                      {paymentCurrency === 'USDC' ? formatUSDC(platformFee) : formatOrigin(platformFee * 1000)}
+                      {paymentCurrency === 'USDC' ? formatUSDC(platformFee) : formatSOL((solAmount || budget / (solPrice || 100)) * 0.1)}
                     </span>
                   </div>
                   <div className="border-t border-border pt-3 flex justify-between font-semibold">
                     <span className="text-foreground">Total Escrow</span>
                     <span className="text-web3-primary">
-                      {paymentCurrency === 'USDC' ? formatUSDC(totalEscrow) : formatOrigin(totalEscrow * 1000)}
+                      {paymentCurrency === 'USDC' ? formatUSDC(totalEscrow) : formatSOL((solAmount || budget / (solPrice || 100)) * 1.1)}
                     </span>
                   </div>
-                  {paymentCurrency === 'USDC' && (
-                    <div className="text-xs text-muted-foreground pt-2 border-t border-border">
-                      * USDC will be converted to ORIGIN tokens internally
+                  {paymentCurrency === 'SOLANA' && solPrice && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      (Based on current SOL price: ${solPrice.toFixed(2)})
                     </div>
                   )}
                 </CardContent>

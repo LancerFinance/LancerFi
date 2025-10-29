@@ -1,8 +1,7 @@
 import { useState, useCallback } from 'react';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { useWallet } from './useWallet';
-import { createEscrowAccount, fundEscrowWithCurrency, releaseEscrowPayment, connection, PaymentCurrency } from '@/lib/solana';
-import { getConversionQuote, createUSDCToOriginSwap } from '@/lib/origin-token';
+import { createEscrowAccount, fundEscrowWithCurrency, releaseEscrowPayment, connection, PaymentCurrency, formatSOL } from '@/lib/solana';
 import { db } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,7 +20,7 @@ export const useEscrow = (): UseEscrowReturn => {
   const createProjectEscrow = useCallback(async (
     projectId: string, 
     amount: number,
-    paymentCurrency: PaymentCurrency = 'ORIGIN'
+    paymentCurrency: PaymentCurrency = 'SOLANA'
   ): Promise<string | null> => {
 
     const w: any = window as any;
@@ -54,27 +53,15 @@ export const useEscrow = (): UseEscrowReturn => {
       let finalAmount = amount;
       let actualCurrency: PaymentCurrency = paymentCurrency;
       
-      // If paying with USDC, convert to Origin for internal accounting
-      if (paymentCurrency === 'USDC') {
-        const conversionQuote = await getConversionQuote(amount);
-        finalAmount = conversionQuote.outputAmount;
-        actualCurrency = 'ORIGIN';
-        
-        toast({
-          title: "Currency Conversion",
-          description: `${amount} USDC will be converted to ~${finalAmount.toFixed(2)} ORIGIN tokens`,
-        });
-      }
-      
       const platformFee = (finalAmount * platformFeePercent) / 100;
       const totalLocked = finalAmount + platformFee;
 
-      // Create escrow account on Solana (always using Origin internally)
+      // Create escrow account on Solana (internally using single token)
       const { escrowAccount, transaction } = await createEscrowAccount(
         clientWallet,
         projectId,
         finalAmount,
-        'ORIGIN',
+        'SOLANA',
         platformFeePercent
       );
 
@@ -93,7 +80,7 @@ export const useEscrow = (): UseEscrowReturn => {
       const escrow = await db.createEscrow({
         project_id: projectId,
         client_wallet: solAddress,
-        amount_usdc: finalAmount, // Store Origin amount for internal accounting
+        amount_usdc: finalAmount, // Internal accounting amount
         platform_fee: platformFee,
         total_locked: totalLocked,
         escrow_account: escrowAccount.toString(),
@@ -104,8 +91,8 @@ export const useEscrow = (): UseEscrowReturn => {
       toast({
         title: "Escrow Created",
         description: paymentCurrency === 'USDC' 
-          ? `Successfully created escrow with ${amount} USDC (converted to ${finalAmount.toFixed(2)} ORIGIN)`
-          : `Successfully locked ${amount} ORIGIN tokens in smart contract escrow`,
+          ? `Successfully created escrow with ${amount} USDC`
+          : `Successfully locked ${formatSOL(amount)} in smart contract escrow`,
       });
 
       return escrow.id;
@@ -125,7 +112,7 @@ export const useEscrow = (): UseEscrowReturn => {
   const fundEscrow = useCallback(async (
     escrowId: string, 
     amount: number,
-    paymentCurrency: PaymentCurrency = 'ORIGIN'
+    paymentCurrency: PaymentCurrency = 'SOLANA'
   ): Promise<boolean> => {
     const w: any = window as any;
     const ph = w.solana;
@@ -159,16 +146,12 @@ export const useEscrow = (): UseEscrowReturn => {
       const clientWallet = new PublicKey(solAddress);
       const escrowAccount = new PublicKey(escrow.escrow_account);
 
-      // Determine if we need to convert USDC to Origin
-      const convertFromUSDC = paymentCurrency === 'USDC';
-      
-      // Create funding transaction (with conversion if needed)
+      // Create funding transaction without any conversion
       const transaction = await fundEscrowWithCurrency(
         clientWallet, 
         escrowAccount, 
         amount, 
-        convertFromUSDC ? 'ORIGIN' : paymentCurrency,
-        convertFromUSDC
+        paymentCurrency
       );
 
       // Get the latest blockhash
@@ -192,8 +175,8 @@ export const useEscrow = (): UseEscrowReturn => {
       toast({
         title: "Escrow Funded",
         description: paymentCurrency === 'USDC' 
-          ? `Successfully funded escrow with ${amount} USDC (converted to ORIGIN)`
-          : `Successfully funded escrow with ${amount} ORIGIN tokens`,
+          ? `Successfully funded escrow with ${amount} USDC`
+          : `Successfully funded escrow with ${formatSOL(amount)}`,
       });
 
       return true;
@@ -250,13 +233,13 @@ export const useEscrow = (): UseEscrowReturn => {
       const freelancerWallet = new PublicKey(escrow.freelancer_wallet);
       const escrowAccount = new PublicKey(escrow.escrow_account);
 
-      // Create payment release transaction (always in Origin tokens)
+      // Create payment release transaction (always in internal token)
       const transaction = await releaseEscrowPayment(
         clientWallet,
         freelancerWallet,
         escrowAccount,
         targetMilestone.amount_usdc,
-        'ORIGIN'
+        'SOLANA'
       );
 
       // Get the latest blockhash
@@ -289,7 +272,7 @@ export const useEscrow = (): UseEscrowReturn => {
 
       toast({
         title: "Payment Released",
-        description: `Successfully released ${targetMilestone.amount_usdc} ORIGIN tokens to freelancer`,
+        description: `Successfully released ${formatSOL(targetMilestone.amount_usdc)} to freelancer`,
       });
 
       return true;

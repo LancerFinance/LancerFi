@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { PROJECT_CATEGORIES } from "@/lib/categories";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,9 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Upload, X } from "lucide-react";
 import { useWallet } from "@/hooks/useWallet";
-import { db, Project } from "@/lib/supabase";
+import { db, Project, supabase } from "@/lib/supabase";
 import { formatUSDC } from "@/lib/solana";
 import { useToast } from "@/hooks/use-toast";
 import { validateProject } from "@/lib/validation";
@@ -33,6 +34,9 @@ const EditProject = () => {
     project_images: ''
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [projectImage, setProjectImage] = useState<File | null>(null);
+  const [projectImagePreview, setProjectImagePreview] = useState<string>('');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -87,8 +91,9 @@ const EditProject = () => {
         budget: projectData.budget_usdc.toString(),
         timeline: projectData.timeline,
         skills: projectData.required_skills.join(', '),
-        project_images: projectData.project_images?.join(', ') || ''
+        project_images: projectData.project_images?.[0] || ''
       });
+      setProjectImagePreview(projectData.project_images?.[0] || '');
 
     } catch (error) {
       console.error('Error loading project:', error);
@@ -135,6 +140,32 @@ const EditProject = () => {
     setFormErrors({});
 
     try {
+      // If a new image file is selected, upload it and get public URL
+      let updatedImages: string[] | null = null;
+      if (projectImage) {
+        setUploadingImage(true);
+        const fileExt = projectImage.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('project-images')
+          .upload(filePath, projectImage);
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('project-images')
+          .getPublicUrl(filePath);
+
+        updatedImages = [publicUrl];
+        setUploadingImage(false);
+      } else if (projectImagePreview) {
+        // Keep existing preview URL if present and not removed
+        updatedImages = [projectImagePreview];
+      } else {
+        updatedImages = null;
+      }
+
       const updatedData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
@@ -142,9 +173,7 @@ const EditProject = () => {
         required_skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
         budget_usdc: parseFloat(formData.budget),
         timeline: formData.timeline,
-        project_images: formData.project_images 
-          ? formData.project_images.split(',').map(s => s.trim()).filter(Boolean)
-          : null,
+        project_images: updatedImages,
       };
 
       await db.updateProject(id, updatedData);
@@ -253,14 +282,9 @@ const EditProject = () => {
                         <SelectValue placeholder="Select project category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="smart-contracts">Smart Contracts</SelectItem>
-                        <SelectItem value="dapp-development">DApp Development</SelectItem>
-                        <SelectItem value="defi">DeFi Solutions</SelectItem>
-                        <SelectItem value="nft">NFT Development</SelectItem>
-                        <SelectItem value="blockchain">Blockchain Development</SelectItem>
-                        <SelectItem value="web3-frontend">Web3 Frontend</SelectItem>
-                        <SelectItem value="marketing">Web3 Marketing</SelectItem>
-                        <SelectItem value="design">UI/UX Design</SelectItem>
+                        {PROJECT_CATEGORIES.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     {formErrors.category && (
@@ -330,15 +354,42 @@ const EditProject = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="project_images">Project Images (Optional)</Label>
-                    <Input 
-                      id="project_images" 
-                      placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"
-                      className="bg-muted/50"
-                      value={formData.project_images}
-                      onChange={(e) => handleInputChange('project_images', e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">Enter image URLs separated by commas</p>
+                    <Label htmlFor="project_image">Project Image</Label>
+                    {projectImagePreview ? (
+                      <div className="relative">
+                        <img 
+                          src={projectImagePreview} 
+                          alt="Project preview" 
+                          className="w-full h-48 object-cover rounded-lg"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2"
+                          onClick={() => { setProjectImage(null); setProjectImagePreview(''); }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <Input
+                          id="project_image"
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) { setProjectImage(f); const r = new FileReader(); r.onloadend = () => setProjectImagePreview(r.result as string); r.readAsDataURL(f);} }}
+                          className={`bg-muted/50 ${formErrors.project_image ? 'border-destructive' : ''}`}
+                        />
+                        <div className="mt-2 flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg bg-muted/50">
+                          <div className="text-center">
+                            <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
+                            <p className="mt-2 text-sm text-muted-foreground">Upload project image</p>
+                            <p className="text-xs text-muted-foreground">Optional • Max 5MB</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-4 pt-4">

@@ -1,8 +1,5 @@
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Shield, Zap, Users } from "lucide-react";
+import { Shield, Zap, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { db } from "@/lib/supabase";
 import { PROJECT_CATEGORIES } from "@/lib/categories";
@@ -76,8 +73,8 @@ const HeroSection = () => {
                 <div className="flex flex-wrap gap-3">
                   <button
                     onClick={() => {
-                      setSelectedCategory("blockchain");
-                      navigate("/browse-services?category=blockchain");
+                      setSelectedCategory("blockchain-infra");
+                      navigate("/browse-services?category=blockchain-infra");
                     }}
                     className="px-4 py-2 bg-background hover:bg-secondary/80 rounded-full text-sm transition-all duration-200 hover-lift border border-border shadow-sm flex items-center gap-2"
                   >
@@ -96,8 +93,8 @@ const HeroSection = () => {
                   </button>
                   <button
                     onClick={() => {
-                      setSelectedCategory("defi");
-                      navigate("/browse-services?category=defi");
+                      setSelectedCategory("defi-engineering");
+                      navigate("/browse-services?category=defi-engineering");
                     }}
                     className="px-4 py-2 bg-background hover:bg-secondary/80 rounded-full text-sm transition-all duration-200 hover-lift border border-border shadow-sm flex items-center gap-2"
                   >
@@ -106,44 +103,7 @@ const HeroSection = () => {
                   </button>
                 </div>
 
-                {/* Search Bar */}
-                <div className="bg-background rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.08)] border border-border">
-                  <div className="flex flex-col md:flex-row gap-3">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-                      <Input
-                        placeholder="Search for any service..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        className="pl-10 h-12 text-base border-border bg-background"
-                      />
-                    </div>
-
-                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                      <SelectTrigger className="md:w-48 h-12 border-border bg-background">
-                        <SelectValue placeholder="Category" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        <SelectItem value="all">All Categories</SelectItem>
-                        {PROJECT_CATEGORIES.map((category) => (
-                          <SelectItem key={category.value} value={category.value}>
-                            {category.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Button
-                      onClick={handleSearch}
-                      size="lg"
-                      className="h-12 px-8 bg-foreground hover:bg-foreground/90 text-background font-semibold ripple"
-                    >
-                      <Search className="h-5 w-5 mr-2" />
-                      Search
-                    </Button>
-                  </div>
-                </div>
+                {/* Search bar moved to Header */}
 
                 {/* Popular Searches */}
                 <div>
