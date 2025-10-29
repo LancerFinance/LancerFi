@@ -121,7 +121,7 @@ const Header = () => {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && <div className="lg:hidden pb-4 border-t border-border pt-4 animate-in slide-in-from-top-2 duration-200">
-            <nav className="flex flex-col space-y-3">
+            <nav className="flex flex-col space-y-4">
               {/* Mobile search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -134,52 +134,43 @@ const Header = () => {
                   aria-label="Search services"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <Link to="/browse-services" className="p-3 rounded-lg bg-muted/50 text-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
-                  Browse Services
-                </Link>
-                <Link to="/hire-talent" className="p-3 rounded-lg bg-muted/50 text-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
-                  Hire Talent
-                </Link>
-              </div>
-              <div className="space-y-2">
-                <Link to="/how-it-works" className="block py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm" onClick={() => setIsMobileMenuOpen(false)}>
-                  How It Works
-                </Link>
-                <Link to="/freelancer" className="block py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm" onClick={() => setIsMobileMenuOpen(false)}>
-                  Find Work
-                </Link>
-                <Link to="/dashboard" className="block py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm" onClick={() => setIsMobileMenuOpen(false)}>
+
+              {/* Main Navigation Links - Same as Desktop */}
+              <div className="space-y-1">
+                <Link to="/dashboard" className="block py-3 px-4 text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
                   Dashboard
                 </Link>
-                <Link to="/messages" className="flex items-center py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm" onClick={() => setIsMobileMenuOpen(false)}>
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  Messages
-                  {unreadCount > 0 && <Badge className="ml-auto h-5 w-5 text-xs bg-destructive text-destructive-foreground p-0 flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </Badge>}
+                <Link to="/browse-services" className="block py-3 px-4 text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                  Browse
                 </Link>
-                <Link to="/faq" className="block py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm" onClick={() => setIsMobileMenuOpen(false)}>
-                  FAQ
+                <Link to="/post-project" className="block py-3 px-4 text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                  Post Project
                 </Link>
+                <Link to="/hire-talent" className="block py-3 px-4 text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                  Find Talent
+                </Link>
+                <Link to="/how-it-works" className="block py-3 px-4 text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                  How It Works
+                </Link>
+                <Link to="/faq" className="block py-3 px-4 text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                  FAQs
+                </Link>
+                {connectedAddress && <>
+                  <Link to="/messages" className="flex items-center py-3 px-4 text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors relative" onClick={() => setIsMobileMenuOpen(false)}>
+                    Messages
+                    {unreadCount > 0 && <span className="absolute -top-1 -right-2 bg-destructive text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {unreadCount}
+                      </span>}
+                  </Link>
+                  <Link to="/edit-profile" className="block py-3 px-4 text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                    Profile
+                  </Link>
+                </>}
               </div>
               
-              <div className="border-t border-border pt-4 mt-4 space-y-2">
-                {isConnected && <Link to="/edit-profile" onClick={() => setIsMobileMenuOpen(false)}>
-                    <Button variant="ghost" size="sm" className="w-full justify-start">
-                      <User className="w-4 h-4 mr-2" />
-                      Edit Profile
-                    </Button>
-                  </Link>}
-                <Link to="/post-project" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="outline" size="sm" className="w-full justify-start">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Post Project
-                  </Button>
-                </Link>
-                <div className="pt-2">
-                  <WalletButton variant="default" className="w-full justify-start" />
-                </div>
+              {/* Wallet Button */}
+              <div className="border-t border-border pt-4">
+                <WalletButton variant="default" className="w-full justify-center" />
               </div>
             </nav>
           </div>}
