@@ -236,10 +236,10 @@ const EditProject = () => {
       <Header />
       
       <div className="container mx-auto px-4 py-8">
-        <Link to={`/project/${id}`}>
+        <Link to="/">
           <Button variant="ghost" className="mb-8">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Project
+            Back to Home
           </Button>
         </Link>
 

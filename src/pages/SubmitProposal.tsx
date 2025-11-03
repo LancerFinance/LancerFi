@@ -262,10 +262,10 @@ const SubmitProposal = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Back Button */}
-          <Link to={`/service/${projectId}`} className="inline-flex mb-6">
+          <Link to="/" className="inline-flex mb-6">
             <Button variant="ghost">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Project
+              Back to Home
             </Button>
           </Link>
 

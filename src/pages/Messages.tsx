@@ -16,7 +16,8 @@ import {
   Mail,
   MailOpen,
   Reply,
-  Trash2
+  Trash2,
+  ArrowLeft
 } from "lucide-react";
 import { db, Message } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -167,6 +168,12 @@ const Messages = () => {
       <Header />
       
       <main className="container mx-auto px-4 py-8">
+        <Link to="/">
+          <Button variant="ghost" className="mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Button>
+        </Link>
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="mb-8">

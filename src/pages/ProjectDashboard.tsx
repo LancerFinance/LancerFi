@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Filter, Search, Wallet, Briefcase, Wrench } from "lucide-react";
+import { Plus, Filter, Search, Wallet, Briefcase, Wrench, ArrowLeft } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { db, Project, Escrow } from "@/lib/supabase";
@@ -184,7 +184,13 @@ const ProjectDashboard = () => {
       <Header />
       
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+        <Link to="/">
+          <Button variant="ghost" className="mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Button>
+        </Link>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
               Dashboard
@@ -193,8 +199,8 @@ const ProjectDashboard = () => {
               Manage your projects and track your work
             </p>
           </div>
-          <Link to="/post-project">
-            <Button variant="default" size="lg">
+          <Link to="/post-project" className="md:self-center">
+            <Button variant="default" size="lg" className="w-full md:w-auto">
               <Plus className="w-5 h-5 mr-2" />
               Post New Project
             </Button>

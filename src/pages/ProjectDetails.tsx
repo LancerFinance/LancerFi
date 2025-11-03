@@ -226,8 +226,8 @@ const ProjectDetails = () => {
           <div className="text-center py-12">
             <h2 className="text-2xl font-bold mb-4">Project Not Found</h2>
             <p className="text-muted-foreground mb-6">The project you're looking for doesn't exist.</p>
-            <Link to="/dashboard">
-              <Button>Back to Dashboard</Button>
+            <Link to="/">
+              <Button>Back to Home</Button>
             </Link>
           </div>
         </div>
@@ -242,10 +242,10 @@ const ProjectDetails = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Back Button */}
-          <Link to="/dashboard" className="inline-flex mb-6">
+          <Link to="/" className="inline-flex mb-6">
             <Button variant="ghost">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
+              Back to Home
             </Button>
           </Link>
 

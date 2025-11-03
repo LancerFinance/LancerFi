@@ -181,8 +181,8 @@ const ViewProposals = () => {
           <div className="text-center py-12">
             <h2 className="text-2xl font-bold mb-4">Project Not Found</h2>
             <p className="text-muted-foreground mb-6">The project doesn't exist or has been removed.</p>
-            <Link to="/dashboard">
-              <Button>Back to Dashboard</Button>
+            <Link to="/">
+              <Button>Back to Home</Button>
             </Link>
           </div>
         </div>
@@ -197,10 +197,10 @@ const ViewProposals = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <Link to={`/project/${id}`} className="inline-flex mb-6">
+          <Link to="/" className="inline-flex mb-6">
             <Button variant="ghost">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Project
+              Back to Home
             </Button>
           </Link>
 

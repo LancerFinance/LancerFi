@@ -12,7 +12,8 @@ import { useEscrow } from "@/hooks/useEscrow";
 import { db, Project } from "@/lib/supabase";
 import { supabase } from "@/integrations/supabase/client";
 import WalletButton from "@/components/WalletButton";
-import { Clock, DollarSign, User, CheckCircle } from "lucide-react";
+import { Clock, DollarSign, User, CheckCircle, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const FreelancerDashboard = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -142,6 +143,12 @@ const FreelancerDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
+        <Link to="/">
+          <Button variant="ghost" className="mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Button>
+        </Link>
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold">Freelancer Dashboard</h1>
