@@ -1,0 +1,319 @@
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback, useRef } from 'react';
+
+interface WalletState {
+  address: string | null;
+  isConnected: boolean;
+  isConnecting: boolean;
+  provider: any | null;
+}
+
+const SESSION_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+interface WalletContextValue extends WalletState {
+  connectWallet: () => Promise<void>;
+  disconnectWallet: () => void;
+  formatAddress: (address: string) => string;
+  signMessage: (message: string) => Promise<{ signature: Uint8Array }>;
+}
+
+const WalletContext = createContext<WalletContextValue | undefined>(undefined);
+
+export const WalletProvider = ({ children }: { children: ReactNode }) => {
+  const [wallet, setWallet] = useState<WalletState>({
+    address: null,
+    isConnected: false,
+    isConnecting: false,
+    provider: null,
+  });
+  
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
+
+  // Optional auto-connect behind a user-controlled flag (disabled by default)
+  useEffect(() => {
+    const shouldAutoConnect = localStorage.getItem('wallet_auto_connect') === 'true';
+    const userDisconnected = localStorage.getItem('wallet_disconnected') === 'true';
+    
+    // If user explicitly disconnected, don't auto-connect even if Phantom is still connected
+    if (userDisconnected) {
+      // Force disconnect in Phantom if it's still connected
+      const w: any = window as any;
+      try {
+        if (w.solana && w.solana.isPhantom && w.solana.isConnected && w.solana.disconnect) {
+          w.solana.disconnect().catch(() => {});
+        }
+      } catch {}
+      return;
+    }
+
+    // Only auto-connect if the flag is set
+    if (!shouldAutoConnect) return;
+
+    const init = async () => {
+      const w: any = window as any;
+      
+      // Try Phantom if already connected
+      try {
+        if (w.solana && w.solana.isPhantom && w.solana.isConnected) {
+          const address = w.solana.publicKey?.toString?.();
+          if (address) {
+            setWallet({ address, isConnected: true, isConnecting: false, provider: w.solana });
+          }
+        }
+      } catch {}
+    };
+
+    init();
+  }, []);
+
+  // Listen to wallet account changes to keep global state in sync
+  useEffect(() => {
+    const w: any = window as any;
+
+    if (w.solana && w.solana.on) {
+      w.solana.on('disconnect', () => {
+        // When Phantom disconnects, clear our state and set disconnect flag
+        localStorage.setItem('wallet_disconnected', 'true');
+        localStorage.removeItem('wallet_auto_connect');
+        setWallet({ address: null, isConnected: false, isConnecting: false, provider: null });
+      });
+      
+      w.solana.on('accountChanged', (pubkey: any) => {
+        // When wallet is swapped in Phantom, handle it
+        if (!pubkey) {
+          // Wallet was disconnected
+          localStorage.setItem('wallet_disconnected', 'true');
+          localStorage.removeItem('wallet_auto_connect');
+          setWallet({ address: null, isConnected: false, isConnecting: false, provider: null });
+        } else {
+          // Wallet was swapped to a different account
+          const address = pubkey?.toString?.() || w.solana?.publicKey?.toString?.();
+          if (address) {
+            // Check if user has explicitly disconnected - if so, don't auto-swap
+            const userDisconnected = localStorage.getItem('wallet_disconnected') === 'true';
+            if (userDisconnected) {
+              // User wants to stay disconnected, so disconnect the new wallet too
+              try {
+                if (w.solana?.disconnect) {
+                  w.solana.disconnect().catch(() => {});
+                }
+              } catch {}
+              return;
+            }
+            // Otherwise, allow the wallet swap
+            setWallet(prev => ({ ...prev, address, isConnected: true, provider: w.solana }));
+          }
+        }
+      });
+      
+      w.solana.on('connect', (pubkey: any) => {
+        // If this is a manual connection, allow it
+        const isManualConnect = localStorage.getItem('wallet_manual_connect') === 'true';
+        if (isManualConnect) {
+          const address = pubkey?.toString?.() || w.solana?.publicKey?.toString?.();
+          if (address) {
+            setWallet(prev => ({ ...prev, address, isConnected: true, provider: w.solana }));
+          }
+          return;
+        }
+        
+        // Only handle auto-connect if user hasn't explicitly disconnected
+        const userDisconnected = localStorage.getItem('wallet_disconnected') === 'true';
+        if (userDisconnected) {
+          // User wants to stay disconnected, so disconnect immediately
+          try {
+            if (w.solana?.disconnect) {
+              w.solana.disconnect().catch(() => {});
+            }
+          } catch {}
+          return;
+        }
+        
+        const address = pubkey?.toString?.() || w.solana?.publicKey?.toString?.();
+        if (address) {
+          setWallet(prev => ({ ...prev, address, isConnected: true, provider: w.solana }));
+        }
+      });
+    }
+
+    return () => {
+      if (w.solana?.removeAllListeners) {
+        try { w.solana.removeAllListeners('disconnect'); } catch {}
+        try { w.solana.removeAllListeners('connect'); } catch {}
+        try { w.solana.removeAllListeners('accountChanged'); } catch {}
+      }
+    };
+  }, []);
+
+  const connectWallet = async () => {
+    // Set a flag to indicate we're manually connecting (bypasses disconnect checks)
+    localStorage.setItem('wallet_manual_connect', 'true');
+    // Clear disconnect flag immediately when user explicitly clicks connect
+    localStorage.removeItem('wallet_disconnected');
+    
+    setWallet(prev => ({ ...prev, isConnecting: true }));
+
+    try {
+      const w: any = window as any;
+
+      // Connect to Solana (Phantom)
+      if (w.solana && w.solana.isPhantom) {
+        const resp = await w.solana.connect();
+        const address = resp?.publicKey?.toString?.() || w.solana?.publicKey?.toString?.();
+        if (!address) throw new Error('Unable to get Solana wallet address');
+
+        // Clear manual connect flag and set auto-connect on manual connection
+        localStorage.removeItem('wallet_manual_connect');
+        localStorage.setItem('wallet_auto_connect', 'true');
+        
+        setWallet({ address, isConnected: true, isConnecting: false, provider: w.solana });
+        return;
+      }
+
+      alert('No Phantom wallet detected. Please install Phantom wallet.');
+      localStorage.removeItem('wallet_manual_connect');
+      setWallet(prev => ({ ...prev, isConnecting: false }));
+    } catch (error) {
+      console.error('Error connecting wallet:', error);
+      localStorage.removeItem('wallet_manual_connect');
+      setWallet(prev => ({ ...prev, isConnecting: false }));
+    }
+  };
+
+  const disconnectWallet = useCallback(() => {
+    try {
+      const w: any = window as any;
+      if (w.solana?.disconnect) {
+        w.solana.disconnect();
+      }
+    } catch {}
+
+    localStorage.removeItem('wallet_auto_connect');
+    localStorage.setItem('wallet_disconnected', 'true'); // Mark as explicitly disconnected
+    setWallet({ address: null, isConnected: false, isConnecting: false, provider: null });
+    
+    // Clear timeout on disconnect
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  // Reset activity timeout
+  const resetActivityTimeout = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Only set timeout if wallet is connected
+    if (wallet.isConnected) {
+      timeoutRef.current = setTimeout(() => {
+        console.log('Session timeout - disconnecting wallet');
+        disconnectWallet();
+      }, SESSION_TIMEOUT);
+    }
+  }, [wallet.isConnected, disconnectWallet]);
+
+  // Track user activity
+  useEffect(() => {
+    if (!wallet.isConnected) return;
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    const handleActivity = () => {
+      resetActivityTimeout();
+    };
+
+    // Add event listeners
+    events.forEach(event => {
+      window.addEventListener(event, handleActivity);
+    });
+
+    // Start initial timeout
+    resetActivityTimeout();
+
+    return () => {
+      // Cleanup event listeners
+      events.forEach(event => {
+        window.removeEventListener(event, handleActivity);
+      });
+      
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [wallet.isConnected, resetActivityTimeout]);
+
+  const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
+
+  const signMessage = useCallback(async (message: string): Promise<{ signature: Uint8Array }> => {
+    // Check our internal state
+    if (!wallet.provider || !wallet.address) {
+      // Double-check Phantom's actual connection state
+      const w: any = window as any;
+      if (w.solana && w.solana.isPhantom && w.solana.isConnected) {
+        // Phantom says it's connected, but our state is stale - update it
+        const address = w.solana.publicKey?.toString?.();
+        if (address) {
+          setWallet({ address, isConnected: true, isConnecting: false, provider: w.solana });
+          // Use the fresh provider
+          const ph = w.solana;
+          try {
+            const encodedMessage = new TextEncoder().encode(message);
+            const signed = await ph.signMessage(encodedMessage, 'utf8');
+            return { signature: signed.signature };
+          } catch (error: any) {
+            console.error('Error signing message:', error);
+            if (error?.code === 4001 || error?.message?.includes('User rejected') || error?.message?.includes('canceled') || error?.message?.includes('denied')) {
+              throw new Error('Signature request was canceled. Payment was not sent.');
+            }
+            throw new Error(error?.message || 'Failed to sign message. Please try again.');
+          }
+        }
+      }
+      throw new Error('Wallet not connected');
+    }
+
+    const ph = wallet.provider as any;
+    if (!ph?.isPhantom || !ph.signMessage) {
+      throw new Error('Phantom wallet not available or does not support message signing');
+    }
+
+    try {
+      const encodedMessage = new TextEncoder().encode(message);
+      // This will trigger Phantom popup for signature
+      const signed = await ph.signMessage(encodedMessage, 'utf8');
+      
+      return {
+        signature: signed.signature
+      };
+    } catch (error: any) {
+      console.error('Error signing message:', error);
+      // Check if user rejected/canceled the signature
+      if (error?.code === 4001 || error?.message?.includes('User rejected') || error?.message?.includes('canceled') || error?.message?.includes('denied')) {
+        throw new Error('Signature request was canceled. Payment was not sent.');
+      }
+      throw new Error(error?.message || 'Failed to sign message. Please try again.');
+    }
+  }, [wallet.provider, wallet.address]);
+
+  const value: WalletContextValue = {
+    ...wallet,
+    connectWallet,
+    disconnectWallet,
+    formatAddress,
+    signMessage,
+  };
+
+  return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
+};
+
+export const useWallet = () => {
+  const ctx = useContext(WalletContext);
+  if (!ctx) {
+    throw new Error('useWallet must be used within a WalletProvider');
+  }
+  return ctx;
+};
