@@ -64,6 +64,7 @@ export interface Escrow {
   escrow_account?: string;
   transaction_signature?: string;
   status: 'pending' | 'funded' | 'released' | 'disputed' | 'refunded';
+  payment_currency?: string;
   created_at: string;
   funded_at?: string;
   released_at?: string;
