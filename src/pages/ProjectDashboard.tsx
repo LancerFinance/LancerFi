@@ -5,12 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Filter, Search, Wallet, Briefcase, Wrench } from "lucide-react";
+import { Plus, Filter, Search, Wallet, Briefcase, Wrench, ArrowLeft } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { db, Project, Escrow } from "@/lib/supabase";
-import { formatUSDC, formatSOL } from "@/lib/solana";
-import { getSolanaPrice } from "@/lib/solana-price";
+import { formatUSDC } from "@/lib/solana";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -29,43 +28,15 @@ const ProjectDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [solPrice, setSolPrice] = useState<number | null>(null);
 
   useEffect(() => {
     if (address) {
-      // Reset state before loading new wallet's projects
-      setPostedProjects([]);
-      setWorkingProjects([]);
-      setEscrows({});
-      setProposalCounts({});
-      setLoading(true);
       loadProjects();
-    } else {
-      // Clear projects when wallet disconnects
-      setPostedProjects([]);
-      setWorkingProjects([]);
-      setEscrows({});
-      setProposalCounts({});
-      setLoading(false);
     }
   }, [address]);
 
-  useEffect(() => {
-    // Load SOL price for converting SOL amounts to USD in stats
-    getSolanaPrice().then(priceData => {
-      setSolPrice(priceData.price_usd);
-    }).catch(() => {
-      setSolPrice(100); // Fallback
-    });
-  }, []);
-
   const loadProjects = async () => {
-    // Get current address at the time of execution (not from closure)
-    const currentAddress = address;
-    if (!currentAddress) {
-      setLoading(false);
-      return;
-    }
+    if (!address) return;
     
     try {
       setLoading(true);
@@ -74,14 +45,14 @@ const ProjectDashboard = () => {
       const { data: profileData } = await supabase
         .from('profiles')
         .select('id')
-        .eq('wallet_address', currentAddress)
+        .eq('wallet_address', address)
         .maybeSingle();
 
       // Load projects POSTED by me (as client)
       const { data: clientProjects, error: clientError } = await supabase
         .from('projects')
         .select('*')
-        .eq('client_id', currentAddress)
+        .eq('client_id', address)
         .order('created_at', { ascending: false });
       
       if (clientError) throw clientError;
@@ -118,7 +89,7 @@ const ProjectDashboard = () => {
         }
 
         // Load proposal count for projects without freelancers (only for posted projects)
-        if (!project.freelancer_id && project.client_id === currentAddress) {
+        if (!project.freelancer_id && project.client_id === address) {
           try {
             const { data: proposals, error } = await supabase
               .from('proposals')
@@ -172,14 +143,7 @@ const ProjectDashboard = () => {
     completed: postedProjects.filter(p => p.status === 'completed').length,
     totalEscrowed: Object.entries(escrows)
       .filter(([projectId]) => postedProjects.some(p => p.id === projectId))
-      .reduce((sum, [_, escrow]) => {
-        // Convert SOL to USD if payment currency is SOLANA
-        if (escrow.payment_currency === 'SOLANA' && solPrice) {
-          return sum + (escrow.total_locked * solPrice);
-        }
-        // Otherwise, assume it's already in USD
-        return sum + escrow.total_locked;
-      }, 0)
+      .reduce((sum, [_, escrow]) => sum + escrow.total_locked, 0)
   };
 
   const workingStats = {
@@ -189,14 +153,7 @@ const ProjectDashboard = () => {
     totalEarned: Object.entries(escrows)
       .filter(([projectId]) => workingProjects.some(p => p.id === projectId))
       .filter(([_, escrow]) => escrow.status === 'released')
-      .reduce((sum, [_, escrow]) => {
-        // Convert SOL to USD if payment currency is SOLANA
-        if (escrow.payment_currency === 'SOLANA' && solPrice) {
-          return sum + (escrow.amount_usdc * solPrice);
-        }
-        // Otherwise, assume it's already in USD
-        return sum + escrow.amount_usdc;
-      }, 0)
+      .reduce((sum, [_, escrow]) => sum + escrow.amount_usdc, 0)
   };
 
   const handleViewProject = (projectId: string) => {
@@ -227,7 +184,13 @@ const ProjectDashboard = () => {
       <Header />
       
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+        <Link to="/">
+          <Button variant="ghost" className="mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Button>
+        </Link>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
               Dashboard
@@ -236,8 +199,8 @@ const ProjectDashboard = () => {
               Manage your projects and track your work
             </p>
           </div>
-          <Link to="/post-project">
-            <Button variant="default" size="lg">
+          <Link to="/post-project" className="md:self-center">
+            <Button variant="default" size="lg" className="w-full md:w-auto">
               <Plus className="w-5 h-5 mr-2" />
               Post New Project
             </Button>

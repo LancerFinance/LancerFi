@@ -249,10 +249,10 @@ const FreelancerProfile = () => {
       <Header />
       
       <main className="container mx-auto px-4 py-8">
-        <Link to="/hire-talent" className="inline-flex mb-6">
+        <Link to="/" className="inline-flex mb-6">
           <Button variant="ghost">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Browse Talent
+            Back to Home
           </Button>
         </Link>
 

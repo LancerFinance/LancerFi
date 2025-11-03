@@ -24,7 +24,6 @@ const EditProject = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [hasEscrow, setHasEscrow] = useState(false); // Track if escrow exists
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -95,17 +94,6 @@ const EditProject = () => {
         project_images: projectData.project_images?.[0] || ''
       });
       setProjectImagePreview(projectData.project_images?.[0] || '');
-
-      // Check if escrow exists for this project
-      try {
-        const escrow = await db.getEscrow(id);
-        if (escrow && (escrow.status === 'funded' || escrow.status === 'pending')) {
-          setHasEscrow(true);
-        }
-      } catch (error) {
-        // Escrow doesn't exist, which is fine
-        setHasEscrow(false);
-      }
 
     } catch (error) {
       console.error('Error loading project:', error);
@@ -248,10 +236,10 @@ const EditProject = () => {
       <Header />
       
       <div className="container mx-auto px-4 py-8">
-        <Link to={`/project/${id}`}>
+        <Link to="/">
           <Button variant="ghost" className="mb-8">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Project
+            Back to Home
           </Button>
         </Link>
 
@@ -321,20 +309,12 @@ const EditProject = () => {
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="budget" className={hasEscrow ? 'text-muted-foreground' : ''}>
-                        Budget (USDC) *
-                        {hasEscrow && (
-                          <span className="ml-2 text-xs text-muted-foreground italic">
-                            (Cannot be changed after payment)
-                          </span>
-                        )}
-                      </Label>
+                      <Label htmlFor="budget">Budget (USDC) *</Label>
                       <Input 
                         id="budget" 
                         type="number"
                         placeholder="5000"
-                        disabled={hasEscrow}
-                        className={`bg-muted/50 ${formErrors.budget ? 'border-destructive' : ''} ${hasEscrow ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        className={`bg-muted/50 ${formErrors.budget ? 'border-destructive' : ''}`}
                         value={formData.budget}
                         onChange={(e) => handleInputChange('budget', e.target.value)}
                       />

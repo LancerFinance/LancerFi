@@ -10,13 +10,13 @@ const HowItWorksPage = () => {
       <Header />
       <div className="container mx-auto px-4 py-8">
         <Link to="/">
-          <Button variant="ghost" className="mb-8">
+          <Button variant="ghost" className="mb-6">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
           </Button>
         </Link>
+        <HowItWorks />
       </div>
-      <HowItWorks />
     </div>
   );
 };

@@ -16,16 +16,13 @@ import {
   CheckCircle,
   AlertTriangle,
   MessageSquare,
-  Edit,
-  Loader2
+  Edit
 } from "lucide-react";
 import { db, supabase, Project, Escrow, Profile } from "@/lib/supabase";
-import { formatUSDC, formatSOL } from "@/lib/solana";
-import { getSolanaPrice } from "@/lib/solana-price";
+import { formatUSDC } from "@/lib/solana";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/useWallet";
 import { useProfile } from "@/hooks/useProfile";
-import { useEscrow } from "@/hooks/useEscrow";
 import MessageDialog from "@/components/MessageDialog";
 import {
   AlertDialog,
@@ -45,7 +42,6 @@ const ProjectDetails = () => {
   const { toast } = useToast();
   const { isConnected, address } = useWallet();
   const { ensureProfile } = useProfile();
-  const { releasePaymentToFreelancer, isLoading: escrowLoading } = useEscrow();
   
   const [project, setProject] = useState<Project | null>(null);
   const [escrow, setEscrow] = useState<Escrow | null>(null);
@@ -54,7 +50,6 @@ const ProjectDetails = () => {
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [proposalCount, setProposalCount] = useState(0);
-  const [solPrice, setSolPrice] = useState<number | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -76,16 +71,6 @@ const ProjectDetails = () => {
       try {
         const escrowData = await db.getEscrow(id);
         setEscrow(escrowData);
-        
-        // Load SOL price if escrow was paid with SOL
-        if (escrowData.payment_currency === 'SOLANA') {
-          try {
-            const priceData = await getSolanaPrice();
-            setSolPrice(priceData.price_usd);
-          } catch (error) {
-            console.error('Error loading SOL price:', error);
-          }
-        }
       } catch (error) {
         // Escrow doesn't exist
       }
@@ -173,80 +158,33 @@ const ProjectDetails = () => {
   const handleCompleteProject = async () => {
     if (!project || !id) return;
     
-    // Security: Verify user is authorized (project owner)
-    if (!isProjectOwner) {
-      toast({
-        title: "Unauthorized",
-        description: "Only the project owner can complete this project",
-        variant: "destructive"
-      });
-      return;
-    }
-    
     setCompleting(true);
     try {
-      // Security: Verify project is in valid state
-      if (project.status !== 'in_progress') {
-        throw new Error(`Cannot complete project. Project must be in progress. Current status: ${project.status}`);
-      }
-
-      // Get freelancer wallet address from profile
-      if (!freelancer?.wallet_address) {
-        throw new Error('Freelancer wallet address not found. Cannot complete project without freelancer information.');
-      }
-
-      if (!escrow) {
-        throw new Error('No escrow found for this project. Cannot release payment.');
-      }
-
-      // Security: Verify escrow hasn't already been released
-      if (escrow.status === 'released') {
-        toast({
-          title: "Payment Already Released",
-          description: "Payment has already been sent to the freelancer for this project.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Release payment to freelancer first (this sends actual funds)
-      let paymentReleased = false;
-      try {
-        paymentReleased = await releasePaymentToFreelancer(
-          escrow.id,
-          freelancer.wallet_address
-        );
-      } catch (e) {
-        console.error('Payment release failed:', e);
-        toast({
-          title: "Payment Release Failed",
-          description: e instanceof Error ? e.message : "Failed to send payment to freelancer. Please try again.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Only update project status if payment was successfully released
-      if (!paymentReleased) {
-        toast({
-          title: "Payment Release Failed",
-          description: "Payment was not released. Project status was not updated.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Update project status to completed only after payment is released
+      // Update project status to completed
       await db.updateProject(id, {
         status: 'completed',
         completed_at: new Date().toISOString()
       });
 
+      // Try to update escrow status to released if escrow exists, but don't fail overall
+      let escrowReleased = false;
+      if (escrow) {
+        try {
+          await db.updateEscrow(escrow.id, {
+            status: 'released',
+            released_at: new Date().toISOString()
+          });
+          escrowReleased = true;
+        } catch (e) {
+          console.error('Escrow release failed (continuing):', e);
+        }
+      }
+
       toast({
         title: 'Project Completed!',
-        description: paymentReleased
-          ? 'Project has been marked as completed and payment has been sent to freelancer.'
-          : 'Project marked as completed.',
+        description: escrowReleased
+          ? 'Project has been marked as completed and escrow funds have been released.'
+          : 'Project marked as completed. Escrow release will be finalized shortly.',
       });
 
       // Reload project details
@@ -255,7 +193,7 @@ const ProjectDetails = () => {
       console.error('Error completing project:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to complete project",
+        description: "Failed to complete project",
         variant: "destructive"
       });
     } finally {
@@ -288,8 +226,8 @@ const ProjectDetails = () => {
           <div className="text-center py-12">
             <h2 className="text-2xl font-bold mb-4">Project Not Found</h2>
             <p className="text-muted-foreground mb-6">The project you're looking for doesn't exist.</p>
-            <Link to="/dashboard">
-              <Button>Back to Dashboard</Button>
+            <Link to="/">
+              <Button>Back to Home</Button>
             </Link>
           </div>
         </div>
@@ -304,10 +242,10 @@ const ProjectDetails = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Back Button */}
-          <Link to="/dashboard" className="inline-flex mb-6">
+          <Link to="/" className="inline-flex mb-6">
             <Button variant="ghost">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
+              Back to Home
             </Button>
           </Link>
 
@@ -358,12 +296,12 @@ const ProjectDetails = () => {
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               {/* Description */}
-              <Card className="overflow-hidden">
+              <Card>
                 <CardHeader>
                   <CardTitle>Project Description</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
+                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
                     {project.description}
                   </p>
                 </CardContent>
@@ -377,7 +315,7 @@ const ProjectDetails = () => {
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
                     {project.required_skills.map((skill, index) => (
-                      <Badge key={index} variant="secondary" style={{ maxWidth: '240px', wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                      <Badge key={index} variant="secondary">
                         {skill}
                       </Badge>
                     ))}
@@ -426,44 +364,16 @@ const ProjectDetails = () => {
                       <div>
                         <div className="text-sm text-muted-foreground">Total Locked</div>
                         <div className="font-medium text-web3-primary">
-                          {escrow.payment_currency === 'SOLANA' 
-                            ? formatSOL(escrow.total_locked)
-                            : formatUSDC(escrow.total_locked)
-                          }
-                          {escrow.payment_currency === 'SOLANA' && solPrice && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              (~{formatUSDC(escrow.total_locked * solPrice)})
-                            </span>
-                          )}
+                          {formatUSDC(escrow.total_locked)}
                         </div>
                       </div>
                       <div>
                         <div className="text-sm text-muted-foreground">Project Amount</div>
-                        <div className="font-medium">
-                          {escrow.payment_currency === 'SOLANA'
-                            ? formatSOL(escrow.amount_usdc)
-                            : formatUSDC(escrow.amount_usdc)
-                          }
-                          {escrow.payment_currency === 'SOLANA' && solPrice && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              (~{formatUSDC(escrow.amount_usdc * solPrice)})
-                            </span>
-                          )}
-                        </div>
+                        <div className="font-medium">{formatUSDC(escrow.amount_usdc)}</div>
                       </div>
                       <div>
                         <div className="text-sm text-muted-foreground">Platform Fee</div>
-                        <div className="font-medium">
-                          {escrow.payment_currency === 'SOLANA'
-                            ? formatSOL(escrow.platform_fee)
-                            : formatUSDC(escrow.platform_fee)
-                          }
-                          {escrow.payment_currency === 'SOLANA' && solPrice && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              (~{formatUSDC(escrow.platform_fee * solPrice)})
-                            </span>
-                          )}
-                        </div>
+                        <div className="font-medium">{formatUSDC(escrow.platform_fee)}</div>
                       </div>
                     </div>
                     {escrow.escrow_account && (
@@ -617,16 +527,9 @@ const ProjectDetails = () => {
                              <AlertDialogCancel>Cancel</AlertDialogCancel>
                              <AlertDialogAction
                                onClick={handleCompleteProject}
-                               disabled={completing || escrowLoading}
+                               disabled={completing}
                              >
-                               {(completing || escrowLoading) ? (
-                                 <>
-                                   <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
-                                   Processing Payment...
-                                 </>
-                               ) : (
-                                 "Complete Project"
-                               )}
+                               {completing ? "Completing..." : "Complete Project"}
                              </AlertDialogAction>
                            </AlertDialogFooter>
                          </AlertDialogContent>

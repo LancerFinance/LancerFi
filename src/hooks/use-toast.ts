@@ -3,14 +3,13 @@ import * as React from "react";
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
 const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 1000; // Delay before removing from DOM after animation
+const TOAST_REMOVE_DELAY = 1000000;
 
 type ToasterToast = ToastProps & {
   id: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: ToastActionElement;
-  duration?: number;
 };
 
 const actionTypes = {
@@ -145,27 +144,17 @@ function toast({ ...props }: Toast) {
     });
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
 
-  const toastData = {
-    ...props,
-    id,
-    open: true,
-    onOpenChange: (open) => {
-      if (!open) dismiss();
-    },
-    duration: props.duration ?? 5000, // Default 5 seconds, but can be overridden
-  };
-
   dispatch({
     type: "ADD_TOAST",
-    toast: toastData,
+    toast: {
+      ...props,
+      id,
+      open: true,
+      onOpenChange: (open) => {
+        if (!open) dismiss();
+      },
+    },
   });
-
-  // Auto-dismiss after duration if specified
-  if (toastData.duration && toastData.duration > 0) {
-    setTimeout(() => {
-      dismiss();
-    }, toastData.duration);
-  }
 
   return {
     id: id,

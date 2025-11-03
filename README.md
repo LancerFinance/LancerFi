@@ -1,146 +1,73 @@
-# LancerFi
+# Welcome to your Lovable project
 
-A decentralized freelancing platform built on Solana blockchain with secure escrow payments.
+## Project info
 
-## Features
+**URL**: https://lovable.dev/projects/022e0ac6-8743-450a-a2e1-ff732d54ad63
 
-- **Solana-based Payments**: Pay freelancers with SOL or USDC
-- **Escrow System**: Secure payment escrow that locks funds until project completion
-- **Wallet Integration**: Connect with Phantom wallet
-- **Smart Contracts**: Automatic payment release to freelancers upon project completion
-- **Platform Fee**: 10% platform fee automatically deducted and retained
+## How can I edit this code?
 
-## Tech Stack
+There are several ways of editing your application.
 
-### Frontend
-- React + TypeScript
-- Vite
-- Tailwind CSS
-- shadcn-ui components
-- Solana Web3.js
+**Use Lovable**
 
-### Backend
-- Node.js + Express
-- Solana blockchain integration
-- Supabase (PostgreSQL database)
+Simply visit the [Lovable Project](https://lovable.dev/projects/022e0ac6-8743-450a-a2e1-ff732d54ad63) and start prompting.
 
-### Infrastructure
-- Frontend: Vercel (https://lancerfi.app)
-- Backend API: Vercel serverless functions
-- Database: Supabase
+Changes made via Lovable will be committed automatically to this repo.
 
-## Setup
+**Use your preferred IDE**
 
-### Prerequisites
-- Node.js 18+ and npm
-- Phantom wallet browser extension
-- Git
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-### Installation
+The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+
+Follow these steps:
 
 ```sh
-# Clone the repository
+# Step 1: Clone the repository using the project's Git URL.
 git clone https://github.com/Powerz98/LancerFi
+
+# Step 2: Navigate to the project directory.
 cd LancerFi
 
-# Install frontend dependencies
-npm install
+# Step 3: Install the necessary dependencies.
+npm i
 
-# Install backend dependencies
-cd server
-npm install
-cd ..
-```
-
-### Environment Variables
-
-#### Frontend (.env)
-```env
-VITE_API_URL=http://localhost:3001
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-#### Backend (server/.env)
-```env
-PORT=3001
-NODE_ENV=development
-FRONTEND_URL=http://localhost:8080
-PLATFORM_WALLET_PRIVATE_KEY=[your_private_key_array]
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_KEY=your_supabase_service_key
-SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-### Run Development Servers
-
-```sh
-# Terminal 1: Frontend (runs on http://localhost:8080)
-npm run dev
-
-# Terminal 2: Backend (runs on http://localhost:3001)
-cd server
+# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-## Solana Network Configuration
+**Edit a file directly in GitHub**
 
-- **Development**: Uses Solana Devnet (for testing)
-- **Production**: Uses Solana Mainnet (for real payments)
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
 
-The network is automatically selected:
-- **Frontend**: Based on `Vite MODE` → `production` = Mainnet, `development` = Devnet
-- **Backend**: Based on `NODE_ENV` → `production` = Mainnet, `development` = Devnet
+**Use GitHub Codespaces**
 
-### Mainnet Deployment Checklist
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
 
-Before deploying to mainnet, ensure:
+## What technologies are used for this project?
 
-1. **Platform Wallet Funding**: The platform wallet `AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U` must have:
-   - Sufficient SOL balance for transaction fees (recommend 1-5 SOL)
-   - USDC balance if clients will pay with USDC (optional but recommended)
+This project is built with:
 
-2. **Vercel Environment Variables**:
-   - Frontend: Set `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-   - Backend: Set `NODE_ENV=production`, `PLATFORM_WALLET_PRIVATE_KEY`, all Supabase keys
-   - Optional: Set `SOLANA_MAINNET_RPC` for better reliability (use paid RPC services)
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
 
-3. **Network Matching**: Users must set their Phantom wallet to **Mainnet** when using the production app
+## How can I deploy this project?
 
-See `MAINNET_READINESS.md` for detailed setup instructions.
+Simply open [Lovable](https://lovable.dev/projects/022e0ac6-8743-450a-a2e1-ff732d54ad63) and click on Share -> Publish.
 
-## Platform Wallet
+## Can I connect a custom domain to my Lovable project?
 
-The escrow wallet address: `AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U`
+Yes, you can!
 
-This wallet holds all escrow funds and automatically releases payments to freelancers when projects are completed.
+To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
-## Payment Flow
-
-1. Client posts project and funds escrow (amount + 10% platform fee)
-2. Funds are locked in platform escrow wallet
-3. Freelancer completes work
-4. Client marks project as completed
-5. Platform wallet automatically sends payment to freelancer's wallet
-6. Platform fee (10%) remains in platform wallet
-
-## Deployment
-
-Both frontend and backend are deployed to Vercel:
-
-- **Frontend**: https://www.lancerfi.app
-- **Backend API**: Configured via Vercel environment variables
-
-See Vercel dashboard for environment variable configuration.
-
-## Security
-
-- Platform wallet private key is stored securely in backend only (never in frontend)
-- Wallet signature authentication required for payment operations
-- Server-side authorization checks prevent unauthorized access
-- Duplicate payment prevention built-in
-- Transaction confirmation on Solana blockchain
-
-## License
-
-MIT
+Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)

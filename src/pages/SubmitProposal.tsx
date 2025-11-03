@@ -115,17 +115,6 @@ const SubmitProposal = () => {
     if (formErrors[field]) {
       setFormErrors(prev => ({ ...prev, [field]: '' }));
     }
-    
-    // Real-time validation for budget
-    if (field === 'proposedBudget' && value && project) {
-      const proposedBudget = parseFloat(value);
-      if (proposedBudget > project.budget_usdc) {
-        setFormErrors(prev => ({
-          ...prev,
-          proposedBudget: `Proposed budget cannot exceed client's budget of $${project.budget_usdc}`
-        }));
-      }
-    }
   };
 
   const validateForm = () => {
@@ -139,13 +128,8 @@ const SubmitProposal = () => {
 
     if (!formData.proposedBudget) {
       errors.proposedBudget = "Proposed budget is required";
-    } else {
-      const proposedBudget = parseFloat(formData.proposedBudget);
-      if (proposedBudget <= 0) {
-        errors.proposedBudget = "Budget must be greater than 0";
-      } else if (project && proposedBudget > project.budget_usdc) {
-        errors.proposedBudget = `Proposed budget cannot exceed client's budget of $${project.budget_usdc}`;
-      }
+    } else if (parseFloat(formData.proposedBudget) <= 0) {
+      errors.proposedBudget = "Budget must be greater than 0";
     }
 
     if (!formData.estimatedTimeline) {
@@ -278,10 +262,10 @@ const SubmitProposal = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Back Button */}
-          <Link to={`/service/${projectId}`} className="inline-flex mb-6">
+          <Link to="/" className="inline-flex mb-6">
             <Button variant="ghost">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Project
+              Back to Home
             </Button>
           </Link>
 
@@ -433,7 +417,7 @@ const SubmitProposal = () => {
                       <h4 className="font-medium mb-2 text-sm">Required Skills</h4>
                       <div className="flex flex-wrap gap-1">
                         {project.required_skills.map((skill: string, index: number) => (
-                          <Badge key={index} variant="outline" className="text-xs" style={{ maxWidth: '240px', wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                          <Badge key={index} variant="outline" className="text-xs">
                             {skill}
                           </Badge>
                         ))}

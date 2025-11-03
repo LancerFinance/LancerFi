@@ -22,15 +22,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.vercel
-
-# Backend environment variables (CRITICAL - contains private keys!)
-server/.env
-server/dist
-.env.backend
-
-# Private keys - NEVER commit these!
-**/escrow-keypair.json
-**/*keypair*.json
-*.key
-*.pem

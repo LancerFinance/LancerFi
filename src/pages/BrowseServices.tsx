@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import Header from "@/components/Header";
-import { Search, Filter, Star, Clock, DollarSign, Grid, List } from "lucide-react";
+import { Search, Filter, Star, Clock, DollarSign, Grid, List, ArrowLeft } from "lucide-react";
 import { db } from "@/lib/supabase";
 
 interface Service {
@@ -70,9 +70,9 @@ const BrowseServices = () => {
       setLoading(true);
       const projects = await db.getProjects();
       
-      // Filter only active projects that don't have a freelancer assigned (available projects)
+      // Filter active projects and add freelancer info
       const activeServices = projects.filter(project => 
-        project.status === 'active' && !project.freelancer_id
+        project.status === 'active' || project.status === 'in_progress'
       );
 
       setServices(activeServices as Service[]);
@@ -134,6 +134,12 @@ const BrowseServices = () => {
       <Header />
       
       <div className="container mx-auto px-4 py-8">
+        <Link to="/">
+          <Button variant="ghost" className="mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Button>
+        </Link>
         {/* Search and Filters Header */}
         <div className="mb-8">
           <div className="flex flex-col gap-4 mb-6">

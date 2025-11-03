@@ -1,4 +1,4 @@
-import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Keypair, sendAndConfirmTransaction } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
 import { ORIGIN_MINT, ORIGIN_DECIMALS } from './origin-token';
 
@@ -16,20 +16,11 @@ export const USDC_MINT = SOLANA_NETWORK === 'mainnet-beta'
   ? new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') // Mainnet USDC
   : new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'); // Devnet USDC
 
-// Platform fee wallet - Production wallet address (LancerFi escrow wallet)
-// Public Key: AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U
-// Private key stored securely in escrow-keypair.json (NEVER commit to git)
-export const PLATFORM_WALLET = new PublicKey('AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U'); // LancerFi escrow wallet
-
-// ⚠️ SECURITY: Platform wallet keypair loading has been moved to backend server
-// This function is deprecated and should not be used in frontend
-// All payment operations must go through the secure backend API
-async function getPlatformKeypair(): Promise<Keypair> {
-  throw new Error('SECURITY ERROR: Platform wallet keypair must not be loaded in frontend. Use backend API for payment operations.');
-}
+// Platform fee wallet - Production wallet address
+export const PLATFORM_WALLET = new PublicKey('DhVcKrZc5b8eVfvhMiVghKVfHkfxBJuNvxXpXfFHQVqg'); // LancerFi platform wallet
 
 // Payment currencies
-export type PaymentCurrency = 'USDC' | 'SOLANA' | 'X402';
+export type PaymentCurrency = 'USDC' | 'SOLANA';
 
 // SOL token configuration
 export const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112'); // Wrapped SOL
@@ -52,8 +43,8 @@ export interface EscrowAccount {
   }[];
 }
 
-// Create and fund escrow account - uses PLATFORM_WALLET as escrow
-export async function createAndFundEscrow(
+// Create escrow account with currency support
+export async function createEscrowAccount(
   clientWallet: PublicKey,
   projectId: string,
   amount: number,
@@ -63,80 +54,40 @@ export async function createAndFundEscrow(
   const platformFee = (amount * platformFeePercent) / 100;
   const totalAmount = amount + platformFee;
   
-  // Use PLATFORM_WALLET as the escrow account (LancerFi's wallet)
-  const escrowAccount = PLATFORM_WALLET;
+  // Generate escrow account keypair
+  // Ensure projectId seed is <= 32 bytes (UUID -> 16 bytes hex)
+  const projectSeedHex = projectId.replace(/-/g, '');
+  let projectSeedBuffer: Buffer;
+  try {
+    // If projectId is a UUID, this yields 16 bytes
+    projectSeedBuffer = Buffer.from(projectSeedHex, 'hex');
+  } catch {
+    // Fallback: truncate utf8 bytes to 32 bytes
+    projectSeedBuffer = Buffer.from(projectId).slice(0, 32);
+  }
+  if (projectSeedBuffer.length > 32) {
+    projectSeedBuffer = projectSeedBuffer.slice(0, 32);
+  }
+
+  const escrowAccount = PublicKey.findProgramAddressSync(
+    [Buffer.from('escrow'), clientWallet.toBuffer(), projectSeedBuffer],
+    new PublicKey('9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM') // LancerFi escrow program ID
+  )[0];
 
   const transaction = new Transaction();
   
-  if (currency === 'SOLANA') {
-    // Native SOL transfer using SystemProgram
-    // Convert to lamports and round to integer (BigInt requires integer)
-    const totalLamports = Math.round(totalAmount * LAMPORTS_PER_SOL);
-    transaction.add(
-      SystemProgram.transfer({
-        fromPubkey: clientWallet,
-        toPubkey: escrowAccount,
-        lamports: totalLamports,
-      })
-    );
-  } else {
-    // USDC or other token transfers
-    const tokenMint = USDC_MINT;
-    const decimals = 6;
-    
-    // Get client's token account
-    const clientTokenAccount = await getAssociatedTokenAddress(
-      tokenMint,
-      clientWallet
-    );
-    
-    // Get escrow's (platform) token account
-    const escrowTokenAccount = await getAssociatedTokenAddress(
-      tokenMint,
-      escrowAccount
-    );
-    
-    // Check if escrow token account exists, if not create it
-    try {
-      await connection.getAccountInfo(escrowTokenAccount);
-    } catch {
-      transaction.add(
-        createAssociatedTokenAccountInstruction(
-          clientWallet,
-          escrowTokenAccount,
-          escrowAccount,
-          tokenMint
-        )
-      );
-    }
-    
-    // Transfer total amount (amount + platform fee) to escrow
-    // Convert to smallest unit (micro-USDC) and round to integer
-    const totalMicroUnits = Math.round(totalAmount * Math.pow(10, decimals));
-    transaction.add(
-      createTransferInstruction(
-        clientTokenAccount,
-        escrowTokenAccount,
-        clientWallet,
-        totalMicroUnits,
-        [],
-        TOKEN_PROGRAM_ID
-      )
-    );
-  }
+  // Initialize escrow account with project details
+  // This would normally call the escrow program's initialize instruction
+  // For now, we create a minimal transaction to establish the escrow account
+  transaction.add(
+    SystemProgram.transfer({
+      fromPubkey: clientWallet,
+      toPubkey: escrowAccount,
+      lamports: 1000000, // Rent for escrow account
+    })
+  );
 
   return { escrowAccount, transaction };
-}
-
-// Legacy function kept for compatibility - redirects to createAndFundEscrow
-export async function createEscrowAccount(
-  clientWallet: PublicKey,
-  projectId: string,
-  amount: number,
-  currency: PaymentCurrency = 'SOLANA',
-  platformFeePercent: number = 10
-): Promise<{ escrowAccount: PublicKey; transaction: Transaction }> {
-  return createAndFundEscrow(clientWallet, projectId, amount, currency, platformFeePercent);
 }
 
 // Fund escrow with USDC or Solana (label), internally same logic
@@ -193,7 +144,7 @@ export async function fundEscrowWithCurrency(
   return transaction;
 }
 
-// Release escrow payment (creates transaction - used by client for approval)
+// Release escrow payment (always in internal token)
 export async function releaseEscrowPayment(
   clientWallet: PublicKey,
   freelancerWallet: PublicKey,
@@ -219,13 +170,13 @@ export async function releaseEscrowPayment(
     freelancerWallet
   );
   
-  // Create freelancer token account if it doesn't exist (use platform wallet as payer)
+  // Create freelancer token account if it doesn't exist
   try {
     await connection.getAccountInfo(freelancerTokenAccount);
   } catch {
     transaction.add(
       createAssociatedTokenAccountInstruction(
-        escrowAccount, // Use platform wallet (escrow account) as payer
+        clientWallet,
         freelancerTokenAccount,
         freelancerWallet,
         tokenMint
@@ -239,26 +190,13 @@ export async function releaseEscrowPayment(
       escrowTokenAccount,
       freelancerTokenAccount,
       escrowAccount, // Escrow account as authority
-      Math.round(amount * Math.pow(10, decimals)),
+      amount * Math.pow(10, decimals),
       [],
       TOKEN_PROGRAM_ID
     )
   );
   
   return transaction;
-}
-
-// ⚠️ DEPRECATED: This function has been moved to backend server
-// DO NOT USE THIS FUNCTION - It exposes private keys in frontend
-// Use the backend API endpoint instead via releasePaymentToFreelancer in api-client.ts
-// This function is kept for backward compatibility but will throw an error
-export async function releasePaymentFromPlatform(
-  freelancerWallet: PublicKey,
-  amount: number,
-  currency: PaymentCurrency = 'SOLANA'
-): Promise<string> {
-  // SECURITY: This function is deprecated - payment release moved to backend
-  throw new Error('SECURITY ERROR: Payment release must be done through secure backend API. This function is disabled.');
 }
 
 // Get USDC balance
@@ -302,4 +240,4 @@ export const fundEscrowWithUSDC = (
   clientWallet: PublicKey,
   escrowAccount: PublicKey,
   amount: number
-) => fundEscrowWithCurrency(clientWallet, escrowAccount, amount, 'USDC');
+) => fundEscrowWithCurrency(clientWallet, escrowAccount, amount, 'USDC', false);

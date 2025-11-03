@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Loader2 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Info, TrendingUp, ArrowRight, Loader2 } from "lucide-react";
 import { PaymentCurrency, formatUSDC, formatSOL } from "@/lib/solana";
 import { getSolanaPrice, convertUSDToSOL } from "@/lib/solana-price";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface PaymentCurrencySelectorProps {
   amount: number;
@@ -66,132 +68,120 @@ const PaymentCurrencySelector = ({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Currency Options */}
-        <div className="grid grid-cols-1 gap-4">
-          {/* Solana Option - Collapsed when not selected */}
-          <Button
-            variant={selectedCurrency === 'SOLANA' ? 'default' : 'outline'}
-            onClick={() => onCurrencyChange('SOLANA')}
-            className={`p-4 flex flex-col items-start space-y-2 transition-all duration-200 ${
-              selectedCurrency === 'SOLANA' ? 'h-auto' : 'h-16'
-            }`}
-          >
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-2">
-                <img 
-                  src="https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png" 
-                  alt="Solana" 
-                  className="w-6 h-6 rounded-full"
-                />
-                <span className="font-semibold">Pay with Solana</span>
-              </div>
-              <Badge
-                variant="secondary"
-                className={`text-xs transition-opacity duration-200 ${
-                  selectedCurrency === 'SOLANA' ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                }`}
-              >
-                Selected
-              </Badge>
-            </div>
-            {selectedCurrency === 'SOLANA' && (
-              <div className="text-left text-sm opacity-80">
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Loading rates...</span>
-                  </div>
-                ) : (
-                  <>
-                    <div>Amount: {formatSOL(getSolEquivalent())}</div>
-                    <div>+ Platform Fee: {formatSOL(solPlatformFee)}</div>
-                    <div className="font-medium">Total: {formatSOL(solTotalAmount)}</div>
-                  </>
-                )}
-              </div>
-            )}
-          </Button>
-
-          {/* USDC Option - Collapsed when not selected */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* USDC Option */}
           <Button
             variant={selectedCurrency === 'USDC' ? 'default' : 'outline'}
             onClick={() => onCurrencyChange('USDC')}
-            className={`p-4 flex flex-col items-start space-y-2 transition-all duration-200 ${
-              selectedCurrency === 'USDC' ? 'h-auto' : 'h-16'
-            }`}
+            className="h-auto p-4 flex flex-col items-start space-y-2"
           >
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
-                <img 
-                  src="https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png" 
-                  alt="USDC" 
-                  className="w-6 h-6 rounded-full"
-                />
+                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                  $
+                </div>
                 <span className="font-semibold">Pay with USDC</span>
               </div>
-              <Badge
-                variant="secondary"
-                className={`text-xs transition-opacity duration-200 ${
-                  selectedCurrency === 'USDC' ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                }`}
-              >
-                Selected
-              </Badge>
+              {selectedCurrency === 'USDC' && (
+                <Badge variant="secondary" className="text-xs">Selected</Badge>
+              )}
             </div>
-            {selectedCurrency === 'USDC' && (
-              <div className="text-left text-sm opacity-80">
-                <div>Amount: {formatUSDC(amount)}</div>
-                <div>+ Platform Fee: {formatUSDC(platformFee)}</div>
-                <div className="font-medium">Total: {formatUSDC(totalAmount)}</div>
-              </div>
-            )}
+            <div className="text-left text-sm opacity-80">
+              <div>Amount: {formatUSDC(amount)}</div>
+              <div>+ Platform Fee: {formatUSDC(platformFee)}</div>
+              <div className="font-medium">Total: {formatUSDC(totalAmount)}</div>
+            </div>
           </Button>
 
-          {/* X402 Option - Collapsed when not selected */}
+          {/* Solana Option */}
           <Button
-            variant={selectedCurrency === 'X402' ? 'default' : 'outline'}
-            onClick={() => onCurrencyChange('X402')}
-            className={`p-4 flex flex-col items-start space-y-2 transition-all duration-200 ${
-              selectedCurrency === 'X402' ? 'h-auto' : 'h-16'
-            }`}
+            variant={selectedCurrency === 'SOLANA' ? 'default' : 'outline'}
+            onClick={() => onCurrencyChange('SOLANA')}
+            className="h-auto p-4 flex flex-col items-start space-y-2"
           >
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
-                <img 
-                  src="https://s2.coinmarketcap.com/static/img/coins/64x64/38785.png" 
-                  alt="x402" 
-                  className="w-6 h-6 rounded-full object-cover"
-                  onError={(e) => {
-                    // Fallback: show purple circle with X if image fails
-                    e.currentTarget.style.display = 'none';
-                    const fallback = document.createElement('div');
-                    fallback.className = 'w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold';
-                    fallback.textContent = 'X';
-                    if (e.currentTarget.parentElement) {
-                      e.currentTarget.parentElement.appendChild(fallback);
-                    }
-                  }}
-                />
-                <span className="font-semibold">Pay with x402</span>
+                <div className="w-6 h-6 bg-black rounded-full flex items-center justify-center text-white text-xs font-bold">
+                  S
+                </div>
+                <span className="font-semibold">Pay with SOLANA</span>
               </div>
-              <Badge
-                variant="secondary"
-                className={`text-xs transition-opacity duration-200 ${
-                  selectedCurrency === 'X402' ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                }`}
-              >
-                Selected
-              </Badge>
+              {selectedCurrency === 'SOLANA' && (
+                <Badge variant="secondary" className="text-xs">Selected</Badge>
+              )}
             </div>
-            {selectedCurrency === 'X402' && (
-              <div className="text-left text-sm opacity-80">
-                <div>Amount: {formatUSDC(amount)}</div>
-                <div>+ Platform Fee: {formatUSDC(platformFee)}</div>
-                <div className="font-medium">Total: {formatUSDC(totalAmount)}</div>
-              </div>
-            )}
+            <div className="text-left text-sm opacity-80">
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Loading rates...</span>
+                </div>
+              ) : (
+                <>
+                  <div>Amount: {formatSOL(getSolEquivalent())}</div>
+                  <div>+ Platform Fee: {formatSOL(solPlatformFee)}</div>
+                  <div className="font-medium">Total: {formatSOL(solTotalAmount)}</div>
+                </>
+              )}
+            </div>
           </Button>
         </div>
 
+        {/* Conversion Information */}
+        {false && (
+          <></>
+        )}
+
+        {/* Market Data */}
+        {false && <></>}
+
+        {/* Benefits Section */}
+        <div className="space-y-3">
+          <Separator />
+          <div className="text-sm space-y-2">
+            <div className="font-medium text-foreground">Payment Options</div>
+            <ul className="space-y-1 text-muted-foreground text-xs">
+              <li className="flex items-start gap-2">
+                <div className="w-1 h-1 bg-web3-primary rounded-full mt-2"></div>
+                <span>Pay directly with USDC or SOLANA</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Pricing Breakdown */}
+        <div className="space-y-3">
+          <Separator />
+          <div className="text-sm">
+            <div className="font-medium text-foreground mb-2">Payment Breakdown</div>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Project Budget</span>
+                <span className="text-foreground">
+                  {selectedCurrency === 'USDC' ? formatUSDC(amount) : formatSOL(getSolEquivalent())}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Platform Fee (10%)</span>
+                <span className="text-foreground">
+                  {selectedCurrency === 'USDC' ? formatUSDC(platformFee) : formatSOL(solPlatformFee)}
+                </span>
+              </div>
+              <Separator className="my-2" />
+              <div className="flex justify-between font-semibold">
+                <span className="text-foreground">Total Payment</span>
+                <span className="text-web3-primary">
+                  {selectedCurrency === 'USDC' ? formatUSDC(totalAmount) : formatSOL(solTotalAmount)}
+                </span>
+              </div>
+              {selectedCurrency === 'SOLANA' && solPrice && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  (Based on current SOL price: ${solPrice.toFixed(2)})
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
