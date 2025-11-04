@@ -3,8 +3,9 @@ import HeroSection from "@/components/HeroSection";
 import FeaturedServices from "@/components/FeaturedServices";
 import CategoryGrid from "@/components/CategoryGrid";
 import ExploreFreelancers from "@/components/ExploreFreelancers";
-import HowItWorks from "@/components/HowItWorks";
+import FrontendRoadmap from "@/components/FrontendRoadmap";
 import ValueProposition from "@/components/ValueProposition";
+import HowItWorks from "@/components/HowItWorks";
 
 const Index = () => {
   return (
@@ -14,6 +15,7 @@ const Index = () => {
       <FeaturedServices />
       <CategoryGrid />
       <ExploreFreelancers />
+      <FrontendRoadmap />
       <ValueProposition />
       <HowItWorks />
     </div>
