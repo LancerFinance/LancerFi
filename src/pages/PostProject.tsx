@@ -494,7 +494,7 @@ const PostProject = () => {
                           onDragOver={handleDragOver}
                           onDragLeave={handleDragLeave}
                           onDrop={handleDrop}
-                          className={`mt-2 flex items-center justify-center w-full h-48 border-2 border-dashed rounded-lg bg-muted/50 cursor-pointer transition-colors ${
+                          className={`mt-2 flex items-center justify-center w-full h-[184px] border-2 border-dashed rounded-lg bg-muted/50 cursor-pointer transition-colors ${
                             isDraggingOver ? 'bg-muted border-primary border-solid' : ''
                           } ${formErrors.project_image ? 'border-destructive' : 'border-border'}`}
                         >
