@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Header from "@/components/Header";
 import { Star, Clock, DollarSign, Shield, MessageCircle, ArrowLeft, User, Award, TrendingUp } from "lucide-react";
 import { db } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/hooks/useWallet";
 import { toast } from "@/hooks/use-toast";
 
@@ -43,12 +44,21 @@ const ServiceDetails = () => {
   const { isConnected, address } = useWallet();
   const [service, setService] = useState<ServiceDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasSubmittedProposal, setHasSubmittedProposal] = useState(false);
 
   useEffect(() => {
     if (id) {
       loadServiceDetails(id);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (id && address && isConnected) {
+      checkExistingProposal(id);
+    } else {
+      setHasSubmittedProposal(false);
+    }
+  }, [id, address, isConnected]);
 
   const loadServiceDetails = async (serviceId: string) => {
     try {
@@ -75,6 +85,41 @@ const ServiceDetails = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkExistingProposal = async (projectId: string) => {
+    if (!address) return;
+    
+    try {
+      // Get user's profile to find their freelancer_id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('wallet_address', address)
+        .maybeSingle();
+
+      if (!profile?.id) {
+        setHasSubmittedProposal(false);
+        return;
+      }
+
+      // Check if there's already a proposal from this user for this project
+      const { data: proposals, error } = await supabase
+        .from('proposals')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('freelancer_id', profile.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking existing proposal:', error);
+        return;
+      }
+
+      setHasSubmittedProposal(!!proposals);
+    } catch (error) {
+      console.error('Error checking existing proposal:', error);
     }
   };
 
@@ -158,12 +203,14 @@ const ServiceDetails = () => {
       
       <div className="container mx-auto px-4 py-8">
         {/* Back Button */}
-        <Link to="/">
-          <Button variant="ghost" className="mb-6">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Home
-          </Button>
-        </Link>
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate(-1)}
+          className="mb-6"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
@@ -195,9 +242,9 @@ const ServiceDetails = () => {
                     />
                   </div>
                 )}
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-semibold mb-3">Project Description</h3>
-                  <p className="text-muted-foreground leading-relaxed">
+                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word' }}>
                     {service.description}
                   </p>
                 </div>
@@ -366,8 +413,9 @@ const ServiceDetails = () => {
                       <Button 
                         className="w-full"
                         onClick={handleSubmitProposal}
+                        disabled={hasSubmittedProposal}
                       >
-                        Submit Proposal
+                        {hasSubmittedProposal ? 'Proposal Already Submitted' : 'Submit Proposal'}
                       </Button>
                       <p className="text-xs text-center text-muted-foreground">
                         Pitch your skills and win this project

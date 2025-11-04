@@ -1,20 +1,22 @@
 import { useState, useCallback } from 'react';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { useWallet } from './useWallet';
-import { createEscrowAccount, fundEscrowWithCurrency, releaseEscrowPayment, connection, PaymentCurrency, formatSOL } from '@/lib/solana';
+import { createEscrowAccount, fundEscrowWithCurrency, releaseEscrowPayment, connection, PaymentCurrency, formatSOL, formatUSDC } from '@/lib/solana';
 import { db } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { releasePaymentToFreelancer as releasePaymentAPI } from '@/lib/api-client';
 
 interface UseEscrowReturn {
   createProjectEscrow: (projectId: string, amount: number, paymentCurrency: PaymentCurrency) => Promise<string | null>;
   fundEscrow: (escrowId: string, amount: number, paymentCurrency: PaymentCurrency) => Promise<boolean>;
   releasePayment: (escrowId: string, milestoneId: string) => Promise<boolean>;
+  releasePaymentToFreelancer: (escrowId: string, freelancerWallet: string) => Promise<boolean>;
   isLoading: boolean;
 }
 
 export const useEscrow = (): UseEscrowReturn => {
   const [isLoading, setIsLoading] = useState(false);
-  const { provider, address } = useWallet();
+  const { provider, address, signMessage } = useWallet();
   const { toast } = useToast();
 
   const createProjectEscrow = useCallback(async (
@@ -80,12 +82,13 @@ export const useEscrow = (): UseEscrowReturn => {
       const escrow = await db.createEscrow({
         project_id: projectId,
         client_wallet: solAddress,
-        amount_usdc: finalAmount, // Internal accounting amount
+        amount_usdc: finalAmount, // Internal accounting amount (SOL if paymentCurrency is SOLANA)
         platform_fee: platformFee,
         total_locked: totalLocked,
         escrow_account: escrowAccount.toString(),
         transaction_signature: signature,
-        status: 'funded'
+        status: 'funded',
+        payment_currency: actualCurrency // Store the payment currency used
       });
 
       toast({
@@ -289,10 +292,83 @@ export const useEscrow = (): UseEscrowReturn => {
     }
   }, [provider, address, toast]);
 
+  const releasePaymentToFreelancer = useCallback(async (
+    escrowId: string,
+    freelancerWallet: string
+  ): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const escrow = await db.getEscrowById(escrowId);
+      
+      if (!escrow || !escrow.escrow_account) {
+        throw new Error('Escrow not found');
+      }
+
+      // Security: Prevent duplicate payments
+      if (escrow.status === 'released') {
+        throw new Error('Payment has already been released for this escrow');
+      }
+
+      if (escrow.status !== 'funded') {
+        throw new Error(`Escrow is not in funded state. Current status: ${escrow.status}`);
+      }
+
+      // Security: Verify caller is authorized (project owner)
+      if (!address) {
+        throw new Error('Wallet not connected');
+      }
+
+      const project = await db.getProject(escrow.project_id);
+      if (project.client_id !== address) {
+        throw new Error('Unauthorized: Only the project owner can release payment');
+      }
+
+      // Security: Verify project is in valid state for completion
+      if (project.status !== 'in_progress') {
+        throw new Error(`Project must be in progress to complete. Current status: ${project.status}`);
+      }
+
+      // Get payment currency from escrow (default to SOLANA if not set)
+      const paymentCurrency = (escrow.payment_currency as PaymentCurrency) || 'SOLANA';
+      
+      // Amount to send to freelancer (project amount, excluding platform fee)
+      const amountToSend = escrow.amount_usdc;
+      
+      // Use secure backend API instead of direct blockchain access
+      // signMessage will trigger Phantom popup for signature
+      const signature = await releasePaymentAPI(
+        escrowId,
+        freelancerWallet,
+        address,
+        signMessage
+      );
+
+      toast({
+        title: "Payment Released",
+        description: paymentCurrency === 'USDC' 
+          ? `Successfully sent ${formatUSDC(amountToSend)} to freelancer`
+          : `Successfully sent ${formatSOL(amountToSend)} to freelancer`,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error releasing payment to freelancer:', error);
+      toast({
+        title: "Payment Release Failed",
+        description: error instanceof Error ? error.message : "Failed to release payment. Please try again.",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast, address, signMessage]);
+
   return {
     createProjectEscrow,
     fundEscrow,
     releasePayment,
+    releasePaymentToFreelancer,
     isLoading
   };
 };

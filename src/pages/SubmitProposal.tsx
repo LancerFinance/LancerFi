@@ -115,6 +115,40 @@ const SubmitProposal = () => {
     if (formErrors[field]) {
       setFormErrors(prev => ({ ...prev, [field]: '' }));
     }
+    
+    // Real-time validation for budget
+    if (field === 'proposedBudget' && value && project) {
+      const proposedBudget = parseFloat(value);
+      if (proposedBudget > project.budget_usdc) {
+        setFormErrors(prev => ({
+          ...prev,
+          proposedBudget: `Proposed budget cannot exceed client's budget of $${project.budget_usdc}`
+        }));
+      } else {
+        // Clear error if it was previously set and now valid
+        if (formErrors.proposedBudget) {
+          setFormErrors(prev => ({ ...prev, proposedBudget: '' }));
+        }
+      }
+    }
+  };
+
+  const handleBudgetFocus = () => {
+    if (project) {
+      // Always clear the value if it matches the default project budget when focused
+      const currentValue = formData.proposedBudget;
+      const defaultBudget = project.budget_usdc.toString();
+      if (currentValue === defaultBudget) {
+        setFormData(prev => ({ ...prev, proposedBudget: '' }));
+      }
+    }
+  };
+
+  const handleBudgetBlur = () => {
+    // If the field is empty on blur, restore the default budget
+    if (!formData.proposedBudget && project) {
+      setFormData(prev => ({ ...prev, proposedBudget: project.budget_usdc.toString() }));
+    }
   };
 
   const validateForm = () => {
@@ -128,8 +162,13 @@ const SubmitProposal = () => {
 
     if (!formData.proposedBudget) {
       errors.proposedBudget = "Proposed budget is required";
-    } else if (parseFloat(formData.proposedBudget) <= 0) {
-      errors.proposedBudget = "Budget must be greater than 0";
+    } else {
+      const proposedBudget = parseFloat(formData.proposedBudget);
+      if (proposedBudget <= 0) {
+        errors.proposedBudget = "Budget must be greater than 0";
+      } else if (project && proposedBudget > project.budget_usdc) {
+        errors.proposedBudget = `Proposed budget cannot exceed client's budget of $${project.budget_usdc}`;
+      }
     }
 
     if (!formData.estimatedTimeline) {
@@ -262,10 +301,10 @@ const SubmitProposal = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Back Button */}
-          <Link to="/" className="inline-flex mb-6">
+          <Link to={`/service/${projectId}`} className="inline-flex mb-6">
             <Button variant="ghost">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Home
+              Back to Project
             </Button>
           </Link>
 
@@ -324,6 +363,8 @@ const SubmitProposal = () => {
                           className={`pl-9 bg-muted/50 ${formErrors.proposedBudget ? 'border-destructive' : ''}`}
                           value={formData.proposedBudget}
                           onChange={(e) => handleInputChange('proposedBudget', e.target.value)}
+                          onFocus={handleBudgetFocus}
+                          onBlur={handleBudgetBlur}
                         />
                       </div>
                       {formErrors.proposedBudget && (
@@ -417,7 +458,7 @@ const SubmitProposal = () => {
                       <h4 className="font-medium mb-2 text-sm">Required Skills</h4>
                       <div className="flex flex-wrap gap-1">
                         {project.required_skills.map((skill: string, index: number) => (
-                          <Badge key={index} variant="outline" className="text-xs">
+                          <Badge key={index} variant="outline" className="text-xs" style={{ maxWidth: '240px', wordBreak: 'break-word', whiteSpace: 'normal' }}>
                             {skill}
                           </Badge>
                         ))}

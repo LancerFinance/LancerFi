@@ -12,8 +12,7 @@ import { useEscrow } from "@/hooks/useEscrow";
 import { db, Project } from "@/lib/supabase";
 import { supabase } from "@/integrations/supabase/client";
 import WalletButton from "@/components/WalletButton";
-import { Clock, DollarSign, User, CheckCircle, ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Clock, DollarSign, User, CheckCircle } from "lucide-react";
 
 const FreelancerDashboard = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -57,6 +56,26 @@ const FreelancerDashboard = () => {
       toast({
         title: "Wallet Required",
         description: "Please connect your wallet to apply for projects",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate proposed budget doesn't exceed client's budget
+    const proposedBudget = parseFloat(proposal.proposed_budget);
+    if (proposedBudget > project.budget_usdc) {
+      toast({
+        title: "Invalid Budget",
+        description: `Proposed budget cannot exceed client's budget of $${project.budget_usdc}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (proposedBudget <= 0) {
+      toast({
+        title: "Invalid Budget",
+        description: "Budget must be greater than 0",
         variant: "destructive"
       });
       return;
@@ -143,12 +162,6 @@ const FreelancerDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <Link to="/">
-          <Button variant="ghost" className="mb-6">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Button>
-        </Link>
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold">Freelancer Dashboard</h1>
@@ -253,11 +266,28 @@ const FreelancerDashboard = () => {
                                 type="number"
                                 placeholder={project.budget_usdc.toString()}
                                 value={proposal.proposed_budget}
-                                onChange={(e) => setProposal({
-                                  ...proposal,
-                                  proposed_budget: e.target.value
-                                })}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setProposal({
+                                    ...proposal,
+                                    proposed_budget: value
+                                  });
+                                  // Real-time validation
+                                  const budget = parseFloat(value);
+                                  if (value && budget > project.budget_usdc) {
+                                    toast({
+                                      title: "Budget Too High",
+                                      description: `Cannot exceed client's budget of $${project.budget_usdc}`,
+                                      variant: "destructive",
+                                      duration: 3000
+                                    });
+                                  }
+                                }}
+                                max={project.budget_usdc}
                               />
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Client's budget: ${project.budget_usdc}
+                              </p>
                             </div>
                             <div>
                               <Label htmlFor="estimated_timeline">Estimated Timeline</Label>

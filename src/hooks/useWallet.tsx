@@ -13,6 +13,7 @@ interface WalletContextValue extends WalletState {
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
   formatAddress: (address: string) => string;
+  signMessage: (message: string) => Promise<{ signature: Uint8Array }>;
 }
 
 const WalletContext = createContext<WalletContextValue | undefined>(undefined);
@@ -163,11 +164,63 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
+  const signMessage = useCallback(async (message: string): Promise<{ signature: Uint8Array }> => {
+    // Check our internal state
+    if (!wallet.provider || !wallet.address) {
+      // Double-check Phantom's actual connection state
+      const w: any = window as any;
+      if (w.solana && w.solana.isPhantom && w.solana.isConnected) {
+        // Phantom says it's connected, but our state is stale - update it
+        const address = w.solana.publicKey?.toString?.();
+        if (address) {
+          setWallet({ address, isConnected: true, isConnecting: false, provider: w.solana });
+          // Use the fresh provider
+          const ph = w.solana;
+          try {
+            const encodedMessage = new TextEncoder().encode(message);
+            const signed = await ph.signMessage(encodedMessage, 'utf8');
+            return { signature: signed.signature };
+          } catch (error: any) {
+            console.error('Error signing message:', error);
+            if (error?.code === 4001 || error?.message?.includes('User rejected') || error?.message?.includes('canceled') || error?.message?.includes('denied')) {
+              throw new Error('Signature request was canceled. Payment was not sent.');
+            }
+            throw new Error(error?.message || 'Failed to sign message. Please try again.');
+          }
+        }
+      }
+      throw new Error('Wallet not connected');
+    }
+
+    const ph = wallet.provider as any;
+    if (!ph?.isPhantom || !ph.signMessage) {
+      throw new Error('Phantom wallet not available or does not support message signing');
+    }
+
+    try {
+      const encodedMessage = new TextEncoder().encode(message);
+      // This will trigger Phantom popup for signature
+      const signed = await ph.signMessage(encodedMessage, 'utf8');
+      
+      return {
+        signature: signed.signature
+      };
+    } catch (error: any) {
+      console.error('Error signing message:', error);
+      // Check if user rejected/canceled the signature
+      if (error?.code === 4001 || error?.message?.includes('User rejected') || error?.message?.includes('canceled') || error?.message?.includes('denied')) {
+        throw new Error('Signature request was canceled. Payment was not sent.');
+      }
+      throw new Error(error?.message || 'Failed to sign message. Please try again.');
+    }
+  }, [wallet.provider, wallet.address]);
+
   const value: WalletContextValue = {
     ...wallet,
     connectWallet,
     disconnectWallet,
     formatAddress,
+    signMessage,
   };
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

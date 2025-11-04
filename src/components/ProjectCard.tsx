@@ -3,7 +3,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, DollarSign, Shield, User, CheckCircle } from "lucide-react";
 import { Project, Escrow } from "@/lib/supabase";
-import { formatUSDC } from "@/lib/solana";
+import { formatUSDC, formatSOL } from "@/lib/solana";
+import { useState, useEffect } from "react";
+import { getSolanaPrice } from "@/lib/solana-price";
 
 interface ProjectCardProps {
   project: Project;
@@ -13,6 +15,19 @@ interface ProjectCardProps {
 }
 
 const ProjectCard = ({ project, escrow, onViewProject, proposalCount = 0 }: ProjectCardProps) => {
+  const [solPrice, setSolPrice] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (escrow?.payment_currency === 'SOLANA') {
+      getSolanaPrice().then(priceData => {
+        setSolPrice(priceData.price_usd);
+      }).catch(() => {
+        // Fallback price
+        setSolPrice(100);
+      });
+    }
+  }, [escrow?.payment_currency]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-web3-success/10 text-web3-success';
@@ -33,14 +48,14 @@ const ProjectCard = ({ project, escrow, onViewProject, proposalCount = 0 }: Proj
   };
 
   return (
-    <Card className="bg-gradient-card border border-border/50 hover:shadow-corporate transition-all duration-300">
+    <Card className="bg-gradient-card border border-border/50 hover:shadow-corporate transition-all duration-300 overflow-hidden">
       <CardHeader className="pb-4">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <CardTitle className="text-xl text-foreground line-clamp-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-2 flex-1 min-w-0">
+            <CardTitle className="text-xl text-foreground line-clamp-2 break-words">
               {project.title}
             </CardTitle>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 flex-wrap">
               <Badge className={getStatusColor(project.status)}>
                 {project.status.replace('_', ' ').toUpperCase()}
               </Badge>
@@ -49,36 +64,36 @@ const ProjectCard = ({ project, escrow, onViewProject, proposalCount = 0 }: Proj
               </Badge>
             </div>
           </div>
-          <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+          <div className="flex items-center space-x-1 text-sm text-muted-foreground flex-shrink-0">
             {getEscrowStatusIcon(escrow?.status)}
-            <span className="capitalize">{escrow?.status || 'No Escrow'}</span>
+            <span className="capitalize whitespace-nowrap">{escrow?.status || 'No Escrow'}</span>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-muted-foreground text-sm line-clamp-3">
+        <p className="text-muted-foreground text-sm line-clamp-3 break-words">
           {project.description}
         </p>
         
         <div className="grid grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center space-x-2">
-            <DollarSign className="w-4 h-4 text-web3-primary" />
-            <span className="text-foreground font-medium">
+          <div className="flex items-center space-x-2 min-w-0">
+            <DollarSign className="w-4 h-4 text-web3-primary flex-shrink-0" />
+            <span className="text-foreground font-medium truncate">
               {formatUSDC(project.budget_usdc)}
             </span>
           </div>
-          <div className="flex items-center space-x-2">
-            <Clock className="w-4 h-4 text-web3-secondary" />
-            <span className="text-muted-foreground">
+          <div className="flex items-center space-x-2 min-w-0">
+            <Clock className="w-4 h-4 text-web3-secondary flex-shrink-0" />
+            <span className="text-muted-foreground truncate">
               {project.timeline}
             </span>
           </div>
         </div>
 
         {project.freelancer && (
-          <div className="flex items-center space-x-2 text-sm">
-            <User className="w-4 h-4 text-web3-success" />
-            <span className="text-foreground">
+          <div className="flex items-center space-x-2 text-sm min-w-0">
+            <User className="w-4 h-4 text-web3-success flex-shrink-0" />
+            <span className="text-foreground truncate">
               Assigned to {project.freelancer.username || project.freelancer.full_name || 'Freelancer'}
             </span>
           </div>
@@ -86,14 +101,22 @@ const ProjectCard = ({ project, escrow, onViewProject, proposalCount = 0 }: Proj
 
         {escrow && (
           <div className="bg-web3-primary/5 rounded-lg p-3 border border-web3-primary/20">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Escrow Locked:</span>
-              <span className="text-web3-primary font-medium">
-                {formatUSDC(escrow.total_locked)}
+            <div className="flex items-center justify-between text-sm gap-2 min-w-0">
+              <span className="text-muted-foreground flex-shrink-0">Escrow Locked:</span>
+              <span className="text-web3-primary font-medium truncate text-right">
+                {escrow.payment_currency === 'SOLANA'
+                  ? formatSOL(escrow.total_locked)
+                  : formatUSDC(escrow.total_locked)
+                }
+                {escrow.payment_currency === 'SOLANA' && solPrice && (
+                  <span className="text-xs text-muted-foreground ml-1 whitespace-nowrap">
+                    (~{formatUSDC(escrow.total_locked * solPrice)})
+                  </span>
+                )}
               </span>
             </div>
             {escrow.escrow_account && (
-              <div className="mt-1 text-xs text-muted-foreground">
+              <div className="mt-1 text-xs text-muted-foreground truncate">
                 Contract: {escrow.escrow_account.slice(0, 8)}...{escrow.escrow_account.slice(-6)}
               </div>
             )}

@@ -116,7 +116,7 @@ const Header = () => {
         {/* Secondary Navigation Bar */}
         <div className="hidden lg:flex items-center justify-between py-3 border-t border-border/50">
           
-          <span className="text-sm text-muted-foreground">USDC payments • Near-zero fees</span>
+          <span className="text-sm text-muted-foreground">SOL, USDC, X402 payments • Near-zero fees</span>
         </div>
 
         {/* Mobile Menu */}
