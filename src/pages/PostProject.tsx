@@ -6,9 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Wallet, Shield, Loader2, Upload, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { db, supabase } from "@/lib/supabase";
 import { formatUSDC, formatSOL, PaymentCurrency } from "@/lib/solana";
@@ -17,11 +18,13 @@ import { useToast } from "@/hooks/use-toast";
 import { validateProject } from "@/lib/validation";
 import PaymentCurrencySelector from "@/components/PaymentCurrencySelector";
 import { PROJECT_CATEGORIES } from "@/lib/categories";
+import { useEscrow } from "@/hooks/useEscrow";
 
 const PostProject = () => {
   const navigate = useNavigate();
   const { isConnected, address } = useWallet();
   const { toast } = useToast();
+  const { createProjectEscrow, isLoading: escrowLoading } = useEscrow();
   const [searchParams] = useSearchParams();
   const preselectedFreelancerId = searchParams.get('freelancer');
   
@@ -40,6 +43,8 @@ const PostProject = () => {
   const [projectImage, setProjectImage] = useState<File | null>(null);
   const [projectImagePreview, setProjectImagePreview] = useState<string>('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [solPrice, setSolPrice] = useState<number | null>(null);
   const [solAmount, setSolAmount] = useState<number | null>(null);
 
@@ -96,22 +101,60 @@ const PostProject = () => {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "File too large",
-          description: "Image must be less than 5MB",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      setProjectImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProjectImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      processImageFile(file);
     }
+  };
+
+  const processImageFile = (file: File) => {
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Image must be less than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setProjectImage(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProjectImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      processImageFile(file);
+    } else {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an image file",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDropAreaClick = () => {
+    fileInputRef.current?.click();
   };
 
   const removeImage = () => {
@@ -195,9 +238,48 @@ const PostProject = () => {
         ...(selectedFreelancer ? { freelancer_id: selectedFreelancer.id } : {})
       });
 
-      toast({
+      // Create and fund escrow immediately after project creation
+      // Convert amount to SOL if SOLANA is selected, otherwise use USD amount
+      const budgetAmount = parseFloat(formData.budget);
+      let escrowAmount = budgetAmount;
+      
+      if (paymentCurrency === 'SOLANA') {
+        // Always recalculate SOL amount from current budget to ensure accuracy
+        const priceData = await getSolanaPrice();
+        const converted = await convertUSDToSOL(budgetAmount);
+        escrowAmount = converted;
+        
+        // Update state for UI
+        setSolPrice(priceData.price_usd);
+        setSolAmount(converted);
+        
+        console.log('Escrow conversion:', {
+          budgetUSD: budgetAmount,
+          solPrice: priceData.price_usd,
+          solAmount: converted,
+          expectedSOL: budgetAmount / priceData.price_usd
+        });
+      }
+      
+      const escrowId = await createProjectEscrow(
+        project.id, 
+        escrowAmount,
+        paymentCurrency
+      );
+
+      if (!escrowId) {
+        throw new Error('Failed to create escrow. Please try again.');
+      }
+
+      const toastResult = toast({
         title: "Project Posted Successfully!",
-        description: `Your project "${formData.title}" is now live with ${paymentCurrency === 'USDC' ? formatUSDC(totalEscrow) : formatSOL(solAmount || totalEscrow / (solPrice || 100))} escrow`,
+        description: `Your project "${formData.title}" is now live. Escrow of ${paymentCurrency === 'USDC' || paymentCurrency === 'X402' ? formatUSDC(totalEscrow) : formatSOL(solAmount || totalEscrow / (solPrice || 100))} has been funded and secured.`,
+        onClick: () => {
+          toastResult.dismiss();
+          navigate(`/project/${project.id}`);
+        },
+        className: "cursor-pointer hover:bg-muted/50 transition-colors",
+        duration: 3000, // Auto-dismiss after 3 seconds
       });
       
       // Reset form
@@ -400,14 +482,23 @@ const PostProject = () => {
                     ) : (
                       <div className="relative">
                         <Input
+                          ref={fileInputRef}
                           id="project_image"
                           type="file"
                           accept="image/*"
                           onChange={handleImageChange}
-                          className={`bg-muted/50 ${formErrors.project_image ? 'border-destructive' : ''}`}
+                          className="hidden"
                         />
-                        <div className="mt-2 flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg bg-muted/50">
-                          <div className="text-center">
+                        <div 
+                          onClick={handleDropAreaClick}
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          onDrop={handleDrop}
+                          className={`mt-2 flex items-center justify-center w-full h-48 border-2 border-dashed rounded-lg bg-muted/50 cursor-pointer transition-colors ${
+                            isDraggingOver ? 'bg-muted border-primary border-solid' : ''
+                          } ${formErrors.project_image ? 'border-destructive' : 'border-border'}`}
+                        >
+                          <div className="text-center pointer-events-none">
                             <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
                             <p className="mt-2 text-sm text-muted-foreground">Upload project image</p>
                             <p className="text-xs text-muted-foreground">Max 5MB</p>
@@ -421,36 +512,32 @@ const PostProject = () => {
                     <p className="text-xs text-muted-foreground">Upload an image that represents your project (required)</p>
                   </div>
 
+                  {/* Spacer for alignment */}
+                  <div className="h-2"></div>
+
                   <Button 
                     variant="default" 
                     size="lg" 
                     className="w-full"
                     onClick={handleSubmit}
-                    disabled={!isConnected || isSubmitting}
+                    disabled={!isConnected || isSubmitting || escrowLoading}
                   >
-                    {isSubmitting ? (
+                    {(isSubmitting || escrowLoading) ? (
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                     ) : (
                       <Wallet className="w-5 h-5 mr-2" />
                     )}
                     {isSubmitting 
                       ? 'Creating Project...' 
-                      : isConnected 
-                        ? 'Post Project & Setup Escrow'
-                        : 'Connect Wallet First'
+                      : escrowLoading
+                        ? 'Setting Up Escrow...'
+                        : isConnected 
+                          ? 'Post Project & Setup Escrow'
+                          : 'Connect Wallet First'
                     }
                   </Button>
                 </CardContent>
               </Card>
-
-              {/* Payment Currency Selection */}
-              {budget > 0 && (
-                <PaymentCurrencySelector
-                  amount={budget}
-                  selectedCurrency={paymentCurrency}
-                  onCurrencyChange={setPaymentCurrency}
-                />
-              )}
             </div>
 
             {/* Sidebar */}
@@ -480,32 +567,34 @@ const PostProject = () => {
 
               <Card className="bg-gradient-card border-border/50">
                 <CardHeader>
-                  <CardTitle className="text-foreground">Pricing</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-foreground">Pricing</CardTitle>
+                    {paymentCurrency === 'SOLANA' && solPrice && (
+                      <span className="text-xs text-muted-foreground">
+                        (Based on current SOL price: ${solPrice.toFixed(2)})
+                      </span>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Project Budget</span>
                     <span className="text-foreground">
-                      {paymentCurrency === 'USDC' ? formatUSDC(budget) : formatSOL(solAmount || budget / (solPrice || 100))}
+                      {paymentCurrency === 'USDC' || paymentCurrency === 'X402' ? formatUSDC(budget) : formatSOL(solAmount || budget / (solPrice || 100))}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Platform Fee (10%)</span>
                     <span className="text-foreground">
-                      {paymentCurrency === 'USDC' ? formatUSDC(platformFee) : formatSOL((solAmount || budget / (solPrice || 100)) * 0.1)}
+                      {paymentCurrency === 'USDC' || paymentCurrency === 'X402' ? formatUSDC(platformFee) : formatSOL((solAmount || budget / (solPrice || 100)) * 0.1)}
                     </span>
                   </div>
                   <div className="border-t border-border pt-3 flex justify-between font-semibold">
                     <span className="text-foreground">Total Escrow</span>
                     <span className="text-web3-primary">
-                      {paymentCurrency === 'USDC' ? formatUSDC(totalEscrow) : formatSOL((solAmount || budget / (solPrice || 100)) * 1.1)}
+                      {paymentCurrency === 'USDC' || paymentCurrency === 'X402' ? formatUSDC(totalEscrow) : formatSOL((solAmount || budget / (solPrice || 100)) * 1.1)}
                     </span>
                   </div>
-                  {paymentCurrency === 'SOLANA' && solPrice && (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      (Based on current SOL price: ${solPrice.toFixed(2)})
-                    </div>
-                  )}
                 </CardContent>
               </Card>
 
@@ -520,8 +609,78 @@ const PostProject = () => {
                   </ul>
                 </CardContent>
               </Card>
+
+              {/* Payment Currency Selection */}
+              {budget > 0 && (
+                <PaymentCurrencySelector
+                  amount={budget}
+                  selectedCurrency={paymentCurrency}
+                  onCurrencyChange={setPaymentCurrency}
+                />
+              )}
             </div>
           </div>
+
+          {/* Payment Options and Breakdown Section */}
+          {budget > 0 && (
+            <Card className="bg-gradient-card border-border/50 mt-6">
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Payment Options */}
+                  <div className="space-y-3">
+                    <div className="text-sm">
+                      <div className="font-medium text-foreground mb-2">Payment Options</div>
+                      <div className="text-muted-foreground text-sm">
+                        Pay directly with USDC, Solana, or x402
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Breakdown */}
+                  <div className="space-y-3">
+                    <div className="text-sm">
+                      <div className="font-medium text-foreground mb-2">Payment Breakdown</div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Project Budget</span>
+                          <span className="text-foreground">
+                            {paymentCurrency === 'USDC' || paymentCurrency === 'X402' 
+                              ? formatUSDC(budget) 
+                              : formatSOL(solAmount || budget / (solPrice || 100))
+                            }
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Platform Fee (10%)</span>
+                          <span className="text-foreground">
+                            {paymentCurrency === 'USDC' || paymentCurrency === 'X402'
+                              ? formatUSDC(platformFee)
+                              : formatSOL((solAmount || budget / (solPrice || 100)) * 0.1)
+                            }
+                          </span>
+                        </div>
+                        <Separator className="my-2" />
+                        <div className="flex justify-between font-semibold">
+                          <span className="text-foreground">Total Payment</span>
+                          <span className="text-web3-primary">
+                            {paymentCurrency === 'USDC' || paymentCurrency === 'X402'
+                              ? formatUSDC(totalEscrow)
+                              : formatSOL((solAmount || budget / (solPrice || 100)) * 1.1)
+                            }
+                          </span>
+                        </div>
+                        {paymentCurrency === 'SOLANA' && solPrice && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            (Based on current SOL price: ${solPrice.toFixed(2)})
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
