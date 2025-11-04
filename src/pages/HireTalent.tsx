@@ -134,32 +134,32 @@ const HireTalent = () => {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8">
         <Link to="/">
-          <Button variant="ghost" className="mb-6">
-            <ArrowLeft className="w-4 h-4 mr-2" />
+          <Button variant="ghost" className="mb-4 sm:mb-6 text-xs sm:text-sm">
+            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
             Back to Home
           </Button>
         </Link>
         {/* Page Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-foreground to-web3-primary bg-clip-text text-transparent">
+        <div className="text-center mb-8 sm:mb-12">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-2 sm:mb-3 md:mb-4 bg-gradient-to-r from-foreground to-web3-primary bg-clip-text text-transparent px-2">
             Hire Top Web3 Talent
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-sm sm:text-base md:text-xl text-muted-foreground max-w-2xl mx-auto px-2">
             Connect with verified Web3 professionals ready to bring your project to life
           </p>
         </div>
 
         {/* Filters Section */}
-        <div className="flex flex-wrap gap-2 sm:gap-4 mb-8 justify-center">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2 md:gap-4 mb-6 sm:mb-8 justify-center px-2">
           {categories.map((category) => (
             <Button
               key={category}
               variant={selectedCategory === category ? "default" : "outline"}
               size="sm"
               onClick={() => setSelectedCategory(category)}
-              className="text-xs sm:text-sm px-3 py-2 h-10 min-w-fit"
+              className="text-[10px] sm:text-xs md:text-sm px-2 sm:px-3 py-1.5 sm:py-2 h-9 sm:h-10 min-w-fit"
             >
               {category}
             </Button>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Filter, Search, Wallet, Briefcase, Wrench } from "lucide-react";
+import { Plus, Filter, Search, Wallet, Briefcase, Wrench, CheckCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { db, Project, Escrow } from "@/lib/supabase";
@@ -165,6 +165,23 @@ const ProjectDashboard = () => {
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
+  // Combine completed projects from both posted and working (deduplicate by ID)
+  const allProjectsMap = new Map<string, Project>();
+  [...postedProjects, ...workingProjects].forEach(p => {
+    if (!allProjectsMap.has(p.id)) {
+      allProjectsMap.set(p.id, p);
+    }
+  });
+  const completedProjects = Array.from(allProjectsMap.values()).filter(p => p.status === 'completed');
+  
+  const filteredCompletedProjects = completedProjects.filter(project => {
+    const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         project.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = categoryFilter === 'all' || project.category === categoryFilter;
+    
+    return matchesSearch && matchesCategory;
+  });
+
   const postedStats = {
     total: postedProjects.length,
     active: postedProjects.filter(p => p.status === 'active').length,
@@ -188,6 +205,23 @@ const ProjectDashboard = () => {
     completed: workingProjects.filter(p => p.status === 'completed').length,
     totalEarned: Object.entries(escrows)
       .filter(([projectId]) => workingProjects.some(p => p.id === projectId))
+      .filter(([_, escrow]) => escrow.status === 'released')
+      .reduce((sum, [_, escrow]) => {
+        // Convert SOL to USD if payment currency is SOLANA
+        if (escrow.payment_currency === 'SOLANA' && solPrice) {
+          return sum + (escrow.amount_usdc * solPrice);
+        }
+        // Otherwise, assume it's already in USD
+        return sum + escrow.amount_usdc;
+      }, 0)
+  };
+
+  const completedStats = {
+    total: completedProjects.length,
+    posted: completedProjects.filter(p => postedProjects.some(pp => pp.id === p.id)).length,
+    working: completedProjects.filter(p => workingProjects.some(wp => wp.id === p.id)).length,
+    totalPaid: Object.entries(escrows)
+      .filter(([projectId]) => completedProjects.some(p => p.id === projectId))
       .filter(([_, escrow]) => escrow.status === 'released')
       .reduce((sum, [_, escrow]) => {
         // Convert SOL to USD if payment currency is SOLANA
@@ -227,17 +261,17 @@ const ProjectDashboard = () => {
       <Header />
       
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+          <div className="flex-1">
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
               Dashboard
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground mb-4 md:mb-0">
               Manage your projects and track your work
             </p>
           </div>
-          <Link to="/post-project">
-            <Button variant="default" size="lg">
+          <Link to="/post-project" className="w-full md:w-auto md:self-center">
+            <Button variant="default" size="lg" className="w-full md:w-auto">
               <Plus className="w-5 h-5 mr-2" />
               Post New Project
             </Button>
@@ -245,16 +279,27 @@ const ProjectDashboard = () => {
         </div>
 
         <Tabs defaultValue="posted" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="posted" className="flex items-center gap-2">
-              <Briefcase className="w-4 h-4" />
-              Projects Posted ({postedProjects.length})
-            </TabsTrigger>
-            <TabsTrigger value="working" className="flex items-center gap-2">
-              <Wrench className="w-4 h-4" />
-              Working On ({workingProjects.length})
-            </TabsTrigger>
-          </TabsList>
+          <div className="w-full overflow-x-auto scrollbar-hide">
+            <TabsList className="inline-flex w-full sm:w-auto min-w-full sm:min-w-0 gap-1 sm:gap-2">
+              <TabsTrigger value="posted" className="flex items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs md:text-sm px-2 sm:px-4 py-2 flex-1 sm:flex-initial whitespace-nowrap">
+                <Briefcase className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Projects Posted</span>
+                <span className="sm:hidden">Posted</span>
+                <span className="ml-0.5">({postedProjects.length})</span>
+              </TabsTrigger>
+              <TabsTrigger value="working" className="flex items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs md:text-sm px-2 sm:px-4 py-2 flex-1 sm:flex-initial whitespace-nowrap">
+                <Wrench className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Working On</span>
+                <span className="sm:hidden">Working</span>
+                <span className="ml-0.5">({workingProjects.length})</span>
+              </TabsTrigger>
+              <TabsTrigger value="completed" className="flex items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs md:text-sm px-2 sm:px-4 py-2 flex-1 sm:flex-initial whitespace-nowrap">
+                <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span>Completed</span>
+                <span className="ml-0.5">({completedProjects.length})</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Projects Posted Tab */}
           <TabsContent value="posted" className="space-y-6">
@@ -445,6 +490,94 @@ const ProjectDashboard = () => {
                     key={project.id}
                     project={project}
                     escrow={escrows[project.id]}
+                    onViewProject={handleViewProject}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Completed Projects Tab */}
+          <TabsContent value="completed" className="space-y-6">
+            {/* Stats Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="border-border bg-card">
+                <CardContent className="p-6">
+                  <div className="text-2xl font-bold text-foreground">{completedStats.total}</div>
+                  <div className="text-sm text-muted-foreground">Total Completed</div>
+                </CardContent>
+              </Card>
+              <Card className="border-border bg-card">
+                <CardContent className="p-6">
+                  <div className="text-2xl font-bold text-primary">{completedStats.posted}</div>
+                  <div className="text-sm text-muted-foreground">Posted Projects</div>
+                </CardContent>
+              </Card>
+              <Card className="border-border bg-card">
+                <CardContent className="p-6">
+                  <div className="text-2xl font-bold text-accent-green">{completedStats.working}</div>
+                  <div className="text-sm text-muted-foreground">Working Projects</div>
+                </CardContent>
+              </Card>
+              <Card className="border-primary/20 bg-card">
+                <CardContent className="p-6">
+                  <div className="text-2xl font-bold text-accent-green">
+                    {formatUSDC(completedStats.totalPaid)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Total Paid</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search projects..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {PROJECT_CATEGORIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Projects Grid */}
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="text-muted-foreground">Loading projects...</div>
+              </div>
+            ) : filteredCompletedProjects.length === 0 ? (
+              <div className="text-center py-12">
+                <CheckCircle className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <div className="text-muted-foreground mb-4">
+                  {completedProjects.length === 0 ? 'No completed projects yet' : 'No completed projects match your filters'}
+                </div>
+                {completedProjects.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Completed projects will appear here once you finish your work
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredCompletedProjects.map((project) => (
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    escrow={escrows[project.id]}
+                    proposalCount={proposalCounts[project.id]}
                     onViewProject={handleViewProject}
                   />
                 ))}

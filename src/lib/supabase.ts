@@ -440,4 +440,59 @@ export const db = {
     if (error) throw error;
     return data;
   },
+
+  // Notifications
+  async sendProjectCompletionNotification(
+    projectId: string,
+    clientWallet: string,
+    freelancerWallet: string | null,
+    projectTitle: string,
+    amount: number,
+    currency: string = 'SOLANA'
+  ) {
+    const systemSender = 'system@lancerfi.app'; // System identifier for notifications
+    const currencyDisplay = currency === 'USDC' || currency === 'X402' 
+      ? `$${amount.toLocaleString()} ${currency}` 
+      : `${amount.toLocaleString()} SOL`;
+    
+    const notifications = [];
+    
+    // Notify client
+    const clientMessage = {
+      sender_id: systemSender,
+      recipient_id: clientWallet,
+      subject: 'Project Completed Successfully',
+      content: `Your project "${projectTitle}" has been completed successfully. The escrow has been released and ${currencyDisplay} has been sent to the freelancer. You can view the project details in your dashboard.`
+    };
+    notifications.push(clientMessage);
+
+    // Notify freelancer if they exist
+    if (freelancerWallet) {
+      const freelancerMessage = {
+        sender_id: systemSender,
+        recipient_id: freelancerWallet,
+        subject: 'Payment Released - Project Completed',
+        content: `Congratulations! The project "${projectTitle}" has been completed and marked as done by the client. The escrow has been released and ${currencyDisplay} has been sent to your wallet. You can view the transaction details in your dashboard.`
+      };
+      notifications.push(freelancerMessage);
+    }
+
+    // Insert all notifications
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .insert(notifications)
+        .select();
+      
+      if (error) {
+        console.error('Error sending completion notifications:', error);
+        // Don't throw - notifications are non-critical
+      }
+      return data;
+    } catch (error) {
+      console.error('Error sending completion notifications:', error);
+      // Don't throw - notifications are non-critical
+      return null;
+    }
+  },
 };

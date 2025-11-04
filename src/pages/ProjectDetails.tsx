@@ -252,6 +252,23 @@ const ProjectDetails = () => {
         completed_at: new Date().toISOString()
       });
 
+      // Send notifications to both client and freelancer
+      try {
+        const amount = escrow.amount_usdc;
+        const currency = escrow.payment_currency || 'SOLANA';
+        await db.sendProjectCompletionNotification(
+          id,
+          project.client_id,
+          freelancer?.wallet_address || null,
+          project.title,
+          amount,
+          currency
+        );
+      } catch (notificationError) {
+        console.error('Error sending notifications:', notificationError);
+        // Don't fail the completion if notifications fail
+      }
+
       toast({
         title: 'Project Completed!',
         description: paymentReleased

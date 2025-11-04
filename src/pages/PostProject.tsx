@@ -311,23 +311,23 @@ const PostProject = () => {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8">
         <Link to="/">
-          <Button variant="ghost" className="mb-8">
-            <ArrowLeft className="w-4 h-4 mr-2" />
+          <Button variant="ghost" className="mb-6 sm:mb-8 text-xs sm:text-sm">
+            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
             Back to Home
           </Button>
         </Link>
 
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-              <h1 className="text-4xl md:text-5xl font-bold mb-6 text-foreground">
+            <div className="text-center mb-8 sm:mb-12">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 md:mb-6 text-foreground px-2">
                 {selectedFreelancer 
                   ? `Hire ${selectedFreelancer.full_name || selectedFreelancer.username}` 
                   : 'Post Your Web3 Project'
                 }
               </h1>
-              <p className="text-xl text-muted-foreground">
+              <p className="text-sm sm:text-base md:text-xl text-muted-foreground px-2">
                 {selectedFreelancer 
                   ? `Create a project to work with ${selectedFreelancer.full_name || selectedFreelancer.username}` 
                   : 'Connect with verified Web3 talent and secure your project with smart contract escrow'
@@ -358,25 +358,25 @@ const PostProject = () => {
               </Card>
             )}
 
-          <div className="grid lg:grid-cols-2 gap-6 lg:gap-8">
+          <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
             {/* Main Form */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <Card className="bg-gradient-card border-border/50">
-                <CardHeader>
-                  <CardTitle className="text-2xl text-foreground">Project Details</CardTitle>
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-lg sm:text-xl md:text-2xl text-foreground">Project Details</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Project Title</Label>
+                <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="title" className="text-xs sm:text-sm">Project Title</Label>
                     <Input 
                       id="title" 
                       placeholder="e.g., DeFi Trading Bot Development"
-                      className={`bg-muted/50 h-12 text-base ${formErrors.title ? 'border-destructive' : ''}`}
+                      className={`bg-muted/50 h-10 sm:h-12 text-xs sm:text-sm md:text-base ${formErrors.title ? 'border-destructive' : ''}`}
                       value={formData.title}
                       onChange={(e) => handleInputChange('title', e.target.value)}
                     />
                     {formErrors.title && (
-                      <p className="text-sm text-destructive">{formErrors.title}</p>
+                      <p className="text-xs sm:text-sm text-destructive">{formErrors.title}</p>
                     )}
                   </div>
 

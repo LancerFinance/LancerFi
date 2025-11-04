@@ -159,19 +159,19 @@ const CategoryGrid = () => {
 
   return (
     <section className="py-16 bg-background">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-8 fade-in">
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Browse by Category</h2>
-          <p className="text-base text-muted-foreground max-w-2xl mx-auto">
+      <div className="container mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
+        <div className="text-center mb-6 sm:mb-8 fade-in">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2 sm:mb-4">Browse by Category</h2>
+          <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto px-2">
             Explore services across different Web3 domains and find the expertise you need
           </p>
         </div>
 
         {/* Sticky Filter & Sort Bar */}
-        <div className="sticky top-14 z-10 mb-6">
-          <div className="rounded-full border border-border bg-card/70 backdrop-blur-md px-3 py-2 shadow-[0_8px_30px_rgb(0,0,0,0.06)] overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-1.5">
+        <div className="sticky top-12 sm:top-14 z-10 mb-4 sm:mb-6">
+          <div className="rounded-full border border-border bg-card/70 backdrop-blur-md px-2 sm:px-3 py-1.5 sm:py-2 shadow-[0_8px_30px_rgb(0,0,0,0.06)] overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1 sm:gap-1.5">
                 {[
                   { key: "all", label: "All" },
                   { key: "trending", label: "Trending" },
@@ -183,7 +183,7 @@ const CategoryGrid = () => {
                     key={f.key}
                     onClick={() => setActiveFilter(f.key as any)}
                     className={cn(
-                      "px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors motion-safe:duration-200 min-h-[32px] flex items-center justify-center whitespace-nowrap",
+                      "px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-colors motion-safe:duration-200 min-h-[28px] sm:min-h-[32px] flex items-center justify-center whitespace-nowrap",
                       activeFilter === f.key
                         ? "bg-gradient-to-r from-violet-500 to-indigo-500 text-white"
                         : "bg-muted text-foreground hover:bg-muted/80"
@@ -194,7 +194,7 @@ const CategoryGrid = () => {
                   </button>
                 ))}
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center justify-center sm:justify-end gap-1 sm:gap-1.5">
                 {[
                   { key: "activity", label: "Activity" },
                   { key: "price", label: "Price" },
@@ -205,7 +205,7 @@ const CategoryGrid = () => {
                     key={s.key}
                     onClick={() => setSortBy(s.key as any)}
                     className={cn(
-                      "px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors motion-safe:duration-200 min-h-[32px] flex items-center justify-center whitespace-nowrap",
+                      "px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-colors motion-safe:duration-200 min-h-[28px] sm:min-h-[32px] flex items-center justify-center whitespace-nowrap",
                       sortBy === s.key
                         ? "bg-background border border-border"
                         : "bg-muted text-foreground hover:bg-muted/80"

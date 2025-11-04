@@ -119,6 +119,56 @@ export async function releasePaymentHandler(
       });
     }
 
+    // Send notifications to client and freelancer about payment release
+    // Note: Project completion notification will be sent from client after project status update
+    try {
+      // Get project details for notification
+      const { data: projectData } = await supabaseClient
+        .from('projects')
+        .select('title, client_id, freelancer_id')
+        .eq('id', escrow.project_id)
+        .single();
+
+      if (projectData) {
+        const systemSender = 'system@lancerfi.app';
+        const currencyDisplay = paymentCurrency === 'USDC' || paymentCurrency === 'X402'
+          ? `$${amountToSend.toLocaleString()} ${paymentCurrency}`
+          : `${amountToSend.toLocaleString()} SOL`;
+
+        const notifications = [];
+
+        // Notify client that payment has been released
+        notifications.push({
+          sender_id: systemSender,
+          recipient_id: projectData.client_id,
+          subject: 'Payment Released',
+          content: `Payment of ${currencyDisplay} has been released from escrow and sent to the freelancer for project "${projectData.title}". The project can now be marked as completed.`
+        });
+
+        // Notify freelancer that payment has been received
+        if (freelancerWallet) {
+          notifications.push({
+            sender_id: systemSender,
+            recipient_id: freelancerWallet,
+            subject: 'Payment Received',
+            content: `Payment of ${currencyDisplay} has been released from escrow and sent to your wallet for project "${projectData.title}". Thank you for your work!`
+          });
+        }
+
+        // Insert notifications (non-blocking)
+        await supabaseClient
+          .from('messages')
+          .insert(notifications)
+          .catch(err => {
+            console.error('Error sending payment release notifications:', err);
+            // Don't fail the request if notifications fail
+          });
+      }
+    } catch (notificationError) {
+      console.error('Error sending payment release notifications:', notificationError);
+      // Don't fail the request if notifications fail
+    }
+
     res.json({
       success: true,
       transactionSignature: signature,
