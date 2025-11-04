@@ -250,19 +250,19 @@ const ViewProposals = () => {
                   <CardContent className="p-6">
                     <div className="flex flex-col lg:flex-row gap-6">
                       {/* Freelancer Info */}
-                      <div className="flex items-start gap-4 lg:flex-1">
-                        <Avatar className="w-12 h-12">
+                      <div className="flex items-start gap-4 lg:flex-1 min-w-0">
+                        <Avatar className="w-12 h-12 flex-shrink-0">
                           <AvatarImage src="" />
                           <AvatarFallback>
                             {proposal.freelancer?.full_name?.split(' ').map(n => n[0]).join('') || 'FL'}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-semibold text-foreground">
+                            <h3 className="font-semibold text-foreground truncate">
                               {proposal.freelancer?.full_name || proposal.freelancer?.username || 'Anonymous'}
                             </h3>
-                            <div className="flex items-center text-yellow-500">
+                            <div className="flex items-center text-yellow-500 flex-shrink-0">
                               <Star className="w-4 h-4 fill-current" />
                               <span className="text-sm ml-1">
                                 {proposal.freelancer?.rating ? proposal.freelancer.rating.toFixed(1) : 'New'}
@@ -284,7 +284,7 @@ const ViewProposals = () => {
                             </div>
                           )}
 
-                          <p className="text-muted-foreground mb-4 leading-relaxed">
+                          <p className="text-muted-foreground mb-4 leading-relaxed whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word' }}>
                             {proposal.cover_letter}
                           </p>
 

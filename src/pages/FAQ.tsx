@@ -24,7 +24,7 @@ const FAQ = () => {
     {
       icon: <Zap className="w-5 h-5" />,
       question: "What cryptocurrencies do you accept?",
-      answer: "We accept major stablecoins (USDC, USDT, DAI) and our native platform token. All payments are processed instantly on the blockchain with minimal gas fees thanks to our Layer 2 integration."
+      answer: "We accept USDC, SOL, and X402. All payments are processed instantly on the blockchain with minimal gas fees thanks to our Layer 2 integration."
     },
     {
       icon: <Shield className="w-5 h-5" />,
