@@ -1,22 +1,20 @@
 import { useState, useCallback } from 'react';
-import { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { PublicKey, Transaction } from '@solana/web3.js';
 import { useWallet } from './useWallet';
-import { createEscrowAccount, fundEscrowWithCurrency, releaseEscrowPayment, connection, PaymentCurrency, formatSOL, formatUSDC } from '@/lib/solana';
+import { createEscrowAccount, fundEscrowWithCurrency, releaseEscrowPayment, connection, PaymentCurrency, formatSOL } from '@/lib/solana';
 import { db } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { releasePaymentToFreelancer as releasePaymentAPI } from '@/lib/api-client';
 
 interface UseEscrowReturn {
   createProjectEscrow: (projectId: string, amount: number, paymentCurrency: PaymentCurrency) => Promise<string | null>;
   fundEscrow: (escrowId: string, amount: number, paymentCurrency: PaymentCurrency) => Promise<boolean>;
   releasePayment: (escrowId: string, milestoneId: string) => Promise<boolean>;
-  releasePaymentToFreelancer: (escrowId: string, freelancerWallet: string) => Promise<boolean>;
   isLoading: boolean;
 }
 
 export const useEscrow = (): UseEscrowReturn => {
   const [isLoading, setIsLoading] = useState(false);
-  const { provider, address, isConnected, signMessage } = useWallet();
+  const { provider, address } = useWallet();
   const { toast } = useToast();
 
   const createProjectEscrow = useCallback(async (
@@ -25,19 +23,8 @@ export const useEscrow = (): UseEscrowReturn => {
     paymentCurrency: PaymentCurrency = 'SOLANA'
   ): Promise<string | null> => {
 
-    // Use wallet connection from our hook to avoid re-connection prompts
-    if (!isConnected || !address || !provider) {
-      toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet first using the Connect Wallet button",
-        variant: "destructive",
-      });
-      return null;
-    }
-
-    // Use the provider directly from our hook to maintain connection context
-    // This helps maintain popup mode instead of triggering fullscreen
-    const ph = provider as any;
+    const w: any = window as any;
+    const ph = w.solana;
     if (!ph?.isPhantom) {
       toast({
         title: "Phantom required",
@@ -46,9 +33,17 @@ export const useEscrow = (): UseEscrowReturn => {
       });
       return null;
     }
-    
-    // Use the address from our wallet hook (already connected)
-    const solAddress = address;
+    if (!ph.isConnected) {
+      try { await ph.connect(); } catch {
+        toast({ title: "Wallet not connected", description: "Phantom connection was rejected", variant: "destructive" });
+        return null;
+      }
+    }
+    const solAddress: string | undefined = ph.publicKey?.toString?.();
+    if (!solAddress) {
+      toast({ title: "Wallet error", description: "Could not read Phantom public key", variant: "destructive" });
+      return null;
+    }
 
     setIsLoading(true);
     try {
@@ -61,34 +56,27 @@ export const useEscrow = (): UseEscrowReturn => {
       const platformFee = (finalAmount * platformFeePercent) / 100;
       const totalLocked = finalAmount + platformFee;
 
-      // Create and fund escrow account on Solana with selected currency
+      // Create escrow account on Solana (internally using single token)
       const { escrowAccount, transaction } = await createEscrowAccount(
         clientWallet,
         projectId,
         finalAmount,
-        actualCurrency,
+        'SOLANA',
         platformFeePercent
       );
 
       // Get the latest blockhash
-      const { blockhash } = await connection.getLatestBlockhash('finalized');
+      const { blockhash } = await connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = clientWallet;
 
-      // Use signAndSendTransaction - when wallet is already connected via our hook provider,
-      // this should maintain popup context instead of fullscreen
-      const result = await ph.signAndSendTransaction(transaction, {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
-      });
-      
-      const signature = typeof result === 'string' ? result : result?.signature;
+      // Sign and send with Phantom
+      const res = await ph.signAndSendTransaction(transaction);
+      const signature = typeof res === 'string' ? res : res?.signature;
       if (!signature) throw new Error('No signature returned from wallet');
-      
-      // Confirm transaction
-      await connection.confirmTransaction(signature, 'confirmed');
+      await connection.confirmTransaction(signature);
 
-      // Store escrow in database with payment currency
+      // Store escrow in database
       const escrow = await db.createEscrow({
         project_id: projectId,
         client_wallet: solAddress,
@@ -97,8 +85,7 @@ export const useEscrow = (): UseEscrowReturn => {
         total_locked: totalLocked,
         escrow_account: escrowAccount.toString(),
         transaction_signature: signature,
-        status: 'funded',
-        payment_currency: actualCurrency
+        status: 'funded'
       });
 
       toast({
@@ -120,23 +107,13 @@ export const useEscrow = (): UseEscrowReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [isConnected, address, provider, toast]);
+  }, [provider, address, toast]);
 
   const fundEscrow = useCallback(async (
     escrowId: string, 
     amount: number,
     paymentCurrency: PaymentCurrency = 'SOLANA'
   ): Promise<boolean> => {
-    // Use wallet connection from our hook
-    if (!isConnected || !address) {
-      toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet first",
-        variant: "destructive",
-      });
-      return false;
-    }
-
     const w: any = window as any;
     const ph = w.solana;
     if (!ph?.isPhantom) {
@@ -147,8 +124,17 @@ export const useEscrow = (): UseEscrowReturn => {
       });
       return false;
     }
-    
-    const solAddress = address;
+    if (!ph.isConnected) {
+      try { await ph.connect(); } catch {
+        toast({ title: "Wallet not connected", description: "Phantom connection was rejected", variant: "destructive" });
+        return false;
+      }
+    }
+    const solAddress: string | undefined = ph.publicKey?.toString?.();
+    if (!solAddress) {
+      toast({ title: "Wallet error", description: "Could not read Phantom public key", variant: "destructive" });
+      return false;
+    }
 
     setIsLoading(true);
     try {
@@ -169,26 +155,15 @@ export const useEscrow = (): UseEscrowReturn => {
       );
 
       // Get the latest blockhash
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+      const { blockhash } = await connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = clientWallet;
-      transaction.lastValidBlockHeight = lastValidBlockHeight;
 
-      // Sign transaction first (uses popup mode when wallet is connected)
-      const signedTransaction = await ph.signTransaction(transaction);
-      
-      // Send the signed transaction
-      const signature = await connection.sendRawTransaction(
-        signedTransaction.serialize(), 
-        { skipPreflight: false, maxRetries: 3 }
-      );
-      
-      // Confirm transaction
-      await connection.confirmTransaction({
-        signature,
-        blockhash,
-        lastValidBlockHeight
-      }, 'confirmed');
+      // Sign and send with Phantom
+      const res = await ph.signAndSendTransaction(transaction);
+      const signature = typeof res === 'string' ? res : res?.signature;
+      if (!signature) throw new Error('No signature returned from wallet');
+      await connection.confirmTransaction(signature);
 
       // Update escrow status in database
       await db.updateEscrow(escrowId, {
@@ -222,16 +197,6 @@ export const useEscrow = (): UseEscrowReturn => {
     escrowId: string, 
     milestoneId: string
   ): Promise<boolean> => {
-    // Use wallet connection from our hook
-    if (!isConnected || !address) {
-      toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet first",
-        variant: "destructive",
-      });
-      return false;
-    }
-
     const w: any = window as any;
     const ph = w.solana;
     if (!ph?.isPhantom) {
@@ -242,8 +207,17 @@ export const useEscrow = (): UseEscrowReturn => {
       });
       return false;
     }
-    
-    const solAddress = address;
+    if (!ph.isConnected) {
+      try { await ph.connect(); } catch {
+        toast({ title: "Wallet not connected", description: "Phantom connection was rejected", variant: "destructive" });
+        return false;
+      }
+    }
+    const solAddress: string | undefined = ph.publicKey?.toString?.();
+    if (!solAddress) {
+      toast({ title: "Wallet error", description: "Could not read Phantom public key", variant: "destructive" });
+      return false;
+    }
 
     setIsLoading(true);
     try {
@@ -269,26 +243,15 @@ export const useEscrow = (): UseEscrowReturn => {
       );
 
       // Get the latest blockhash
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+      const { blockhash } = await connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = clientWallet;
-      transaction.lastValidBlockHeight = lastValidBlockHeight;
 
-      // Sign transaction first (uses popup mode when wallet is connected)
-      const signedTransaction = await ph.signTransaction(transaction);
-      
-      // Send the signed transaction
-      const signature = await connection.sendRawTransaction(
-        signedTransaction.serialize(), 
-        { skipPreflight: false, maxRetries: 3 }
-      );
-      
-      // Confirm transaction
-      await connection.confirmTransaction({
-        signature,
-        blockhash,
-        lastValidBlockHeight
-      }, 'confirmed');
+      // Sign and send with Phantom
+      const res = await ph.signAndSendTransaction(transaction);
+      const signature = typeof res === 'string' ? res : res?.signature;
+      if (!signature) throw new Error('No signature returned from wallet');
+      await connection.confirmTransaction(signature);
 
       // Update milestone and escrow status
       await db.updateMilestone(milestoneId, {
@@ -324,102 +287,12 @@ export const useEscrow = (): UseEscrowReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [isConnected, address, provider, toast]);
-
-  const releasePaymentToFreelancer = useCallback(async (
-    escrowId: string,
-    freelancerWallet: string
-  ): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      // Security: Verify wallet is connected first
-      if (!isConnected || !address || !signMessage) {
-        toast({
-          title: "Wallet not connected",
-          description: "Please connect your wallet to release payment",
-          variant: "destructive",
-        });
-        return false;
-      }
-
-      const escrow = await db.getEscrowById(escrowId);
-      
-      if (!escrow || !escrow.escrow_account) {
-        throw new Error('Escrow not found');
-      }
-
-      // Security: Prevent duplicate payments
-      if (escrow.status === 'released') {
-        throw new Error('Payment has already been released for this escrow');
-      }
-
-      if (escrow.status !== 'funded') {
-        throw new Error(`Escrow is not in funded state. Current status: ${escrow.status}`);
-      }
-
-      // Security: Verify caller is authorized (project owner)
-      if (!address) {
-        throw new Error('Wallet not connected');
-      }
-
-      const project = await db.getProject(escrow.project_id);
-      if (project.client_id !== address) {
-        throw new Error('Unauthorized: Only the project owner can release payment');
-      }
-
-      // Security: Verify project is in valid state for completion
-      if (project.status !== 'in_progress') {
-        throw new Error(`Project must be in progress to complete. Current status: ${project.status}`);
-      }
-
-      // Security: Verify escrow hasn't already been released (check transaction signature)
-      if (escrow.transaction_signature) {
-        // Check if this is a new release attempt (could be retry of failed completion)
-        // For now, allow if status is still 'funded' but log warning
-        console.warn('Escrow has existing transaction signature but status is still funded');
-      }
-
-      // Get payment currency from escrow (default to SOLANA if not set)
-      const paymentCurrency = (escrow.payment_currency as PaymentCurrency) || 'SOLANA';
-      
-      // Amount to send to freelancer (project amount, excluding platform fee)
-      const amountToSend = escrow.amount_usdc;
-      
-      // Use secure backend API instead of direct blockchain access
-      // signMessage will trigger Phantom popup for signature
-      const signature = await releasePaymentAPI(
-        escrowId,
-        freelancerWallet,
-        address,
-        signMessage
-      );
-
-      toast({
-        title: "Payment Released",
-        description: paymentCurrency === 'USDC' 
-          ? `Successfully sent ${formatUSDC(amountToSend)} to freelancer`
-          : `Successfully sent ${formatSOL(amountToSend)} to freelancer`,
-      });
-
-      return true;
-    } catch (error) {
-      console.error('Error releasing payment to freelancer:', error);
-      toast({
-        title: "Payment Release Failed",
-        description: error instanceof Error ? error.message : "Failed to release payment. Please try again.",
-        variant: "destructive",
-      });
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast, address, signMessage, isConnected]);
+  }, [provider, address, toast]);
 
   return {
     createProjectEscrow,
     fundEscrow,
     releasePayment,
-    releasePaymentToFreelancer,
     isLoading
   };
 };
