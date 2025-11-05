@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { releasePaymentRouter } from './routes/release-payment.js';
+import rpcProxyRouter from './routes/rpc-proxy.js';
 
 // Load environment variables
 dotenv.config();
@@ -13,6 +14,7 @@ const PORT = process.env.PORT || 3001;
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'https://lancerfi.app',
+  'https://www.lancerfi.app', // Add www version
   'http://localhost:8080',
   'http://localhost:5173',
 ].filter(Boolean) as string[];
@@ -38,6 +40,7 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/payment', releasePaymentRouter);
+app.use('/api/rpc', rpcProxyRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

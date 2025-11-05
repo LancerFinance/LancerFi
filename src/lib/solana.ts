@@ -5,11 +5,289 @@ import { ORIGIN_MINT, ORIGIN_DECIMALS } from './origin-token';
 // Solana configuration
 const MODE = import.meta.env.MODE || 'development';
 export const SOLANA_NETWORK = MODE === 'production' ? 'mainnet-beta' : 'devnet';
-export const RPC_ENDPOINT = SOLANA_NETWORK === 'mainnet-beta' 
-  ? 'https://api.mainnet-beta.solana.com'
-  : 'https://api.devnet.solana.com';
 
-export const connection = new Connection(RPC_ENDPOINT, 'confirmed');
+// RPC endpoints - try official first, fallback to free public alternatives
+// Note: Official Solana RPC (api.mainnet-beta.solana.com) has strict rate limits
+// and often blocks browser requests with 403 errors. Many free RPCs now require API keys.
+// These are free public endpoints that should work without authentication.
+const MAINNET_RPC_ENDPOINTS = [
+  import.meta.env.VITE_SOLANA_MAINNET_RPC, // Custom env var (highest priority)
+  'https://api.mainnet-beta.solana.com', // Official (rate-limited, but try first)
+  'https://solana-api.projectserum.com', // Serum (free, no account needed)
+  'https://rpc-mainnet.helius.xyz/?api-key=YOUR_API_KEY', // Not used (requires key)
+].filter((endpoint) => endpoint && !endpoint.includes('YOUR_API_KEY'));
+
+const DEVNET_RPC_ENDPOINTS = [
+  import.meta.env.VITE_SOLANA_DEVNET_RPC,
+  'https://api.devnet.solana.com',
+].filter(Boolean);
+
+// Use first available endpoint (custom env var takes priority)
+export const RPC_ENDPOINT = SOLANA_NETWORK === 'mainnet-beta' 
+  ? (MAINNET_RPC_ENDPOINTS[0] || 'https://api.mainnet-beta.solana.com')
+  : (DEVNET_RPC_ENDPOINTS[0] || 'https://api.devnet.solana.com');
+
+// Create connection with retry configuration
+// Disable WebSockets to avoid connection issues (use HTTP polling instead)
+export const connection = new Connection(RPC_ENDPOINT, {
+  commitment: 'confirmed',
+  confirmTransactionInitialTimeout: 60000, // 60 seconds
+  disableRetryOnRateLimit: false,
+  wsEndpoint: undefined, // Disable WebSocket, use HTTP polling only
+});
+
+// Helper function to get blockhash - tries backend proxy first, then falls back to direct RPC
+export async function getLatestBlockhashWithFallback(): Promise<{ blockhash: string; lastValidBlockHeight: number }> {
+  // Try backend proxy first (avoids CORS and browser rate limiting)
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 
+    (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/rpc/blockhash`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success) {
+        return {
+          blockhash: data.blockhash,
+          lastValidBlockHeight: data.lastValidBlockHeight
+        };
+      }
+    }
+  } catch (error) {
+    console.warn('Backend RPC proxy failed, trying direct RPC:', error);
+  }
+  
+  // Fallback to direct RPC (try endpoints in order)
+  const endpoints = SOLANA_NETWORK === 'mainnet-beta' 
+    ? MAINNET_RPC_ENDPOINTS 
+    : DEVNET_RPC_ENDPOINTS;
+  
+  let lastError: Error | null = null;
+  
+  for (const endpoint of endpoints) {
+    try {
+      const testConnection = new Connection(endpoint, 'confirmed');
+      const result = await testConnection.getLatestBlockhash('confirmed');
+      return result;
+    } catch (error) {
+      console.warn(`RPC endpoint ${endpoint} failed:`, error);
+      lastError = error instanceof Error ? error : new Error(String(error));
+      // Continue to next endpoint
+    }
+  }
+  
+  // If all endpoints fail, throw the last error
+  throw lastError || new Error('All RPC endpoints failed');
+}
+
+// Helper function to get account balance via backend proxy (avoids CORS/403 errors)
+export async function getAccountBalanceViaProxy(address: string): Promise<{ balance: number; balanceSOL: number; accountExists: boolean; owner: string | null }> {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 
+    (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/rpc/account-balance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Backend balance response:', data);
+      if (data.success) {
+        return {
+          balance: data.balance,
+          balanceSOL: data.balanceSOL,
+          accountExists: data.accountExists,
+          owner: data.owner
+        };
+      }
+      const errorMsg = data.error || 'Failed to get account balance';
+      console.error('Backend balance check failed:', errorMsg);
+      throw new Error(errorMsg);
+    }
+    
+    const errorText = await response.text();
+    console.error('Backend balance check HTTP error:', response.status, errorText);
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  } catch (error) {
+    console.warn('Backend balance check failed, trying direct RPC:', error);
+    
+    // Fallback to direct RPC (will likely fail with 403 on mainnet)
+    try {
+      const publicKey = new PublicKey(address);
+      const balance = await connection.getBalance(publicKey);
+      const accountInfo = await connection.getAccountInfo(publicKey);
+      return {
+        balance,
+        balanceSOL: balance / 1e9,
+        accountExists: accountInfo !== null,
+        owner: accountInfo?.owner?.toString() || null
+      };
+    } catch (directError) {
+      throw new Error(`Failed to get account balance: ${directError instanceof Error ? directError.message : 'Unknown error'}`);
+    }
+  }
+}
+
+// Helper function to send a raw transaction via backend proxy (avoids CORS/403 errors)
+export async function sendRawTransactionViaProxy(serializedTransaction: Uint8Array): Promise<string> {
+  // Try backend proxy first (avoids CORS and browser rate limiting)
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 
+    (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+  
+  try {
+    // Convert Uint8Array to base64 for transmission
+    // Use btoa for browser compatibility (Buffer is Node.js only)
+    let base64Transaction: string;
+    if (typeof Buffer !== 'undefined') {
+      // Node.js environment
+      base64Transaction = Buffer.from(serializedTransaction).toString('base64');
+    } else {
+      // Browser environment - convert Uint8Array to base64
+      const binary = String.fromCharCode(...Array.from(serializedTransaction));
+      base64Transaction = btoa(binary);
+    }
+    
+    console.log('Sending transaction to backend proxy, size:', serializedTransaction.length, 'bytes');
+    
+    const response = await fetch(`${API_BASE_URL}/api/rpc/send-transaction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transaction: base64Transaction,
+        options: { skipPreflight: false, maxRetries: 3 }
+      }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success) {
+        console.log('✅ Transaction sent via backend proxy:', data.signature);
+        return data.signature;
+      }
+      throw new Error(data.error || 'Failed to send transaction');
+    }
+    
+    const errorText = await response.text();
+    console.error('Backend proxy error response:', errorText);
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  } catch (error) {
+    console.warn('Backend RPC proxy failed, trying direct RPC:', error);
+    
+    // Fallback to direct RPC (will likely fail with 403 on mainnet, but try anyway)
+    try {
+      return await connection.sendRawTransaction(serializedTransaction, {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
+    } catch (directError) {
+      throw new Error(`Failed to send transaction: ${directError instanceof Error ? directError.message : 'Unknown error'}`);
+    }
+  }
+}
+
+// Helper function to confirm transaction via backend proxy (avoids CORS/403 errors)
+export async function confirmTransactionViaProxy(
+  signature: string,
+  blockhash: string,
+  lastValidBlockHeight?: number,
+  commitment: 'confirmed' | 'finalized' = 'confirmed'
+): Promise<{ success: boolean; slot?: number; error?: string }> {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 
+    (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/rpc/confirm-transaction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        signature,
+        blockhash,
+        lastValidBlockHeight,
+        commitment
+      }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        success: data.success && data.confirmed,
+        slot: data.slot,
+        error: data.error
+      };
+    }
+    
+    const errorText = await response.text();
+    throw new Error(`HTTP ${response.status}: ${errorText}`);
+  } catch (error) {
+    console.error('Backend transaction confirmation failed:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to confirm transaction'
+    };
+  }
+}
+
+// Helper function to verify transaction was actually sent and confirmed
+export async function verifyTransaction(signature: string): Promise<{ confirmed: boolean; error?: string; success?: boolean }> {
+  // Try backend proxy first (avoids CORS and browser rate limiting)
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 
+    (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/rpc/verify-transaction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signature }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      // Check if transaction has an error - if it does, it failed
+      const hasError = data.error && !data.error.includes('not found');
+      const isConfirmed = data.success && data.confirmed && !hasError;
+      
+      return {
+        confirmed: isConfirmed,
+        success: isConfirmed && !hasError,
+        error: hasError ? data.error : undefined
+      };
+    }
+  } catch (error) {
+    console.warn('Backend transaction verification failed, trying direct RPC:', error);
+  }
+  
+  // Fallback to direct RPC verification (will likely fail with 403 on mainnet)
+  try {
+    const statusResult = await connection.getSignatureStatus(signature);
+    if (!statusResult || !statusResult.value) {
+      return { confirmed: false, success: false, error: 'Transaction not found' };
+    }
+    const status = statusResult.value;
+    // CRITICAL: Check if transaction has an error - if err is not null, transaction failed
+    if (status.err) {
+      return { confirmed: false, success: false, error: status.err.toString() };
+    }
+    // Transaction exists, has no error, and is confirmed
+    return { confirmed: true, success: true };
+  } catch (error) {
+    // If we get 403, it's an RPC access issue, not a transaction failure
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    if (errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
+      console.warn('⚠️ RPC verification blocked (403) - transaction may still be processing');
+      // Return unknown status - can't verify but transaction might be fine
+      return { confirmed: false, success: undefined, error: 'RPC access blocked (403) - cannot verify' };
+    }
+    console.error('Error verifying transaction:', error);
+    return { confirmed: false, success: false, error: errorMsg };
+  }
+}
 
 // USDC Token addresses
 export const USDC_MINT = SOLANA_NETWORK === 'mainnet-beta'
@@ -72,6 +350,34 @@ export async function createAndFundEscrow(
     // Native SOL transfer using SystemProgram
     // Convert to lamports and round to integer (BigInt requires integer)
     const totalLamports = Math.round(totalAmount * LAMPORTS_PER_SOL);
+    
+    // Verify accounts exist before creating transaction (use backend proxy to avoid 403)
+    console.log('Creating SOL transfer:', {
+      from: clientWallet.toString(),
+      to: escrowAccount.toString(),
+      amount: totalAmount,
+      lamports: totalLamports,
+      network: SOLANA_NETWORK,
+    });
+    
+    // Verify balance via backend proxy (already checked in useEscrow, but double-check here)
+    try {
+      const accountData = await getAccountBalanceViaProxy(clientWallet.toString());
+      if (!accountData.accountExists) {
+        throw new Error(`Source account ${clientWallet.toString()} does not exist`);
+      }
+      if (accountData.balance < totalLamports) {
+        throw new Error(`Insufficient balance: account has ${accountData.balanceSOL} SOL but needs ${totalAmount} SOL`);
+      }
+      console.log('Account verification passed:', {
+        fromAccountExists: accountData.accountExists,
+        fromBalance: accountData.balanceSOL,
+      });
+    } catch (error) {
+      // If backend proxy fails, log warning but continue (balance was already checked)
+      console.warn('Account verification via proxy failed, but continuing:', error);
+    }
+    
     transaction.add(
       SystemProgram.transfer({
         fromPubkey: clientWallet,

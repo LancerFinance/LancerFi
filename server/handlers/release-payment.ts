@@ -156,13 +156,17 @@ export async function releasePaymentHandler(
         }
 
         // Insert notifications (non-blocking)
-        await supabaseClient
-          .from('messages')
-          .insert(notifications)
-          .catch(err => {
-            console.error('Error sending payment release notifications:', err);
-            // Don't fail the request if notifications fail
-          });
+        try {
+          const { error } = await supabaseClient
+            .from('messages')
+            .insert(notifications);
+          if (error) {
+            console.error('Error sending payment release notifications:', error);
+          }
+        } catch (err) {
+          console.error('Error sending payment release notifications:', err);
+          // Don't fail the request if notifications fail
+        }
       }
     } catch (notificationError) {
       console.error('Error sending payment release notifications:', notificationError);
