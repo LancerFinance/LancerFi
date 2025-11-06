@@ -112,6 +112,21 @@ const ViewProposals = () => {
         budget_usdc: proposal.proposed_budget // Update budget to accepted proposal amount
       });
 
+      // Send notification message to freelancer
+      try {
+        if (proposal.freelancer?.wallet_address && project && address) {
+          await db.createMessage({
+            sender_id: address,
+            recipient_id: proposal.freelancer.wallet_address,
+            subject: `Proposal Accepted for "${project.title}"`,
+            content: `Great news! Your proposal for "${project.title}" has been accepted. The project is now in progress. You can start working on it from your dashboard.`
+          });
+        }
+      } catch (messageError) {
+        // Don't fail the proposal acceptance if message fails
+        console.error('Error sending notification message:', messageError);
+      }
+
       toast({
         title: "Proposal Accepted!",
         description: `You've hired ${proposal.freelancer?.full_name || 'the freelancer'} for this project`,

@@ -227,6 +227,21 @@ const SubmitProposal = () => {
 
       if (error) throw error;
 
+      // Send notification message to project owner
+      try {
+        if (project?.client_id && profile?.full_name) {
+          await db.createMessage({
+            sender_id: address!,
+            recipient_id: project.client_id,
+            subject: `New Proposal for "${project.title}"`,
+            content: `${profile.full_name || 'A freelancer'} has submitted a proposal for your project "${project.title}". View the proposal to accept or decline.`
+          });
+        }
+      } catch (messageError) {
+        // Don't fail the proposal submission if message fails
+        console.error('Error sending notification message:', messageError);
+      }
+
       toast({
         title: "Proposal Submitted!",
         description: "Your proposal has been sent to the client",

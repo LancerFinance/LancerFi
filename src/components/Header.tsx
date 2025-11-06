@@ -92,11 +92,13 @@ const Header = () => {
               FAQs
             </Link>
             {connectedAddress && <>
-                <Link to="/messages" className="text-sm font-medium text-foreground hover:text-primary transition-colors relative">
+                <Link to="/messages" className="text-sm font-medium text-foreground hover:text-primary transition-colors relative inline-flex items-center">
                   Messages
-                  {unreadCount > 0 && <span className="absolute -top-1 -right-2 bg-destructive text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {unreadCount}
-                    </span>}
+                  {unreadCount > 0 && (
+                    <span className="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 bg-destructive text-destructive-foreground text-[10px] font-semibold rounded-full leading-none">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
                 </Link>
                 <Link to="/edit-profile" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
                   Profile
@@ -156,11 +158,15 @@ const Header = () => {
                   FAQs
                 </Link>
                 {connectedAddress && <>
-                  <Link to="/messages" className="flex items-center py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors relative" onClick={() => setIsMobileMenuOpen(false)}>
-                    Messages
-                    {unreadCount > 0 && <span className="absolute -top-1 -right-2 bg-destructive text-destructive-foreground text-[10px] sm:text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center">
-                        {unreadCount}
-                      </span>}
+                  <Link to="/messages" className="flex items-center py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                    <span className="relative inline-flex items-center">
+                      Messages
+                      {unreadCount > 0 && (
+                        <span className="ml-1.5 inline-flex items-center justify-center min-w-[1rem] h-4 px-1 bg-destructive text-destructive-foreground text-[10px] font-semibold rounded-full leading-none">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                      )}
+                    </span>
                   </Link>
                   <Link to="/edit-profile" className="block py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
                     Profile
