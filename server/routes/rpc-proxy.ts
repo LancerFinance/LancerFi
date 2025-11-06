@@ -349,28 +349,11 @@ router.post('/send-transaction', async (req, res) => {
         const blockhashStr = txToSimulate.recentBlockhash?.toString() || 'MISSING';
         console.log(`Transaction blockhash: ${blockhashStr.substring(0, 20)}...`);
         console.log(`Transaction fee payer: ${txToSimulate.feePayer?.toString() || 'MISSING'}`);
+        console.log(`Transaction instructions count: ${txToSimulate.instructions.length}`);
         
-        // Validate blockhash is still valid on MAINNET
-        try {
-          const latestBlockhash = await testConnection.getLatestBlockhash('confirmed');
-          const currentHeight = await testConnection.getBlockHeight('confirmed');
-          const blockhashHeight = txToSimulate.lastValidBlockHeight || 0;
-          const blocksRemaining = blockhashHeight - currentHeight;
-          
-          console.log(`Blockhash validity check (MAINNET):`, {
-            currentHeight,
-            lastValidBlockHeight: blockhashHeight,
-            blocksRemaining,
-            isExpired: blocksRemaining < 0
-          });
-          
-          if (blocksRemaining < 0) {
-            throw new Error(`Blockhash EXPIRED: ${blocksRemaining} blocks remaining. Transaction will be rejected by validators.`);
-          }
-        } catch (blockhashError: any) {
-          console.error(`❌ Blockhash validation failed:`, blockhashError.message);
-          throw blockhashError;
-        }
+        // NOTE: lastValidBlockHeight is NOT serialized in transactions, so it will be 0 after deserialization
+        // We skip blockhash validation here - the RPC will reject it if the blockhash is truly expired
+        // The frontend ensures a fresh blockhash is used before signing
         
         // Simulate transaction on MAINNET
         try {
