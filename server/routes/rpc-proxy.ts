@@ -352,32 +352,10 @@ router.post('/send-transaction', async (req, res) => {
         console.log(`Transaction instructions count: ${txToSimulate.instructions.length}`);
         
         // NOTE: lastValidBlockHeight is NOT serialized in transactions, so it will be 0 after deserialization
-        // We skip blockhash validation here - the RPC will reject it if the blockhash is truly expired
+        // We skip blockhash validation and simulation - the RPC will validate and reject if invalid
         // The frontend ensures a fresh blockhash is used before signing
         
-        // Simulate transaction on MAINNET
-        try {
-          const simulation = await testConnection.simulateTransaction(
-            txToSimulate,
-            {
-              commitment: 'confirmed',
-              replaceRecentBlockhash: false,
-            } as any
-          );
-          
-          if (simulation.value.err) {
-            console.error(`❌ Transaction simulation FAILED:`, simulation.value.err);
-            throw new Error(`Transaction simulation failed: ${JSON.stringify(simulation.value.err)}`);
-          }
-          
-          console.log(`✅ Transaction simulation passed on MAINNET`);
-        } catch (simError: any) {
-          const errorMsg = simError?.message || String(simError);
-          console.error(`❌ Transaction simulation error:`, errorMsg);
-          throw new Error(`Transaction simulation failed: ${errorMsg}`);
-        }
-        
-        // Send transaction to MAINNET
+        // Send transaction directly to MAINNET - RPC will validate it
         try {
           console.log(`🚀 Sending transaction to MAINNET via ${endpoint}...`);
           
