@@ -1,0 +1,403 @@
+import { useState, useRef } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Upload, X, Link as LinkIcon, Loader2, FileText } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useWallet } from "@/hooks/useWallet";
+import { db, supabase } from "@/lib/supabase";
+
+interface SubmitWorkDialogProps {
+  projectId: string;
+  freelancerId: string;
+  projectTitle: string;
+  onSubmissionComplete?: () => void;
+  triggerVariant?: "outline" | "default" | "ghost";
+  triggerSize?: "sm" | "default" | "lg";
+  triggerClassName?: string;
+}
+
+const SubmitWorkDialog = ({ 
+  projectId,
+  freelancerId,
+  projectTitle,
+  onSubmissionComplete,
+  triggerVariant = "default",
+  triggerSize = "sm",
+  triggerClassName = "w-full"
+}: SubmitWorkDialogProps) => {
+  const [open, setOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [formData, setFormData] = useState({
+    description: '',
+    linkUrl: ''
+  });
+  const [files, setFiles] = useState<File[]>([]);
+  const [fileUrls, setFileUrls] = useState<string[]>([]);
+  const [linkUrls, setLinkUrls] = useState<string[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { toast } = useToast();
+  const { address, isConnected } = useWallet();
+
+  const handleFileSelect = (selectedFiles: FileList | null) => {
+    if (!selectedFiles) return;
+    
+    const newFiles = Array.from(selectedFiles);
+    const validFiles = newFiles.filter(file => {
+      // Limit file size to 10MB
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} is larger than 10MB. Please select a smaller file.`,
+          variant: "destructive",
+        });
+        return false;
+      }
+      return true;
+    });
+
+    setFiles(prev => [...prev, ...validFiles]);
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const addLink = () => {
+    const link = formData.linkUrl.trim();
+    if (!link) {
+      setErrors(prev => ({ ...prev, linkUrl: 'Please enter a valid URL' }));
+      return;
+    }
+
+    // Basic URL validation
+    try {
+      new URL(link);
+      setLinkUrls(prev => [...prev, link]);
+      setFormData(prev => ({ ...prev, linkUrl: '' }));
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.linkUrl;
+        return newErrors;
+      });
+    } catch {
+      setErrors(prev => ({ ...prev, linkUrl: 'Please enter a valid URL (e.g., https://example.com)' }));
+    }
+  };
+
+  const removeLink = (index: number) => {
+    setLinkUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadFiles = async (): Promise<string[]> => {
+    if (files.length === 0) return [];
+
+    setUploadingFiles(true);
+    const uploadedUrls: string[] = [];
+
+    try {
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${projectId}/${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = fileName;
+
+        const { error: uploadError } = await supabase.storage
+          .from('work-submissions')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('work-submissions')
+          .getPublicUrl(filePath);
+
+        uploadedUrls.push(publicUrl);
+      }
+
+      return uploadedUrls;
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      throw error;
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!isConnected || !address) {
+      toast({
+        title: "Wallet Required",
+        description: "Please connect your wallet to submit work",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate form
+    const newErrors: Record<string, string> = {};
+    if (!formData.description.trim()) {
+      newErrors.description = 'Please provide a description of your work';
+    }
+    if (files.length === 0 && linkUrls.length === 0) {
+      newErrors.files = 'Please add at least one file or link';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setSubmitting(true);
+    setErrors({});
+
+    try {
+      // Upload files if any
+      const uploadedFileUrls = await uploadFiles();
+
+      // Create work submission
+      const submission = await db.createWorkSubmission({
+        project_id: projectId,
+        freelancer_id: freelancerId,
+        description: formData.description.trim(),
+        file_urls: uploadedFileUrls,
+        link_urls: linkUrls,
+        status: 'pending'
+      });
+
+      // Get project details for notification
+      const project = await db.getProject(projectId);
+      if (project && submission) {
+        // Send notification to client
+        await db.sendWorkSubmissionNotification(
+          projectId,
+          projectTitle,
+          project.client_id,
+          address,
+          submission.id,
+          true
+        );
+      }
+
+      toast({
+        title: "Work Submitted!",
+        description: "Your work has been submitted for review. The client will be notified.",
+      });
+
+      // Reset form and close dialog
+      setFormData({ description: '', linkUrl: '' });
+      setFiles([]);
+      setFileUrls([]);
+      setLinkUrls([]);
+      setOpen(false);
+
+      // Callback to refresh data
+      if (onSubmissionComplete) {
+        onSubmissionComplete();
+      }
+    } catch (error) {
+      console.error('Error submitting work:', error);
+      toast({
+        title: "Failed to Submit Work",
+        description: error instanceof Error ? error.message : "Please try again later",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button 
+          variant={triggerVariant} 
+          size={triggerSize} 
+          className={triggerClassName}
+          disabled={!isConnected}
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          Submit Work
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Submit Work for {projectTitle}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Work Description *</Label>
+            <Textarea
+              id="description"
+              placeholder="Describe the work you've completed, what was delivered, and any important notes..."
+              value={formData.description}
+              onChange={(e) => {
+                setFormData(prev => ({ ...prev, description: e.target.value }));
+                setErrors(prev => {
+                  const newErrors = { ...prev };
+                  delete newErrors.description;
+                  return newErrors;
+                });
+              }}
+              rows={6}
+              className={errors.description ? 'border-destructive' : ''}
+            />
+            {errors.description && (
+              <p className="text-sm text-destructive">{errors.description}</p>
+            )}
+          </div>
+
+          {/* File Upload */}
+          <div className="space-y-2">
+            <Label>Files (Optional)</Label>
+            <div className="border-2 border-dashed border-border rounded-lg p-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={(e) => handleFileSelect(e.target.files)}
+                className="hidden"
+              />
+              <div className="flex flex-col items-center justify-center space-y-2">
+                <Upload className="w-8 h-8 text-muted-foreground" />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Select Files
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Upload files (max 10MB per file)
+                </p>
+              </div>
+            </div>
+            {files.length > 0 && (
+              <div className="space-y-2">
+                {files.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm truncate">{file.name}</span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
+                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeFile(index)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {errors.files && (
+              <p className="text-sm text-destructive">{errors.files}</p>
+            )}
+          </div>
+
+          {/* Links */}
+          <div className="space-y-2">
+            <Label htmlFor="linkUrl">Links (Optional)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="linkUrl"
+                type="url"
+                placeholder="https://example.com"
+                value={formData.linkUrl}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, linkUrl: e.target.value }));
+                  setErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.linkUrl;
+                    return newErrors;
+                  });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addLink();
+                  }
+                }}
+                className={errors.linkUrl ? 'border-destructive' : ''}
+              />
+              <Button type="button" variant="outline" onClick={addLink}>
+                <LinkIcon className="w-4 h-4 mr-2" />
+                Add Link
+              </Button>
+            </div>
+            {errors.linkUrl && (
+              <p className="text-sm text-destructive">{errors.linkUrl}</p>
+            )}
+            {linkUrls.length > 0 && (
+              <div className="space-y-2">
+                {linkUrls.map((link, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                    <a
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary hover:underline truncate flex-1"
+                    >
+                      {link}
+                    </a>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeLink(index)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={submitting || uploadingFiles}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting || uploadingFiles}
+            >
+              {(submitting || uploadingFiles) ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {uploadingFiles ? 'Uploading...' : 'Submitting...'}
+                </>
+              ) : (
+                'Submit Work'
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default SubmitWorkDialog;
+

@@ -63,7 +63,7 @@ export const useEscrow = (): UseEscrowReturn => {
       
       const platformFee = (finalAmount * platformFeePercent) / 100;
       const totalLocked = finalAmount + platformFee;
-      
+
       console.log('Transaction details:', {
         amount: finalAmount,
         platformFee,

@@ -109,6 +109,22 @@ export interface Message {
   updated_at: string;
 }
 
+export interface WorkSubmission {
+  id: string;
+  project_id: string;
+  freelancer_id: string;
+  description: string;
+  file_urls?: string[];
+  link_urls?: string[];
+  status: 'pending' | 'approved' | 'rejected' | 'revision_requested';
+  submitted_at: string;
+  reviewed_at?: string;
+  reviewed_by?: string;
+  review_notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Database functions
 export const db = {
   // Projects
@@ -439,6 +455,119 @@ export const db = {
     
     if (error) throw error;
     return data;
+  },
+
+  // Work Submissions
+  async createWorkSubmission(submission: Omit<WorkSubmission, 'id' | 'created_at' | 'updated_at' | 'submitted_at'>) {
+    const { data, error } = await supabase
+      .from('work_submissions')
+      .insert({
+        ...submission,
+        submitted_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getWorkSubmissions(projectId: string) {
+    const { data, error } = await supabase
+      .from('work_submissions')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('submitted_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getWorkSubmission(id: string) {
+    const { data, error } = await supabase
+      .from('work_submissions')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async updateWorkSubmission(id: string, updates: Partial<WorkSubmission>) {
+    const { data, error } = await supabase
+      .from('work_submissions')
+      .update({
+        ...updates,
+        reviewed_at: updates.status && updates.status !== 'pending' ? new Date().toISOString() : undefined
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async sendWorkSubmissionNotification(
+    projectId: string,
+    projectTitle: string,
+    clientWallet: string,
+    freelancerWallet: string,
+    submissionId: string,
+    isNewSubmission: boolean = true,
+    status?: 'approved' | 'rejected' | 'revision_requested',
+    reviewNotes?: string
+  ) {
+    const systemSender = 'system@lancerfi.app';
+    
+    const notifications = [];
+    
+    if (isNewSubmission) {
+      // Notify client that work has been submitted
+      notifications.push({
+        sender_id: systemSender,
+        recipient_id: clientWallet,
+        subject: 'Work Submitted for Review',
+        content: `The freelancer has submitted work for your project "${projectTitle}". Please review the submission and approve or request revisions.`
+      });
+    } else {
+      // Notify freelancer about review decision
+      const statusMessage = status === 'approved' 
+        ? 'Your work submission has been approved!'
+        : status === 'rejected'
+        ? 'Your work submission has been rejected. Please review the feedback and resubmit.'
+        : 'Revision has been requested for your work submission. Please review the feedback and make the necessary changes.';
+      
+      const subject = status === 'approved' 
+        ? 'Work Submission Approved'
+        : status === 'rejected'
+        ? 'Work Submission Rejected'
+        : 'Revision Requested';
+      
+      notifications.push({
+        sender_id: systemSender,
+        recipient_id: freelancerWallet,
+        subject: subject,
+        content: `${statusMessage} Project: "${projectTitle}". ${reviewNotes ? `Review Notes: ${reviewNotes}` : ''}`
+      });
+    }
+
+    // Insert notifications
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .insert(notifications)
+        .select();
+      
+      if (error) {
+        console.error('Error sending work submission notifications:', error);
+      }
+      return data;
+    } catch (error) {
+      console.error('Error sending work submission notifications:', error);
+      return null;
+    }
   },
 
   // Notifications

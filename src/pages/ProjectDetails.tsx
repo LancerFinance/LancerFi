@@ -19,7 +19,9 @@ import {
   Edit,
   Loader2
 } from "lucide-react";
-import { db, supabase, Project, Escrow, Profile } from "@/lib/supabase";
+import { db, supabase, Project, Escrow, Profile, WorkSubmission } from "@/lib/supabase";
+import SubmitWorkDialog from "@/components/SubmitWorkDialog";
+import WorkSubmissionReview from "@/components/WorkSubmissionReview";
 import { formatUSDC, formatSOL } from "@/lib/solana";
 import { getSolanaPrice } from "@/lib/solana-price";
 import { useToast } from "@/hooks/use-toast";
@@ -55,6 +57,8 @@ const ProjectDetails = () => {
   const [completing, setCompleting] = useState(false);
   const [proposalCount, setProposalCount] = useState(0);
   const [solPrice, setSolPrice] = useState<number | null>(null);
+  const [workSubmissions, setWorkSubmissions] = useState<WorkSubmission[]>([]);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -71,6 +75,11 @@ const ProjectDetails = () => {
       // Load project
       const projectData = await db.getProject(id);
       setProject(projectData);
+
+      // Load work submissions if project is in progress
+      if (projectData.status === 'in_progress' && projectData.freelancer_id) {
+        await loadWorkSubmissions();
+      }
 
           // Load escrow if exists
           try {
@@ -144,6 +153,20 @@ const ProjectDetails = () => {
       navigate('/dashboard');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadWorkSubmissions = async () => {
+    if (!id) return;
+    
+    try {
+      setLoadingSubmissions(true);
+      const submissions = await db.getWorkSubmissions(id);
+      setWorkSubmissions(submissions || []);
+    } catch (error) {
+      console.error('Error loading work submissions:', error);
+    } finally {
+      setLoadingSubmissions(false);
     }
   };
 
@@ -276,8 +299,9 @@ const ProjectDetails = () => {
           : 'Project marked as completed.',
       });
 
-      // Reload project details
+      // Reload project details and submissions
       await loadProjectDetails();
+      await loadWorkSubmissions();
     } catch (error) {
       console.error('Error completing project:', error);
       toast({
@@ -429,6 +453,28 @@ const ProjectDetails = () => {
                         />
                       ))}
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Work Submissions */}
+              {project.status === 'in_progress' && workSubmissions.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Work Submissions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {workSubmissions.map((submission) => (
+                      <WorkSubmissionReview
+                        key={submission.id}
+                        submission={submission}
+                        projectId={project.id}
+                        projectTitle={project.title}
+                        clientWallet={project.client_id}
+                        freelancerWallet={freelancer?.wallet_address || ''}
+                        onReviewComplete={loadWorkSubmissions}
+                      />
+                    ))}
                   </CardContent>
                 </Card>
               )}
@@ -651,51 +697,69 @@ const ProjectDetails = () => {
                        />
                      )}
 
+                     {/* Freelancer: Submit Work Button */}
+                     {project.status === 'in_progress' && isAssignedFreelancer && freelancer?.id && (
+                       <SubmitWorkDialog
+                         projectId={project.id}
+                         freelancerId={freelancer.id}
+                         projectTitle={project.title}
+                         onSubmissionComplete={loadWorkSubmissions}
+                       />
+                     )}
 
-                     {project.status === 'in_progress' && (isProjectOwner || isAssignedFreelancer) && (
-                       <AlertDialog>
-                         <AlertDialogTrigger asChild>
-                           <Button 
-                             variant="default" 
-                             size="sm" 
-                             className="w-full"
-                             disabled={completing}
-                           >
-                             <CheckCircle className="w-4 h-4 mr-2" />
-                             Complete Project
-                           </Button>
-                         </AlertDialogTrigger>
-                         <AlertDialogContent>
-                           <AlertDialogHeader>
-                             <AlertDialogTitle>Complete Project</AlertDialogTitle>
-                             <AlertDialogDescription>
-                               Are you sure you want to mark this project as completed? This will:
-                               <ul className="list-disc list-inside mt-2 space-y-1">
-                                 <li>Update the project status to "Completed"</li>
-                                 <li>Release the escrow funds to the freelancer</li>
-                                 <li>Update the freelancer's earnings and project count</li>
-                               </ul>
-                               This action cannot be undone.
-                             </AlertDialogDescription>
-                           </AlertDialogHeader>
-                           <AlertDialogFooter>
-                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                             <AlertDialogAction
-                               onClick={handleCompleteProject}
-                               disabled={completing || escrowLoading}
-                             >
-                               {(completing || escrowLoading) ? (
-                                 <>
-                                   <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
-                                   Processing Payment...
-                                 </>
-                               ) : (
-                                 "Complete Project"
-                               )}
-                             </AlertDialogAction>
-                           </AlertDialogFooter>
-                         </AlertDialogContent>
-                       </AlertDialog>
+                     {/* Client: Complete Project Button (only if work is approved) */}
+                     {project.status === 'in_progress' && isProjectOwner && (
+                       <>
+                         {workSubmissions.some(sub => sub.status === 'approved') ? (
+                           <AlertDialog>
+                             <AlertDialogTrigger asChild>
+                               <Button 
+                                 variant="default" 
+                                 size="sm" 
+                                 className="w-full"
+                                 disabled={completing}
+                               >
+                                 <CheckCircle className="w-4 h-4 mr-2" />
+                                 Complete Project
+                               </Button>
+                             </AlertDialogTrigger>
+                             <AlertDialogContent>
+                               <AlertDialogHeader>
+                                 <AlertDialogTitle>Complete Project</AlertDialogTitle>
+                                 <AlertDialogDescription>
+                                   Are you sure you want to mark this project as completed? This will:
+                                   <ul className="list-disc list-inside mt-2 space-y-1">
+                                     <li>Update the project status to "Completed"</li>
+                                     <li>Release the escrow funds to the freelancer</li>
+                                     <li>Update the freelancer's earnings and project count</li>
+                                   </ul>
+                                   This action cannot be undone.
+                                 </AlertDialogDescription>
+                               </AlertDialogHeader>
+                               <AlertDialogFooter>
+                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                 <AlertDialogAction
+                                   onClick={handleCompleteProject}
+                                   disabled={completing || escrowLoading}
+                                 >
+                                   {(completing || escrowLoading) ? (
+                                     <>
+                                       <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
+                                       Processing Payment...
+                                     </>
+                                   ) : (
+                                     "Complete Project"
+                                   )}
+                                 </AlertDialogAction>
+                               </AlertDialogFooter>
+                             </AlertDialogContent>
+                           </AlertDialog>
+                         ) : (
+                           <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
+                             Waiting for work submission to be approved before completing project.
+                           </div>
+                         )}
+                       </>
                      )}
                       {project.status === 'active' && isProjectOwner && !project.freelancer_id && (
                         <Link to={`/project/${project.id}/edit`} className="block">
