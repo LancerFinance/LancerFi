@@ -624,4 +624,61 @@ export const db = {
       return null;
     }
   },
+
+  // Get count of new proposals for a client (proposals on their active projects)
+  async getNewProposalsCount(clientWallet: string): Promise<number> {
+    try {
+      // Get all active projects for this client (where no freelancer has been assigned)
+      const { data: projects, error: projectsError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('client_id', clientWallet)
+        .eq('status', 'active')
+        .is('freelancer_id', null);
+      
+      if (projectsError) throw projectsError;
+      if (!projects || projects.length === 0) return 0;
+
+      // Get count of proposals for these projects
+      const projectIds = projects.map(p => p.id);
+      const { count, error: proposalsError } = await supabase
+        .from('proposals')
+        .select('*', { count: 'exact', head: true })
+        .in('project_id', projectIds);
+      
+      if (proposalsError) throw proposalsError;
+      return count || 0;
+    } catch (error) {
+      console.error('Error getting new proposals count:', error);
+      return 0;
+    }
+  },
+
+  // Get count of new work submissions for a client (pending submissions on their projects)
+  async getNewWorkSubmissionsCount(clientWallet: string): Promise<number> {
+    try {
+      // Get all projects for this client
+      const { data: projects, error: projectsError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('client_id', clientWallet);
+      
+      if (projectsError) throw projectsError;
+      if (!projects || projects.length === 0) return 0;
+
+      // Get count of pending work submissions for these projects
+      const projectIds = projects.map(p => p.id);
+      const { count, error: submissionsError } = await supabase
+        .from('work_submissions')
+        .select('*', { count: 'exact', head: true })
+        .in('project_id', projectIds)
+        .eq('status', 'pending');
+      
+      if (submissionsError) throw submissionsError;
+      return count || 0;
+    } catch (error) {
+      console.error('Error getting new work submissions count:', error);
+      return 0;
+    }
+  },
 };

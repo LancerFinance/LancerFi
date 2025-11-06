@@ -13,6 +13,7 @@ const Header = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [dashboardNotificationCount, setDashboardNotificationCount] = useState(0);
   const {
     isConnected,
     address: connectedAddress
@@ -20,8 +21,12 @@ const Header = () => {
   useEffect(() => {
     if (isConnected && connectedAddress) {
       checkUnreadMessages();
+      checkDashboardNotifications();
       // Check for new messages every 30 seconds
-      const interval = setInterval(checkUnreadMessages, 30000);
+      const interval = setInterval(() => {
+        checkUnreadMessages();
+        checkDashboardNotifications();
+      }, 30000);
 
       // Listen for message read events to update count immediately
       const handleMessageRead = () => checkUnreadMessages();
@@ -32,6 +37,7 @@ const Header = () => {
       };
     } else {
       setUnreadCount(0);
+      setDashboardNotificationCount(0);
     }
   }, [isConnected, connectedAddress]);
   const checkUnreadMessages = async () => {
@@ -42,6 +48,18 @@ const Header = () => {
       setUnreadCount(unread);
     } catch (error) {
       console.error('Error checking unread messages:', error);
+    }
+  };
+  const checkDashboardNotifications = async () => {
+    if (!connectedAddress) return;
+    try {
+      const [proposalsCount, submissionsCount] = await Promise.all([
+        db.getNewProposalsCount(connectedAddress),
+        db.getNewWorkSubmissionsCount(connectedAddress)
+      ]);
+      setDashboardNotificationCount(proposalsCount + submissionsCount);
+    } catch (error) {
+      console.error('Error checking dashboard notifications:', error);
     }
   };
   return <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -73,8 +91,13 @@ const Header = () => {
 
           {/* Navigation Links - Desktop */}
           <nav className="hidden lg:flex items-center space-x-6 justify-end">
-            <Link to="/dashboard" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+            <Link to="/dashboard" className="text-sm font-medium text-foreground hover:text-primary transition-colors relative inline-flex items-center">
               Dashboard
+              {dashboardNotificationCount > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 bg-destructive text-destructive-foreground text-[10px] font-semibold rounded-full leading-none">
+                  {dashboardNotificationCount > 99 ? '99+' : dashboardNotificationCount}
+                </span>
+              )}
             </Link>
             <Link to="/browse-services" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
               Browse
@@ -139,8 +162,15 @@ const Header = () => {
 
               {/* Main Navigation Links - Same as Desktop */}
               <div className="space-y-1">
-                <Link to="/dashboard" className="block py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
-                  Dashboard
+                <Link to="/dashboard" className="flex items-center py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                  <span className="relative inline-flex items-center">
+                    Dashboard
+                    {dashboardNotificationCount > 0 && (
+                      <span className="ml-1.5 inline-flex items-center justify-center min-w-[1rem] h-4 px-1 bg-destructive text-destructive-foreground text-[10px] font-semibold rounded-full leading-none">
+                        {dashboardNotificationCount > 99 ? '99+' : dashboardNotificationCount}
+                      </span>
+                    )}
+                  </span>
                 </Link>
                 <Link to="/browse-services" className="block py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
                   Browse
