@@ -23,6 +23,7 @@ export type Database = {
           freelancer_wallet: string | null
           funded_at: string | null
           id: string
+          payment_currency: string | null
           platform_fee: number
           project_id: string | null
           released_at: string | null
@@ -39,6 +40,7 @@ export type Database = {
           freelancer_wallet?: string | null
           funded_at?: string | null
           id?: string
+          payment_currency?: string | null
           platform_fee: number
           project_id?: string | null
           released_at?: string | null
@@ -55,6 +57,7 @@ export type Database = {
           freelancer_wallet?: string | null
           funded_at?: string | null
           id?: string
+          payment_currency?: string | null
           platform_fee?: number
           project_id?: string | null
           released_at?: string | null
@@ -353,6 +356,69 @@ export type Database = {
           },
           {
             foreignKeyName: "proposals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_submissions: {
+        Row: {
+          created_at: string | null
+          description: string
+          file_urls: string[] | null
+          freelancer_id: string
+          id: string
+          link_urls: string[] | null
+          project_id: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          submitted_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          file_urls?: string[] | null
+          freelancer_id: string
+          id?: string
+          link_urls?: string[] | null
+          project_id: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          submitted_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          file_urls?: string[] | null
+          freelancer_id?: string
+          id?: string
+          link_urls?: string[] | null
+          project_id?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          submitted_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_submissions_freelancer_id_fkey"
+            columns: ["freelancer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_submissions_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
