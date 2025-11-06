@@ -112,7 +112,15 @@ const SubmitWorkDialog = ({
 
         if (uploadError) {
           console.error('Upload error:', uploadError);
-          throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
+          
+          // Provide specific error messages for storage issues
+          if (uploadError.message.includes('Bucket not found') || uploadError.message.includes('does not exist')) {
+            throw new Error(`Storage bucket not found. Please ensure the 'work-submissions' storage bucket has been created.`);
+          } else if (uploadError.message.includes('permission denied') || uploadError.message.includes('new row violates row-level security')) {
+            throw new Error(`Permission denied for file upload. Please check storage bucket permissions.`);
+          } else {
+            throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
+          }
         }
 
         const { data: { publicUrl } } = supabase.storage
@@ -202,11 +210,32 @@ const SubmitWorkDialog = ({
       if (onSubmissionComplete) {
         onSubmissionComplete();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting work:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = "Please try again later";
+      
+      if (error?.message) {
+        errorMessage = error.message;
+        
+        // Check for common database errors
+        if (error.message.includes('relation "work_submissions" does not exist')) {
+          errorMessage = "Database table not found. Please ensure migrations have been run.";
+        } else if (error.message.includes('permission denied') || error.message.includes('new row violates row-level security')) {
+          errorMessage = "Permission denied. Please ensure you are the assigned freelancer for this project.";
+        } else if (error.message.includes('violates foreign key constraint')) {
+          errorMessage = "Invalid project or freelancer reference. Please refresh the page and try again.";
+        } else if (error.code === 'PGRST116') {
+          errorMessage = "Table not found. Please ensure database migrations have been run.";
+        } else if (error.code === '42501') {
+          errorMessage = "Permission denied. Please ensure you are the assigned freelancer for this project.";
+        }
+      }
+      
       toast({
         title: "Failed to Submit Work",
-        description: error instanceof Error ? error.message : "Please try again later",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
