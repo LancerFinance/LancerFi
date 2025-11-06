@@ -530,7 +530,7 @@ const ProjectDetails = () => {
                           {escrow.transaction_signature}
                         </div>
                         <a 
-                          href={`https://solscan.io/tx/${escrow.transaction_signature}${solPrice ? '?cluster=devnet' : ''}`}
+                          href={`https://solscan.io/tx/${escrow.transaction_signature}${import.meta.env.MODE === 'production' ? '?cluster=mainnet-beta' : '?cluster=devnet'}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-web3-primary hover:underline mt-1 inline-block"
