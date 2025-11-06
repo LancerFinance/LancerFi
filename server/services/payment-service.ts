@@ -1,19 +1,15 @@
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Keypair } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
 
-// Solana configuration
-const MODE = process.env.NODE_ENV || 'development';
-const SOLANA_NETWORK = MODE === 'production' ? 'mainnet-beta' : 'devnet';
-const RPC_ENDPOINT = SOLANA_NETWORK === 'mainnet-beta' 
-  ? process.env.SOLANA_MAINNET_RPC || 'https://api.mainnet-beta.solana.com'
-  : process.env.SOLANA_DEVNET_RPC || 'https://api.devnet.solana.com';
+// Solana configuration - PRODUCTION ONLY: MAINNET-BETA
+// NO DEVNET, NO CONDITIONALS
+const RPC_ENDPOINT = process.env.SOLANA_MAINNET_RPC || 'https://api.mainnet-beta.solana.com';
+const SOLANA_NETWORK = 'mainnet-beta';
 
 export const connection = new Connection(RPC_ENDPOINT, 'confirmed');
 
-// USDC Token addresses
-export const USDC_MINT = SOLANA_NETWORK === 'mainnet-beta'
-  ? new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') // Mainnet USDC
-  : new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'); // Devnet USDC
+// USDC Token addresses - MAINNET ONLY
+export const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // Mainnet USDC
 
 export type PaymentCurrency = 'USDC' | 'SOLANA' | 'X402';
 
