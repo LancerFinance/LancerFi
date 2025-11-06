@@ -124,31 +124,97 @@ export const useEscrow = (): UseEscrowReturn => {
         // Use Phantom's signAndSendTransaction - it's more reliable
         // Phantom handles the network connection and broadcasting internally
         console.log('Sending transaction via Phantom signAndSendTransaction...');
-        
-        // Phantom's signAndSendTransaction signs AND broadcasts the transaction
-        // It uses Phantom's own RPC connection, which is more reliable
-        signature = await ph.signAndSendTransaction(transaction, {
-          skipPreflight: false, // Let Phantom do preflight to catch errors early
+        console.log('Transaction details before sending:', {
+          instructions: transaction.instructions.length,
+          feePayer: transaction.feePayer?.toString(),
+          recentBlockhash: transaction.recentBlockhash?.toString().substring(0, 20) + '...',
+          lastValidBlockHeight: transaction.lastValidBlockHeight
         });
         
-        console.log('Transaction sent via Phantom, signature:', signature);
-        console.log('Verifying transaction was actually processed on-chain...');
+        // CRITICAL FIX: Get FRESH blockhash RIGHT before signing and sending
+        // Blockhashes expire after ~60 seconds. If blockhash expires, transaction will be dropped
+        // Strategy: Get fresh blockhash → Update transaction → Sign → Send immediately
+        try {
+          console.log('Getting fresh blockhash right before signing (blockhashes expire after ~60 seconds)...');
+          
+          // Get FRESH blockhash right before signing
+          const freshBlockhash = await getLatestBlockhashWithFallback();
+          
+          // Update transaction with fresh blockhash
+          transaction.recentBlockhash = freshBlockhash.blockhash;
+          transaction.lastValidBlockHeight = freshBlockhash.lastValidBlockHeight;
+          
+          console.log('Fresh blockhash obtained:', {
+            blockhash: freshBlockhash.blockhash.substring(0, 20) + '...',
+            lastValidBlockHeight: freshBlockhash.lastValidBlockHeight,
+            timestamp: new Date().toISOString()
+          });
+          
+          console.log('Step 1: Signing transaction with Phantom (user approval)...');
+          
+          // Sign with Phantom (user approves in wallet)
+          const signedTransaction = await ph.signTransaction(transaction);
+          
+          console.log('✅ Transaction signed by Phantom');
+          console.log('Signed transaction has', signedTransaction.signatures.length, 'signature(s)');
+          
+          // Serialize immediately after signing
+          const serializedTransaction = signedTransaction.serialize();
+          console.log('Transaction serialized, size:', serializedTransaction.length, 'bytes');
+          
+          // Step 2: Send IMMEDIATELY after signing (don't wait - blockhash could expire)
+          console.log('Step 2: Broadcasting signed transaction to Solana network via backend proxy...');
+          signature = await sendRawTransactionViaProxy(serializedTransaction);
+          
+          console.log('✅ Transaction broadcast to network, signature:', signature);
+          
+        } catch (phantomError: any) {
+          console.error('Phantom signAndSendTransaction error:', phantomError);
+          // Check for specific Phantom errors
+          if (phantomError?.code === 4001 || phantomError?.message?.includes('User rejected')) {
+            throw new Error('Transaction was rejected by user');
+          }
+          if (phantomError?.message?.includes('insufficient funds') || phantomError?.message?.includes('Insufficient')) {
+            throw new Error('Insufficient balance to complete transaction');
+          }
+          throw new Error(`Phantom transaction failed: ${phantomError?.message || 'Unknown error'}`);
+        }
         
+        console.log('Transaction sent via Phantom, signature:', signature);
+        console.log('Per Phantom docs, signAndSendTransaction should handle confirmation internally');
+        console.log('Verifying transaction exists on-chain...');
+        
+        // Per Phantom docs, signAndSendTransaction should wait for confirmation
+        // But we'll verify it exists on-chain to ensure it actually executed
         // Wait a moment for transaction to propagate
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
         
         // Check if transaction exists and succeeded
-        // Note: If verification fails with 403, it's an RPC access issue, not a transaction failure
         let initialCheck = await verifyTransaction(signature);
         
-        // If we got a 403, it's an RPC issue, not a transaction failure
-        if (initialCheck.error && initialCheck.error.includes('403') || initialCheck.error?.includes('RPC access blocked')) {
-          console.warn('⚠️ Cannot verify transaction due to RPC access (403) - assuming Phantom sent it successfully');
-          // Trust Phantom's signAndSendTransaction - if it returned a signature, it was sent
-          // Continue with polling but don't fail immediately
-        } else if (initialCheck.error && !initialCheck.error.includes('not found')) {
-          // Transaction exists but has an error - it failed on-chain
+        console.log('Initial verification result:', initialCheck);
+        
+        // If transaction doesn't exist, it may still be processing or failed
+        if (initialCheck.error && initialCheck.error.includes('not found')) {
+          console.log('Transaction not found yet, waiting longer...');
+          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 more seconds
+          
+          const retryCheck = await verifyTransaction(signature);
+          if (retryCheck.error && retryCheck.error.includes('not found')) {
+            // Transaction still not found after 7 seconds total - it likely failed
+            throw new Error('Transaction was not found on-chain after multiple attempts. The transaction may have failed during Phantom\'s processing. Please check your wallet balance and try again.');
+          }
+          initialCheck = retryCheck;
+        }
+        
+        // If transaction exists but has an error, it failed on-chain
+        if (initialCheck.error && !initialCheck.error.includes('not found') && !initialCheck.error.includes('403')) {
           throw new Error(`Transaction failed on-chain: ${initialCheck.error}`);
+        }
+        
+        // If we got 403, we can't verify - but Phantom said it sent it
+        if (initialCheck.error && (initialCheck.error.includes('403') || initialCheck.error.includes('RPC access blocked'))) {
+          console.warn('⚠️ Cannot verify due to RPC access (403) - Phantom said transaction was sent, continuing...');
         } else if (initialCheck.success && initialCheck.confirmed) {
           console.log('✅ Transaction verified on-chain immediately!');
         } else {
@@ -200,13 +266,40 @@ export const useEscrow = (): UseEscrowReturn => {
         }
         
         if (!confirmed) {
-          // Transaction was not confirmed - check if it actually exists on-chain
+          // Transaction was not confirmed after polling - check one final time
+          console.log('⚠️ Transaction not confirmed after polling, doing final verification...');
           const finalCheck = await verifyTransaction(signature);
-          if (!finalCheck.success || !finalCheck.confirmed) {
-            throw new Error(`Transaction failed or was not processed: ${finalCheck.error || 'Transaction not found on-chain'}`);
+          
+          console.log('Final verification result:', finalCheck);
+          
+          // CRITICAL: If transaction is not found on-chain, it was NEVER sent
+          // Even if Phantom returned a signature, if the transaction doesn't exist on-chain,
+          // it means Phantom signed it but failed to broadcast it
+          if (finalCheck.error && finalCheck.error.includes('not found')) {
+            throw new Error('Transaction was not found on-chain. Phantom returned a signature, but the transaction was never broadcast to the network. This may indicate a network issue or insufficient balance. Please check your wallet and try again.');
           }
-          // If it exists and succeeded, continue
-          console.log('✅ Transaction confirmed after timeout');
+          
+          // If transaction exists but has an error, it failed on-chain
+          if (finalCheck.error && !finalCheck.error.includes('403') && !finalCheck.error.includes('RPC access blocked')) {
+            throw new Error(`Transaction failed on-chain: ${finalCheck.error}`);
+          }
+          
+          // If we can't verify due to RPC access issues (403), we have a problem
+          // We can't trust Phantom's signature alone - we need on-chain confirmation
+          if (finalCheck.error && (finalCheck.error.includes('403') || finalCheck.error.includes('RPC access blocked'))) {
+            console.error('❌ Cannot verify transaction due to RPC access issues (403)');
+            console.error('❌ This is a critical problem - we cannot confirm the transaction was sent');
+            throw new Error('Unable to verify transaction on-chain due to RPC access issues. The transaction may not have been sent. Please try again or check your wallet balance.');
+          }
+          
+          // If we still don't have confirmation, fail
+          if (!finalCheck.confirmed || !finalCheck.success) {
+            throw new Error('Transaction could not be confirmed on-chain. The transaction may not have been sent or may have failed. Please check your wallet and try again.');
+          }
+          
+          // Transaction verified - proceed
+          console.log('✅ Transaction verified in final check');
+          confirmed = true;
         }
         
       } catch (error: any) {
@@ -224,16 +317,59 @@ export const useEscrow = (): UseEscrowReturn => {
         throw error;
       }
       
-      // Transaction was successfully sent and confirmed
-      console.log('Transaction successfully sent and confirmed on blockchain:', signature);
+      // Transaction was successfully sent via Phantom, signature:', signature);
+      console.log('Transaction sent via Phantom, signature:', signature);
       
-      // Double-check that transaction actually succeeded before proceeding
-      const finalVerification = await verifyTransaction(signature);
-      if (!finalVerification.success) {
-        throw new Error(`Transaction verification failed: ${finalVerification.error || 'Transaction did not succeed on-chain'}`);
+      // CRITICAL: We MUST verify the transaction actually exists on-chain before creating escrow
+      // Don't trust Phantom's signature alone - verify it actually executed
+      console.log('Verifying transaction exists on-chain before creating escrow...');
+      
+      // Wait longer for transaction to be included in a block
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+      
+      // Try multiple times to verify
+      let verified = false;
+      let verificationAttempts = 0;
+      const maxVerificationAttempts = 10;
+      
+      while (!verified && verificationAttempts < maxVerificationAttempts) {
+        verificationAttempts++;
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds between attempts
+        
+        try {
+          const finalVerification = await verifyTransaction(signature);
+          
+          if (finalVerification.success && finalVerification.confirmed) {
+            verified = true;
+            console.log('✅ Transaction verified on-chain - transaction exists and succeeded!');
+            break;
+          } else if (finalVerification.error && !finalVerification.error.includes('not found') && !finalVerification.error.includes('403')) {
+            // Transaction exists but has an error - it failed
+            throw new Error(`Transaction failed on-chain: ${finalVerification.error}`);
+          } else if (finalVerification.error && finalVerification.error.includes('not found')) {
+            // Transaction not found yet, continue trying
+            console.log(`Transaction not found yet (attempt ${verificationAttempts}/${maxVerificationAttempts}), waiting...`);
+          } else if (finalVerification.error && finalVerification.error.includes('403')) {
+            // RPC access blocked - can't verify, but this is a problem
+            console.warn(`⚠️ RPC access blocked (attempt ${verificationAttempts}/${maxVerificationAttempts})`);
+            // Continue trying
+          }
+        } catch (verifyError: any) {
+          // If it's not a 403, it's a real error
+          if (!verifyError?.message?.includes('403') && !verifyError?.message?.includes('RPC access')) {
+            throw verifyError;
+          }
+          console.warn(`⚠️ Verification error (attempt ${verificationAttempts}/${maxVerificationAttempts}):`, verifyError.message);
+        }
+      }
+      
+      if (!verified) {
+        // We couldn't verify the transaction - don't create escrow
+        throw new Error('Transaction could not be verified on-chain. The transaction may not have been processed. Please check your wallet and try again.');
       }
 
-      // Store escrow in database
+      // Transaction verified - safe to create escrow
+      console.log('✅ Transaction verified - proceeding to create escrow record');
       const escrow = await db.createEscrow({
         project_id: projectId,
         client_wallet: solAddress,

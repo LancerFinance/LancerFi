@@ -141,6 +141,8 @@ export async function sendRawTransactionViaProxy(serializedTransaction: Uint8Arr
   const API_BASE_URL = import.meta.env.VITE_API_URL || 
     (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
   
+  console.log('🔍 Backend URL:', API_BASE_URL);
+  
   try {
     // Convert Uint8Array to base64 for transmission
     // Use btoa for browser compatibility (Buffer is Node.js only)
@@ -154,7 +156,8 @@ export async function sendRawTransactionViaProxy(serializedTransaction: Uint8Arr
       base64Transaction = btoa(binary);
     }
     
-    console.log('Sending transaction to backend proxy, size:', serializedTransaction.length, 'bytes');
+    console.log('Sending transaction to backend proxy:', API_BASE_URL);
+    console.log('Transaction size:', serializedTransaction.length, 'bytes');
     
     const response = await fetch(`${API_BASE_URL}/api/rpc/send-transaction`, {
       method: 'POST',
@@ -378,13 +381,22 @@ export async function createAndFundEscrow(
       console.warn('Account verification via proxy failed, but continuing:', error);
     }
     
-    transaction.add(
-      SystemProgram.transfer({
-        fromPubkey: clientWallet,
-        toPubkey: escrowAccount,
-        lamports: totalLamports,
-      })
-    );
+    // Add SOL transfer instruction
+    const transferInstruction = SystemProgram.transfer({
+      fromPubkey: clientWallet,
+      toPubkey: escrowAccount,
+      lamports: totalLamports,
+    });
+    
+    console.log('Transfer instruction created:', {
+      from: clientWallet.toString(),
+      to: escrowAccount.toString(),
+      lamports: totalLamports,
+      programId: transferInstruction.programId.toString(),
+      keys: transferInstruction.keys.length
+    });
+    
+    transaction.add(transferInstruction);
   } else {
     // USDC or other token transfers
     const tokenMint = USDC_MINT;

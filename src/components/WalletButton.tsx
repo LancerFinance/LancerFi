@@ -1,8 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Wallet, LogOut } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { useWallet } from "@/hooks/useWallet";
-import { SOLANA_NETWORK } from "@/lib/solana";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,16 +15,10 @@ interface WalletButtonProps {
 
 const WalletButton = ({ variant = "default", className }: WalletButtonProps) => {
   const { isConnected, isConnecting, address, connectWallet, disconnectWallet, formatAddress } = useWallet();
-  const isMainnet = SOLANA_NETWORK === 'mainnet-beta';
 
   if (isConnected && address) {
     return (
       <div className="flex items-center gap-2">
-        {isMainnet && (
-          <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">
-            Mainnet
-          </Badge>
-        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant={variant} className={className}>
@@ -47,11 +39,6 @@ const WalletButton = ({ variant = "default", className }: WalletButtonProps) => 
 
   return (
     <div className="flex items-center gap-2">
-      {isMainnet && (
-        <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">
-          Mainnet
-        </Badge>
-      )}
       <Button 
         variant={variant} 
         className={className}
