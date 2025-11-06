@@ -23,9 +23,11 @@ const RPC_ENDPOINTS = MAINNET_RPC_ENDPOINTS.length > 0
 
 const RPC_ENDPOINT = RPC_ENDPOINTS[0];
 
-console.log(`🚀 PRODUCTION MODE: Using MAINNET-BETA ONLY`);
+console.log(`🚀🚀🚀 VERSION 2.0 - PRODUCTION MODE: Using MAINNET-BETA ONLY 🚀🚀🚀`);
 console.log(`🚀 RPC Endpoints:`, RPC_ENDPOINTS);
 console.log(`🚀 Primary Endpoint:`, RPC_ENDPOINT);
+console.log(`🚀 BUILD TIMESTAMP: ${new Date().toISOString()}`);
+console.log(`🚀 IF YOU SEE DEVNET IN LOGS, VERCEL IS SERVING OLD CODE`);
 
 // Create connection to mainnet
 const connection = new Connection(RPC_ENDPOINT, {
