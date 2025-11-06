@@ -387,17 +387,28 @@ const Messages = () => {
                   </div>
                   
                   <div className="flex gap-2">
-                    <MessageDialog
-                      recipientId={selectedMessage.sender_id === address 
-                        ? selectedMessage.recipient_id 
-                        : selectedMessage.sender_id}
-                      recipientName={selectedMessage.sender_id === address 
-                        ? selectedMessage.recipient_name || 'User'
-                        : selectedMessage.sender_name || 'User'}
-                      projectTitle={selectedMessage.subject ? `Re: ${selectedMessage.subject}` : undefined}
-                      triggerVariant="default"
-                      triggerClassName="flex-1"
-                    />
+                    {selectedMessage.sender_id === 'system@lancerfi.app' ? (
+                      <Button 
+                        variant="default" 
+                        className="flex-1" 
+                        disabled
+                      >
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        Send Message
+                      </Button>
+                    ) : (
+                      <MessageDialog
+                        recipientId={selectedMessage.sender_id === address 
+                          ? selectedMessage.recipient_id 
+                          : selectedMessage.sender_id}
+                        recipientName={selectedMessage.sender_id === address 
+                          ? selectedMessage.recipient_name || 'User'
+                          : selectedMessage.sender_name || 'User'}
+                        projectTitle={selectedMessage.subject ? `Re: ${selectedMessage.subject}` : undefined}
+                        triggerVariant="default"
+                        triggerClassName="flex-1"
+                      />
+                    )}
                     <Button variant="outline" onClick={() => setSelectedMessage(null)}>
                       Close
                     </Button>
