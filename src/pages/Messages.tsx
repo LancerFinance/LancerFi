@@ -282,7 +282,11 @@ const Messages = () => {
                         key={message.id} 
                         className={`cursor-pointer transition-colors hover:bg-muted/50 ${
                           selectedMessage?.id === message.id ? 'border-web3-primary' : ''
-                        } ${isReceived && !message.is_read ? 'border-l-4 border-l-web3-primary bg-web3-primary/5' : ''}`}
+                        } ${
+                          isReceived && !message.is_read 
+                            ? 'border-l-4 border-l-web3-primary bg-background' 
+                            : 'bg-muted/30'
+                        }`}
                         onClick={() => {
                           setSelectedMessage(message);
                           if (isReceived && !message.is_read) {
