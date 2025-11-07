@@ -455,9 +455,8 @@ const ProjectDetails = () => {
       await loadWorkSubmissions();
       setShowKickOffDialog(false);
       
-      // Navigate to proposals page to refresh and see updated list
-      // This ensures any remaining proposals from kicked-off freelancer are filtered out
-      navigate(`/project/${id}/proposals`);
+      // Navigate back to project details page
+      navigate(`/project/${id}`);
     } catch (error) {
       console.error('Error kicking off freelancer:', error);
       toast({
