@@ -261,8 +261,8 @@ const Messages = () => {
                   <Button
                     onClick={markAllAsRead}
                     disabled={markingAllAsRead}
-                    className="w-full"
-                    variant="default"
+                    className="w-full bg-white text-black border border-gray-300 hover:bg-gray-50"
+                    variant="outline"
                   >
                     {markingAllAsRead ? (
                       <>
@@ -400,7 +400,7 @@ const Messages = () => {
                                     {isReceived ? 'From' : 'To'}
                                   </Badge>
                                   {isReceived && !message.is_read && (
-                                    <Badge className="text-xs bg-destructive text-destructive-foreground">
+                                    <Badge className="text-xs bg-black text-white">
                                       New
                                     </Badge>
                                   )}
