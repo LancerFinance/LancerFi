@@ -930,64 +930,73 @@ const ProjectDetails = () => {
                        </AlertDialog>
                      )}
 
-                     {/* Client: Kick Off Freelancer Button */}
-                     {project.status === 'in_progress' && isProjectOwner && project.freelancer_id && (() => {
-                       const hasRevisionRequested = workSubmissions.some(
-                         sub => sub.status === 'revision_requested'
-                       );
-                       const hasApprovedWork = workSubmissions.some(
-                         sub => sub.status === 'approved'
-                       );
-                       
-                       // Don't show if work is approved
-                       if (hasApprovedWork) {
-                         return null;
-                       }
-                       
-                       return (
-                         <AlertDialog open={showKickOffDialog} onOpenChange={setShowKickOffDialog}>
-                           <AlertDialogTrigger asChild>
-                             <Button 
-                               variant="outline" 
-                               size="sm" 
-                               className="w-full"
-                               disabled={hasRevisionRequested || kickingOffFreelancer}
-                             >
-                               <User className="w-4 h-4 mr-2" />
-                               Kick Off Freelancer
-                             </Button>
-                           </AlertDialogTrigger>
-                           <AlertDialogContent>
-                             <AlertDialogHeader>
-                               <AlertDialogTitle>Kick Off Freelancer</AlertDialogTitle>
-                               <AlertDialogDescription>
-                                 Are you sure you want to remove the current freelancer from this project? This will:
-                                 <ul className="list-disc list-inside mt-2 space-y-1">
-                                   <li>Remove the freelancer from the project</li>
-                                   <li>Set the project status back to "Active"</li>
-                                   <li>Make the project available for other freelancers to apply</li>
-                                   <li>Send a notification to the removed freelancer</li>
-                                 </ul>
-                                 This action cannot be undone.
-                               </AlertDialogDescription>
-                             </AlertDialogHeader>
-                             <AlertDialogFooter>
-                               <AlertDialogCancel disabled={kickingOffFreelancer}>Cancel</AlertDialogCancel>
-                               <AlertDialogAction
-                                 onClick={handleKickOffFreelancer}
-                                 disabled={kickingOffFreelancer}
-                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                               >
-                                 {kickingOffFreelancer ? (
-                                   <>
-                                     <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
-                                     Removing...
-                                   </>
-                                 ) : (
-                                   "Kick Off Freelancer"
-                                 )}
-                               </AlertDialogAction>
-                             </AlertDialogFooter>
+          {/* Client: Kick Off Freelancer Button */}
+          {project.status === 'in_progress' && isProjectOwner && project.freelancer_id && (() => {
+            const hasRevisionRequested = workSubmissions.some(
+              sub => sub.status === 'revision_requested'
+            );
+            const hasApprovedWork = workSubmissions.some(
+              sub => sub.status === 'approved'
+            );
+            const hasAnyWorkSubmission = workSubmissions.length > 0;
+            
+            // Don't show if work is approved
+            if (hasApprovedWork) {
+              return null;
+            }
+            
+            return (
+              <AlertDialog open={showKickOffDialog} onOpenChange={setShowKickOffDialog}>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    disabled={hasRevisionRequested || kickingOffFreelancer || hasAnyWorkSubmission}
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    Kick Off Freelancer
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Kick Off Freelancer</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {hasAnyWorkSubmission ? (
+                        <span className="text-destructive font-medium">
+                          Cannot remove freelancer: There are work submissions that need to be reviewed first. Please approve, request revision, or reject all work submissions before removing the freelancer.
+                        </span>
+                      ) : (
+                        <>
+                          Are you sure you want to remove the current freelancer from this project? This will:
+                          <ul className="list-disc list-inside mt-2 space-y-1">
+                            <li>Remove the freelancer from the project</li>
+                            <li>Set the project status back to "Active"</li>
+                            <li>Make the project available for other freelancers to apply</li>
+                            <li>Send a notification to the removed freelancer</li>
+                          </ul>
+                          This action cannot be undone.
+                        </>
+                      )}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={kickingOffFreelancer || hasAnyWorkSubmission}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleKickOffFreelancer}
+                      disabled={kickingOffFreelancer || hasAnyWorkSubmission}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {kickingOffFreelancer ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
+                          Removing...
+                        </>
+                      ) : (
+                        "Kick Off Freelancer"
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
                            </AlertDialogContent>
                          </AlertDialog>
                        );
