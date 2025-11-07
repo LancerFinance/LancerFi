@@ -59,6 +59,8 @@ const ProjectDetails = () => {
   const [solPrice, setSolPrice] = useState<number | null>(null);
   const [workSubmissions, setWorkSubmissions] = useState<WorkSubmission[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [kickingOffFreelancer, setKickingOffFreelancer] = useState(false);
+  const [showKickOffDialog, setShowKickOffDialog] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -206,16 +208,11 @@ const ProjectDetails = () => {
   const handleCompleteProject = async () => {
     if (!project || !id) return;
     
-    // Security: Verify user is authorized (project owner or freelancer when work is approved)
-    const hasApprovedWork = workSubmissions.some(sub => sub.status === 'approved');
-    const canComplete = isProjectOwner || (isAssignedFreelancer && hasApprovedWork);
-    
-    if (!canComplete) {
+    // Security: Verify user is authorized (project owner)
+    if (!isProjectOwner) {
       toast({
         title: "Unauthorized",
-        description: isAssignedFreelancer 
-          ? "Work must be approved before you can collect payment"
-          : "Only the project owner can complete this project",
+        description: "Only the project owner can complete this project",
         variant: "destructive"
       });
       return;
@@ -319,6 +316,77 @@ const ProjectDetails = () => {
     }
   };
 
+  const handleKickOffFreelancer = async () => {
+    if (!project || !id) return;
+    
+    // Security: Verify user is authorized (project owner)
+    if (!isProjectOwner) {
+      toast({
+        title: "Unauthorized",
+        description: "Only the project owner can kick off a freelancer",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if freelancer is currently revising work
+    const hasRevisionRequested = workSubmissions.some(
+      sub => sub.status === 'revision_requested'
+    );
+
+    if (hasRevisionRequested) {
+      toast({
+        title: "Cannot Kick Off Freelancer",
+        description: "The freelancer is currently working on revisions. Please wait for them to submit the revised work before removing them.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setKickingOffFreelancer(true);
+    try {
+      // Update project to remove freelancer and set status back to active
+      await db.updateProject(id, {
+        freelancer_id: null,
+        status: 'active',
+        started_at: null
+      });
+
+      // Send notification to freelancer
+      if (freelancer?.wallet_address) {
+        try {
+          await db.createMessage({
+            sender_id: address!,
+            recipient_id: freelancer.wallet_address,
+            subject: `Removed from "${project.title}"`,
+            content: `You have been removed from the project "${project.title}". The project is now open for other freelancers to apply.`
+          });
+        } catch (notificationError) {
+          console.error('Error sending notification:', notificationError);
+          // Don't fail the kick-off if notification fails
+        }
+      }
+
+      toast({
+        title: 'Freelancer Removed',
+        description: 'The freelancer has been removed and the project is now active and open for new applications.',
+      });
+
+      // Reload project details
+      await loadProjectDetails();
+      await loadWorkSubmissions();
+      setShowKickOffDialog(false);
+    } catch (error) {
+      console.error('Error kicking off freelancer:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to remove freelancer",
+        variant: "destructive"
+      });
+    } finally {
+      setKickingOffFreelancer(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -702,61 +770,12 @@ const ProjectDetails = () => {
                        />
                      )}
 
-                     {/* Freelancer: Submit Work or Collect Payment Button */}
+                     {/* Freelancer: Submit Work Button */}
                      {project.status === 'in_progress' && isAssignedFreelancer && freelancer?.id && (() => {
-                       const hasApprovedWork = workSubmissions.some(sub => sub.status === 'approved');
+                       // Check if there's a pending or approved submission
                        const hasActiveSubmission = workSubmissions.some(
                          sub => sub.status === 'pending' || sub.status === 'approved'
                        );
-                       
-                       // Show "Collect Payment" if work is approved, otherwise show "Submit Work"
-                       if (hasApprovedWork) {
-                         return (
-                           <AlertDialog>
-                             <AlertDialogTrigger asChild>
-                               <Button 
-                                 variant="default" 
-                                 size="sm" 
-                                 className="w-full"
-                                 disabled={completing || escrowLoading}
-                               >
-                                 <CheckCircle className="w-4 h-4 mr-2" />
-                                 Collect Payment
-                               </Button>
-                             </AlertDialogTrigger>
-                             <AlertDialogContent>
-                               <AlertDialogHeader>
-                                 <AlertDialogTitle>Collect Payment</AlertDialogTitle>
-                                 <AlertDialogDescription>
-                                   Your work has been approved! Collecting payment will:
-                                   <ul className="list-disc list-inside mt-2 space-y-1">
-                                     <li>Release the escrow funds to your wallet</li>
-                                     <li>Mark the project as completed</li>
-                                     <li>Update your earnings and project count</li>
-                                   </ul>
-                                   This action cannot be undone.
-                                 </AlertDialogDescription>
-                               </AlertDialogHeader>
-                               <AlertDialogFooter>
-                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                 <AlertDialogAction
-                                   onClick={handleCompleteProject}
-                                   disabled={completing || escrowLoading}
-                                 >
-                                   {(completing || escrowLoading) ? (
-                                     <>
-                                       <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
-                                       Processing Payment...
-                                     </>
-                                   ) : (
-                                     "Collect Payment"
-                                   )}
-                                 </AlertDialogAction>
-                               </AlertDialogFooter>
-                             </AlertDialogContent>
-                           </AlertDialog>
-                         );
-                       }
                        
                        return (
                          <SubmitWorkDialog
@@ -823,6 +842,64 @@ const ProjectDetails = () => {
                          )}
                        </>
                      )}
+
+                     {/* Client: Kick Off Freelancer Button */}
+                     {project.status === 'in_progress' && isProjectOwner && project.freelancer_id && (() => {
+                       const hasRevisionRequested = workSubmissions.some(
+                         sub => sub.status === 'revision_requested'
+                       );
+                       
+                       return (
+                         <AlertDialog open={showKickOffDialog} onOpenChange={setShowKickOffDialog}>
+                           <AlertDialogTrigger asChild>
+                             <Button 
+                               variant="outline" 
+                               size="sm" 
+                               className="w-full"
+                               disabled={hasRevisionRequested || kickingOffFreelancer}
+                             >
+                               <User className="w-4 h-4 mr-2" />
+                               Kick Off Freelancer
+                             </Button>
+                           </AlertDialogTrigger>
+                           <AlertDialogContent>
+                             <AlertDialogHeader>
+                               <AlertDialogTitle>Kick Off Freelancer</AlertDialogTitle>
+                               <AlertDialogDescription>
+                                 Are you sure you want to remove the current freelancer from this project? This will:
+                                 <ul className="list-disc list-inside mt-2 space-y-1">
+                                   <li>Remove the freelancer from the project</li>
+                                   <li>Set the project status back to "Active"</li>
+                                   <li>Make the project available for other freelancers to apply</li>
+                                   <li>Send a notification to the removed freelancer</li>
+                                 </ul>
+                                 <strong className="text-destructive mt-2 block">
+                                   Note: The escrow funds will remain locked. You can create a new escrow when you hire a new freelancer.
+                                 </strong>
+                                 This action cannot be undone.
+                               </AlertDialogDescription>
+                             </AlertDialogHeader>
+                             <AlertDialogFooter>
+                               <AlertDialogCancel disabled={kickingOffFreelancer}>Cancel</AlertDialogCancel>
+                               <AlertDialogAction
+                                 onClick={handleKickOffFreelancer}
+                                 disabled={kickingOffFreelancer}
+                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                               >
+                                 {kickingOffFreelancer ? (
+                                   <>
+                                     <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
+                                     Removing...
+                                   </>
+                                 ) : (
+                                   "Kick Off Freelancer"
+                                 )}
+                               </AlertDialogAction>
+                             </AlertDialogFooter>
+                           </AlertDialogContent>
+                         </AlertDialog>
+                       );
+                     })()}
                       {project.status === 'active' && isProjectOwner && !project.freelancer_id && (
                         <Link to={`/project/${project.id}/edit`} className="block">
                           <Button variant="outline" size="sm" className="w-full">
