@@ -117,6 +117,24 @@ const Messages = () => {
     }
   };
 
+  const filteredMessages = messages.filter(message => {
+    const matchesSearch = searchTerm === '' || 
+      message.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      message.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      message.sender_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      message.recipient_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesFilter = filter === 'all' || 
+      (filter === 'received' && message.recipient_id === address) ||
+      (filter === 'sent' && message.sender_id === address);
+    
+    return matchesSearch && matchesFilter;
+  });
+
+  const receivedMessages = messages.filter(msg => msg.recipient_id === address);
+  const sentMessages = messages.filter(msg => msg.sender_id === address);
+  const unreadCount = receivedMessages.filter(msg => !msg.is_read).length;
+
   const markAllAsRead = async () => {
     if (!address) return;
     
@@ -176,24 +194,6 @@ const Messages = () => {
       setMarkingAllAsRead(false);
     }
   };
-
-  const filteredMessages = messages.filter(message => {
-    const matchesSearch = searchTerm === '' || 
-      message.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      message.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      message.sender_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      message.recipient_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = filter === 'all' || 
-      (filter === 'received' && message.recipient_id === address) ||
-      (filter === 'sent' && message.sender_id === address);
-    
-    return matchesSearch && matchesFilter;
-  });
-
-  const receivedMessages = messages.filter(msg => msg.recipient_id === address);
-  const sentMessages = messages.filter(msg => msg.sender_id === address);
-  const unreadCount = receivedMessages.filter(msg => !msg.is_read).length;
 
   if (!isConnected) {
     return (
