@@ -346,12 +346,14 @@ const ProjectDetails = () => {
     setKickingOffFreelancer(true);
     try {
       // Delete all proposals from this freelancer for this project to prevent duplicate notifications
+      // Do this BEFORE updating the project status to ensure proposals are deleted
       if (freelancer?.id) {
         try {
-          await db.deleteProposalsByFreelancer(id, freelancer.id);
+          const deletedProposals = await db.deleteProposalsByFreelancer(id, freelancer.id);
+          console.log(`Successfully deleted ${deletedProposals?.length || 0} proposal(s) for kicked-off freelancer ${freelancer.id}`);
         } catch (proposalError) {
           console.error('Error deleting proposals:', proposalError);
-          // Don't fail the kick-off if proposal deletion fails
+          // Don't fail the kick-off if proposal deletion fails, but log it
         }
       }
 
@@ -386,6 +388,10 @@ const ProjectDetails = () => {
       await loadProjectDetails();
       await loadWorkSubmissions();
       setShowKickOffDialog(false);
+      
+      // Navigate to proposals page to refresh and see updated list
+      // This ensures any remaining proposals from kicked-off freelancer are filtered out
+      navigate(`/project/${id}/proposals`);
     } catch (error) {
       console.error('Error kicking off freelancer:', error);
       toast({

@@ -458,16 +458,20 @@ export const db = {
   },
 
   async deleteProposalsByFreelancer(projectId: string, freelancerId: string) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('proposals')
       .delete()
       .eq('project_id', projectId)
-      .eq('freelancer_id', freelancerId);
+      .eq('freelancer_id', freelancerId)
+      .select();
     
     if (error) {
       console.error('Error deleting proposals:', error);
       throw error;
     }
+    
+    console.log(`Deleted ${data?.length || 0} proposal(s) for freelancer ${freelancerId} on project ${projectId}`);
+    return data;
   },
 
   async deleteProposal(proposalId: string) {
