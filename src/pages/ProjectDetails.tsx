@@ -938,7 +938,11 @@ const ProjectDetails = () => {
             const hasApprovedWork = workSubmissions.some(
               sub => sub.status === 'approved'
             );
-            const hasAnyWorkSubmission = workSubmissions.length > 0;
+            // Only disable if there are work submissions that are NOT rejected
+            // Allow kicking off if all work submissions are rejected
+            const hasActiveWorkSubmissions = workSubmissions.some(
+              sub => sub.status !== 'rejected'
+            );
             
             // Don't show if work is approved
             if (hasApprovedWork) {
@@ -952,7 +956,7 @@ const ProjectDetails = () => {
                     variant="outline" 
                     size="sm" 
                     className="w-full"
-                    disabled={hasRevisionRequested || kickingOffFreelancer || hasAnyWorkSubmission}
+                    disabled={hasRevisionRequested || kickingOffFreelancer || hasActiveWorkSubmissions}
                   >
                     <User className="w-4 h-4 mr-2" />
                     Kick Off Freelancer
@@ -962,7 +966,7 @@ const ProjectDetails = () => {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Kick Off Freelancer</AlertDialogTitle>
                     <AlertDialogDescription>
-                      {hasAnyWorkSubmission ? (
+                      {hasActiveWorkSubmissions ? (
                         <span className="text-destructive font-medium">
                           Cannot remove freelancer: There are work submissions that need to be reviewed first. Please approve, request revision, or reject all work submissions before removing the freelancer.
                         </span>
@@ -981,10 +985,10 @@ const ProjectDetails = () => {
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel disabled={kickingOffFreelancer || hasAnyWorkSubmission}>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel disabled={kickingOffFreelancer || hasActiveWorkSubmissions}>Cancel</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleKickOffFreelancer}
-                      disabled={kickingOffFreelancer || hasAnyWorkSubmission}
+                      disabled={kickingOffFreelancer || hasActiveWorkSubmissions}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
                       {kickingOffFreelancer ? (
@@ -997,10 +1001,10 @@ const ProjectDetails = () => {
                       )}
                     </AlertDialogAction>
                   </AlertDialogFooter>
-                           </AlertDialogContent>
-                         </AlertDialog>
-                       );
-                     })()}
+                </AlertDialogContent>
+              </AlertDialog>
+            );
+          })()}
                       {project.status === 'active' && isProjectOwner && !project.freelancer_id && (
                         <Link to={`/project/${project.id}/edit`} className="block">
                           <Button variant="outline" size="sm" className="w-full">
