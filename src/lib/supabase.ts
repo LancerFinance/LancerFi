@@ -652,12 +652,13 @@ export const db = {
   },
 
   // Get count of new proposals for a client (proposals on their active projects)
+  // Excludes old proposals from kicked-off freelancers
   async getNewProposalsCount(clientWallet: string): Promise<number> {
     try {
       // Get all active projects for this client (where no freelancer has been assigned)
       const { data: projects, error: projectsError } = await supabase
         .from('projects')
-        .select('id')
+        .select('id, started_at')
         .eq('client_id', clientWallet)
         .eq('status', 'active')
         .is('freelancer_id', null);
@@ -665,15 +666,78 @@ export const db = {
       if (projectsError) throw projectsError;
       if (!projects || projects.length === 0) return 0;
 
-      // Get count of proposals for these projects
-      const projectIds = projects.map(p => p.id);
-      const { count, error: proposalsError } = await supabase
-        .from('proposals')
-        .select('*', { count: 'exact', head: true })
-        .in('project_id', projectIds);
+      let totalValidProposals = 0;
+
+      // For each project, get proposals and filter out old ones
+      for (const project of projects) {
+        try {
+          const proposals = await this.getProposals(project.id);
+          
+          // If project has started_at, filter out proposals from previously assigned freelancers
+          if (project.started_at) {
+            try {
+              // Get all work submissions to find which freelancers were previously assigned
+              const workSubmissions = await this.getWorkSubmissions(project.id);
+              const freelancerIdsFromWork = new Set(
+                workSubmissions.map(sub => sub.freelancer_id).filter(Boolean)
+              );
+              
+              // Check escrow to find the previously assigned freelancer's wallet
+              let freelancerIdsFromEscrow = new Set<string>();
+              try {
+                const escrow = await this.getEscrow(project.id);
+                if (escrow && escrow.freelancer_wallet) {
+                  const freelancerProfile = await this.getProfileByWallet(escrow.freelancer_wallet);
+                  if (freelancerProfile?.id) {
+                    freelancerIdsFromEscrow.add(freelancerProfile.id);
+                  }
+                }
+              } catch (escrowError) {
+                // Ignore escrow errors
+              }
+              
+              // Combine both strategies
+              const previouslyAssignedFreelancerIds = new Set([
+                ...Array.from(freelancerIdsFromWork),
+                ...Array.from(freelancerIdsFromEscrow)
+              ]);
+              
+              // Filter out proposals from previously assigned freelancers
+              // Also filter out proposals created before started_at
+              const startedAtDate = new Date(project.started_at);
+              const validProposals = proposals.filter(proposal => {
+                if (!proposal.freelancer_id) return true;
+                
+                // Exclude if freelancer was previously assigned
+                if (previouslyAssignedFreelancerIds.has(proposal.freelancer_id)) {
+                  return false;
+                }
+                
+                // Exclude if proposal was created before project started
+                if (proposal.created_at && new Date(proposal.created_at) < startedAtDate) {
+                  return false;
+                }
+                
+                return true;
+              });
+              
+              totalValidProposals += validProposals.length;
+            } catch (filterError) {
+              // If filtering fails, count all proposals (fallback)
+              console.error('Error filtering proposals for count:', filterError);
+              totalValidProposals += proposals.length;
+            }
+          } else {
+            // Project never had a freelancer assigned, count all proposals
+            totalValidProposals += proposals.length;
+          }
+        } catch (error) {
+          // If error loading proposals for this project, skip it
+          console.error(`Error loading proposals for project ${project.id}:`, error);
+        }
+      }
       
-      if (proposalsError) throw proposalsError;
-      return count || 0;
+      return totalValidProposals;
     } catch (error) {
       console.error('Error getting new proposals count:', error);
       return 0;
