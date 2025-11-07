@@ -383,12 +383,16 @@ const ProjectDetails = () => {
       return;
     }
 
-    // Check if freelancer is currently revising work
+    // Check if freelancer is currently revising work (only if not all work is rejected)
     const hasRevisionRequested = workSubmissions.some(
       sub => sub.status === 'revision_requested'
     );
+    const allWorkRejected = workSubmissions.length > 0 && workSubmissions.every(
+      sub => sub.status === 'rejected'
+    );
 
-    if (hasRevisionRequested) {
+    // Only block if there's a revision requested AND not all work is rejected
+    if (hasRevisionRequested && !allWorkRejected) {
       toast({
         title: "Cannot Kick Off Freelancer",
         description: "The freelancer is currently working on revisions. Please wait for them to submit the revised work before removing them.",
@@ -932,9 +936,6 @@ const ProjectDetails = () => {
 
           {/* Client: Kick Off Freelancer Button */}
           {project.status === 'in_progress' && isProjectOwner && project.freelancer_id && (() => {
-            const hasRevisionRequested = workSubmissions.some(
-              sub => sub.status === 'revision_requested'
-            );
             const hasApprovedWork = workSubmissions.some(
               sub => sub.status === 'approved'
             );
@@ -943,6 +944,15 @@ const ProjectDetails = () => {
             const hasActiveWorkSubmissions = workSubmissions.some(
               sub => sub.status !== 'rejected'
             );
+            // Check if there's a revision requested, but only block if not all work is rejected
+            const hasRevisionRequested = workSubmissions.some(
+              sub => sub.status === 'revision_requested'
+            );
+            const allWorkRejected = workSubmissions.length > 0 && workSubmissions.every(
+              sub => sub.status === 'rejected'
+            );
+            // Only disable for revision requested if not all work is rejected
+            const shouldDisableForRevision = hasRevisionRequested && !allWorkRejected;
             
             // Don't show if work is approved
             if (hasApprovedWork) {
@@ -956,7 +966,7 @@ const ProjectDetails = () => {
                     variant="outline" 
                     size="sm" 
                     className="w-full"
-                    disabled={hasRevisionRequested || kickingOffFreelancer || hasActiveWorkSubmissions}
+                    disabled={shouldDisableForRevision || kickingOffFreelancer || hasActiveWorkSubmissions}
                   >
                     <User className="w-4 h-4 mr-2" />
                     Kick Off Freelancer
