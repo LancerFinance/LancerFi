@@ -17,7 +17,8 @@ import {
   MailOpen,
   Reply,
   Trash2,
-  ArrowLeft
+  ArrowLeft,
+  Loader2
 } from "lucide-react";
 import { db, Message } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +39,8 @@ const Messages = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMessage, setSelectedMessage] = useState<MessageWithSender | null>(null);
   const [filter, setFilter] = useState<'all' | 'received' | 'sent'>('all');
+  const [markingAllAsRead, setMarkingAllAsRead] = useState(false);
+  const [lastMarkAllTime, setLastMarkAllTime] = useState<number>(0);
 
   useEffect(() => {
     if (isConnected && address) {
@@ -111,6 +114,66 @@ const Messages = () => {
       window.dispatchEvent(new CustomEvent('messageRead'));
     } catch (error) {
       console.error('Error marking message as read:', error);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    if (!address) return;
+    
+    // Spam protection: prevent clicking too quickly (within 2 seconds)
+    const now = Date.now();
+    if (now - lastMarkAllTime < 2000) {
+      toast({
+        title: "Please wait",
+        description: "You're clicking too fast. Please wait a moment before marking all messages as read again.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Check if there are any unread messages
+    const unreadMessages = receivedMessages.filter(msg => !msg.is_read);
+    if (unreadMessages.length === 0) {
+      toast({
+        title: "No unread messages",
+        description: "All messages are already read.",
+        variant: "default"
+      });
+      return;
+    }
+    
+    setMarkingAllAsRead(true);
+    setLastMarkAllTime(now);
+    
+    try {
+      // Mark all unread messages as read
+      await Promise.all(
+        unreadMessages.map(msg => db.markMessageAsRead(msg.id, address!))
+      );
+      
+      // Update local state
+      setMessages(prev => prev.map(msg => 
+        msg.recipient_id === address && !msg.is_read 
+          ? { ...msg, is_read: true } 
+          : msg
+      ));
+      
+      // Force header to refresh unread count
+      window.dispatchEvent(new CustomEvent('messageRead'));
+      
+      toast({
+        title: "All messages marked as read",
+        description: `Marked ${unreadMessages.length} message${unreadMessages.length === 1 ? '' : 's'} as read.`,
+      });
+    } catch (error) {
+      console.error('Error marking all messages as read:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark all messages as read. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setMarkingAllAsRead(false);
     }
   };
 
@@ -192,6 +255,30 @@ const Messages = () => {
           <div className="grid lg:grid-cols-4 gap-6">
             {/* Sidebar */}
             <div className="lg:col-span-1">
+              {/* Read All Button */}
+              {unreadCount > 0 && (
+                <div className="mb-4">
+                  <Button
+                    onClick={markAllAsRead}
+                    disabled={markingAllAsRead}
+                    className="w-full"
+                    variant="default"
+                  >
+                    {markingAllAsRead ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Marking as read...
+                      </>
+                    ) : (
+                      <>
+                        <MailOpen className="w-4 h-4 mr-2" />
+                        Read All
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+              
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Filter Messages</CardTitle>
