@@ -345,23 +345,48 @@ const ProjectDetails = () => {
     
     setKickingOffFreelancer(true);
     try {
-      // Delete all proposals from this freelancer for this project to prevent duplicate notifications
+      // CRITICAL: Delete ALL proposals from this freelancer for this project
+      // This ensures they can NEVER see their old proposal again - they must submit a new one
       // Do this BEFORE updating the project status to ensure proposals are deleted
       if (freelancer?.id) {
         try {
           const deletedProposals = await db.deleteProposalsByFreelancer(id, freelancer.id);
-          console.log(`Successfully deleted ${deletedProposals?.length || 0} proposal(s) for kicked-off freelancer ${freelancer.id}`);
+          console.log(`✅ PERMANENTLY deleted ${deletedProposals?.length || 0} proposal(s) for kicked-off freelancer ${freelancer.id}`);
+          console.log(`✅ This freelancer will need to submit a BRAND NEW proposal if they want to apply again`);
+          
+          // Double-check: verify proposals are actually deleted (wait a moment for DB to sync)
+          await new Promise(resolve => setTimeout(resolve, 500));
+          try {
+            const remainingProposals = await db.getProposals(id);
+            const stillExists = remainingProposals.some(p => p.freelancer_id === freelancer.id);
+            if (stillExists) {
+              console.error(`⚠️ WARNING: Some proposals from freelancer ${freelancer.id} still exist after deletion! Retrying...`);
+              // Try to delete again
+              await db.deleteProposalsByFreelancer(id, freelancer.id);
+            } else {
+              console.log(`✅ Verified: All proposals from freelancer ${freelancer.id} have been deleted`);
+            }
+          } catch (verifyError) {
+            console.warn('Could not verify proposal deletion:', verifyError);
+            // Continue anyway - deletion was attempted
+          }
         } catch (proposalError) {
-          console.error('Error deleting proposals:', proposalError);
-          // Don't fail the kick-off if proposal deletion fails, but log it
+          console.error('❌ CRITICAL ERROR deleting proposals:', proposalError);
+          // Don't fail the kick-off if proposal deletion fails, but log it prominently
+          toast({
+            title: "Warning",
+            description: "Failed to delete proposals from removed freelancer. They may still appear in the proposals list.",
+            variant: "destructive"
+          });
         }
       }
 
       // Update project to remove freelancer and set status back to active
+      // NOTE: We keep started_at set so we know a freelancer was previously assigned
       await db.updateProject(id, {
         freelancer_id: null,
-        status: 'active',
-        started_at: null
+        status: 'active'
+        // DO NOT clear started_at - we need it to know a freelancer was previously assigned
       });
 
       // Send notification to freelancer

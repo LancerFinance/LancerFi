@@ -86,47 +86,52 @@ const ViewProposals = () => {
       // Load proposals for this project
       let proposalsData = await db.getProposals(id);
       
-      // Filter out proposals from freelancers who were previously assigned
+      // CRITICAL: If project has started_at but no freelancer_id, a freelancer was assigned and then removed
+      // In this case, we MUST filter out ALL proposals from any freelancer who was previously assigned
       // This prevents showing old proposals from kicked-off freelancers
-      // Only check if project is currently active (no freelancer assigned)
-      if (projectData.status === 'active' && !projectData.freelancer_id) {
+      if (projectData.status === 'active' && !projectData.freelancer_id && projectData.started_at) {
         try {
+          // Get all work submissions to find which freelancers were previously assigned
           const workSubmissions = await db.getWorkSubmissions(id);
-          const freelancerIdsWithWork = new Set(
+          const previouslyAssignedFreelancerIds = new Set(
             workSubmissions.map(sub => sub.freelancer_id).filter(Boolean)
           );
           
-          // If project has started_at, it means a freelancer was assigned at some point
-          // Filter out proposals from any freelancer who has work submissions
-          // OR if started_at exists, be more aggressive (filter all proposals from freelancers with work)
+          console.log(`Project was previously started (started_at: ${projectData.started_at}). Filtering out proposals from previously assigned freelancers:`, Array.from(previouslyAssignedFreelancerIds));
+          
+          // Filter out ALL proposals from freelancers who were previously assigned
           const validProposals = proposalsData.filter(
             proposal => {
               if (!proposal.freelancer_id) return true;
-              // If project was started (has started_at) and this freelancer has work submissions, filter them out
-              if (projectData.started_at && freelancerIdsWithWork.has(proposal.freelancer_id)) {
+              
+              // If this freelancer was previously assigned (has work submissions), NEVER show their proposal
+              if (previouslyAssignedFreelancerIds.has(proposal.freelancer_id)) {
+                console.log(`Filtering out proposal from previously assigned freelancer: ${proposal.freelancer_id}`);
                 return false;
               }
-              // Also filter if freelancer has work submissions (regardless of started_at)
-              if (freelancerIdsWithWork.has(proposal.freelancer_id)) {
-                return false;
-              }
+              
               return true;
             }
           );
           
-          // Also delete any proposals from freelancers with work submissions (cleanup)
+          // PERMANENTLY DELETE all proposals from previously assigned freelancers
           const proposalsToDelete = proposalsData.filter(
-            proposal => proposal.freelancer_id && freelancerIdsWithWork.has(proposal.freelancer_id)
+            proposal => proposal.freelancer_id && previouslyAssignedFreelancerIds.has(proposal.freelancer_id)
           );
           
-          // Delete proposals synchronously to ensure they're gone
+          // Delete proposals synchronously to ensure they're permanently removed
           if (proposalsToDelete.length > 0) {
+            console.log(`Deleting ${proposalsToDelete.length} proposal(s) from previously assigned freelancers...`);
             await Promise.all(
-              proposalsToDelete.map(p => db.deleteProposal(p.id).catch(err => {
-                console.error('Error deleting proposal:', err);
-                return null;
-              }))
+              proposalsToDelete.map(p => {
+                console.log(`Deleting proposal ${p.id} from freelancer ${p.freelancer_id}`);
+                return db.deleteProposal(p.id).catch(err => {
+                  console.error(`Error deleting proposal ${p.id}:`, err);
+                  return null;
+                });
+              })
             );
+            console.log(`Successfully deleted ${proposalsToDelete.length} proposal(s) from previously assigned freelancers`);
           }
           
           setProposals(validProposals);
@@ -135,8 +140,12 @@ const ViewProposals = () => {
           console.error('Error checking work submissions:', error);
           setProposals(proposalsData);
         }
+      } else if (projectData.status === 'active' && !projectData.freelancer_id) {
+        // Project is active but never had a freelancer assigned (no started_at)
+        // Show all proposals normally
+        setProposals(proposalsData);
       } else {
-        // If project has a freelancer assigned, show all proposals (normal case)
+        // Project has a freelancer assigned, show all proposals (normal case)
         setProposals(proposalsData);
       }
 
