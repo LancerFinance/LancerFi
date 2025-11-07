@@ -88,6 +88,16 @@ const WorkSubmissionReview = ({
       return;
     }
 
+    // Require review notes for revision requests
+    if (status === 'revision_requested' && !reviewNotes.trim()) {
+      toast({
+        title: "Review Notes Required",
+        description: "Please provide feedback in the review notes field before requesting a revision. This helps the freelancer understand what needs to be changed.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setReviewing(true);
 
     try {
@@ -343,14 +353,21 @@ const WorkSubmissionReview = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Request Revision</AlertDialogTitle>
             <AlertDialogDescription>
-              Request the freelancer to make revisions to their work. They will be notified with your review notes.
+              {reviewNotes.trim() ? (
+                <>Request the freelancer to make revisions to their work. They will be notified with your review notes.</>
+              ) : (
+                <span className="text-destructive font-medium">
+                  ⚠️ Warning: You haven't provided any review notes. Please add feedback in the review notes field above before requesting a revision. This helps the freelancer understand what needs to be changed.
+                </span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={reviewing}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => handleReview('revision_requested')}
-              disabled={reviewing}
+              disabled={reviewing || !reviewNotes.trim()}
+              className={!reviewNotes.trim() ? "opacity-50 cursor-not-allowed" : ""}
             >
               {reviewing ? (
                 <>
