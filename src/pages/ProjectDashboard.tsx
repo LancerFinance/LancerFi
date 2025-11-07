@@ -102,97 +102,131 @@ const ProjectDashboard = () => {
       }
       setWorkingProjects(freelancerProjects);
 
-      // Load escrows and proposal counts for all projects
+      // Load escrows and proposal counts for all projects in parallel
       const allProjects = [...(clientProjects || []), ...freelancerProjects];
       const escrowData: Record<string, Escrow> = {};
       const proposalCountData: Record<string, number> = {};
       
-      for (const project of allProjects) {
+      // Load all escrows in parallel
+      const escrowPromises = allProjects.map(async (project) => {
         try {
           const escrow = await db.getEscrow(project.id);
-          if (escrow) {
-            escrowData[project.id] = escrow;
+          return { projectId: project.id, escrow };
+        } catch (error) {
+          return { projectId: project.id, escrow: null };
+        }
+      });
+      
+      const escrowResults = await Promise.all(escrowPromises);
+      escrowResults.forEach(({ projectId, escrow }) => {
+        if (escrow) {
+          escrowData[projectId] = escrow;
+        }
+      });
+
+      // Load proposal counts for projects without freelancers (only for posted projects)
+      const projectsNeedingProposals = allProjects.filter(
+        project => !project.freelancer_id && project.client_id === currentAddress
+      );
+
+      // Load all proposals in parallel
+      const proposalPromises = projectsNeedingProposals.map(async (project) => {
+        try {
+          const proposals = await db.getProposals(project.id);
+          return { project, proposals };
+        } catch (error) {
+          console.log(`Error loading proposals for project ${project.id}:`, error);
+          return { project, proposals: [] };
+        }
+      });
+
+      const proposalResults = await Promise.all(proposalPromises);
+
+      // Load all work submissions in parallel for projects that need filtering
+      const projectsNeedingFiltering = proposalResults.filter(
+        ({ project }) => project.started_at
+      );
+
+      const workSubmissionPromises = projectsNeedingFiltering.map(async ({ project }) => {
+        try {
+          const workSubmissions = await db.getWorkSubmissions(project.id);
+          return { projectId: project.id, workSubmissions };
+        } catch (error) {
+          return { projectId: project.id, workSubmissions: [] };
+        }
+      });
+
+      const workSubmissionResults = await Promise.all(workSubmissionPromises);
+      const workSubmissionsByProject = new Map(
+        workSubmissionResults.map(({ projectId, workSubmissions }) => [projectId, workSubmissions])
+      );
+
+      // Process proposal counts
+      for (const { project, proposals } of proposalResults) {
+        try {
+          if (project.started_at) {
+            // Get work submissions for this project
+            const workSubmissions = workSubmissionsByProject.get(project.id) || [];
+            const freelancerIdsFromWork = new Set(
+              workSubmissions.map(sub => sub.freelancer_id).filter(Boolean)
+            );
+            
+            // Check escrow to find the previously assigned freelancer's wallet
+            let freelancerIdsFromEscrow = new Set<string>();
+            const escrow = escrowData[project.id];
+            if (escrow && escrow.freelancer_wallet) {
+              try {
+                const freelancerProfile = await db.getProfileByWallet(escrow.freelancer_wallet);
+                if (freelancerProfile?.id) {
+                  freelancerIdsFromEscrow.add(freelancerProfile.id);
+                }
+              } catch (escrowError) {
+                // Ignore escrow errors
+              }
+            }
+            
+            // Combine both strategies
+            const previouslyAssignedFreelancerIds = new Set([
+              ...Array.from(freelancerIdsFromWork),
+              ...Array.from(freelancerIdsFromEscrow)
+            ]);
+            
+            // Filter out only OLD proposals from previously assigned freelancers (created before started_at)
+            // Allow NEW proposals from previously assigned freelancers (created after started_at)
+            const startedAtDate = new Date(project.started_at);
+            const validProposals = proposals.filter(proposal => {
+              if (!proposal.freelancer_id) return true;
+              
+              // If this freelancer was previously assigned, only exclude OLD proposals
+              if (previouslyAssignedFreelancerIds.has(proposal.freelancer_id)) {
+                const proposalDate = proposal.created_at ? new Date(proposal.created_at) : null;
+                // Exclude if proposal was created before project started (it's an old proposal)
+                if (proposalDate && proposalDate < startedAtDate) {
+                  return false;
+                }
+                // Allow if proposal was created after project started (it's a new proposal)
+                return true;
+              }
+              
+              // Exclude if proposal was created before project started (old proposals from any freelancer)
+              if (proposal.created_at && new Date(proposal.created_at) < startedAtDate) {
+                return false;
+              }
+              
+              return true;
+            });
+            
+            proposalCountData[project.id] = validProposals.length;
+          } else {
+            // Project never had a freelancer assigned, show all proposals
+            proposalCountData[project.id] = proposals.length;
           }
         } catch (error) {
-          // Escrow doesn't exist for this project
-        }
-
-        // Load proposal count for projects without freelancers (only for posted projects)
-        // Apply the same filtering logic as ViewProposals to exclude old proposals from kicked-off freelancers
-        if (!project.freelancer_id && project.client_id === currentAddress) {
-          try {
-            const proposals = await db.getProposals(project.id);
-            
-            // If project has started_at, filter out proposals from previously assigned freelancers
-            if (project.started_at) {
-              try {
-                // Get all work submissions to find which freelancers were previously assigned
-                const workSubmissions = await db.getWorkSubmissions(project.id);
-                const freelancerIdsFromWork = new Set(
-                  workSubmissions.map(sub => sub.freelancer_id).filter(Boolean)
-                );
-                
-                // Check escrow to find the previously assigned freelancer's wallet
-                let freelancerIdsFromEscrow = new Set<string>();
-                try {
-                  const escrow = await db.getEscrow(project.id);
-                  if (escrow && escrow.freelancer_wallet) {
-                    const freelancerProfile = await db.getProfileByWallet(escrow.freelancer_wallet);
-                    if (freelancerProfile?.id) {
-                      freelancerIdsFromEscrow.add(freelancerProfile.id);
-                    }
-                  }
-                } catch (escrowError) {
-                  // Ignore escrow errors
-                }
-                
-                // Combine both strategies
-                const previouslyAssignedFreelancerIds = new Set([
-                  ...Array.from(freelancerIdsFromWork),
-                  ...Array.from(freelancerIdsFromEscrow)
-                ]);
-                
-                // Filter out only OLD proposals from previously assigned freelancers (created before started_at)
-                // Allow NEW proposals from previously assigned freelancers (created after started_at)
-                const startedAtDate = new Date(project.started_at);
-                const validProposals = proposals.filter(proposal => {
-                  if (!proposal.freelancer_id) return true;
-                  
-                  // If this freelancer was previously assigned, only exclude OLD proposals
-                  if (previouslyAssignedFreelancerIds.has(proposal.freelancer_id)) {
-                    const proposalDate = proposal.created_at ? new Date(proposal.created_at) : null;
-                    // Exclude if proposal was created before project started (it's an old proposal)
-                    if (proposalDate && proposalDate < startedAtDate) {
-                      return false;
-                    }
-                    // Allow if proposal was created after project started (it's a new proposal)
-                    return true;
-                  }
-                  
-                  // Exclude if proposal was created before project started (old proposals from any freelancer)
-                  if (proposal.created_at && new Date(proposal.created_at) < startedAtDate) {
-                    return false;
-                  }
-                  
-                  return true;
-                });
-                
-                proposalCountData[project.id] = validProposals.length;
-              } catch (filterError) {
-                // If filtering fails, show all proposals count (fallback)
-                console.error('Error filtering proposals for count:', filterError);
-                proposalCountData[project.id] = proposals.length;
-              }
-            } else {
-              // Project never had a freelancer assigned, show all proposals
-              proposalCountData[project.id] = proposals.length;
-            }
-          } catch (error) {
-            console.log('Error loading proposal count:', error);
-            proposalCountData[project.id] = 0;
-          }
+          console.log(`Error processing proposal count for project ${project.id}:`, error);
+          proposalCountData[project.id] = 0;
         }
       }
+      
       setEscrows(escrowData);
       setProposalCounts(proposalCountData);
     } catch (error) {
