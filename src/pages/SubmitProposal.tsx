@@ -229,17 +229,26 @@ const SubmitProposal = () => {
 
       // Send notification message to project owner
       try {
-        if (project?.client_id && profile?.full_name) {
+        if (project?.client_id) {
+          const freelancerName = profile?.full_name || profile?.username || 'A freelancer';
           await db.createMessage({
             sender_id: address!,
             recipient_id: project.client_id,
             subject: `New Proposal for "${project.title}"`,
-            content: `${profile.full_name || 'A freelancer'} has submitted a proposal for your project "${project.title}". View the proposal to accept or decline.`
+            content: `${freelancerName} has submitted a proposal for your project "${project.title}". View the proposal to accept or decline.`
           });
+          console.log(`✅ Notification sent to project owner ${project.client_id} about new proposal from ${freelancerName}`);
+        } else {
+          console.warn('⚠️ Cannot send notification: project.client_id is missing');
         }
       } catch (messageError) {
-        // Don't fail the proposal submission if message fails
-        console.error('Error sending notification message:', messageError);
+        // Don't fail the proposal submission if message fails, but log it prominently
+        console.error('❌ Error sending notification message:', messageError);
+        toast({
+          title: "Proposal Submitted",
+          description: "Your proposal was submitted, but we couldn't send a notification to the client. They will see it when they check their proposals.",
+          variant: "default"
+        });
       }
 
       toast({
