@@ -13,7 +13,7 @@ import {
   User, 
   Clock,
   CheckCircle,
-  X,
+  XCircle,
   MessageSquare,
   Star
 } from "lucide-react";
@@ -44,6 +44,7 @@ const ViewProposals = () => {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [acceptingProposal, setAcceptingProposal] = useState<string | null>(null);
+  const [rejectingProposal, setRejectingProposal] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -83,9 +84,9 @@ const ViewProposals = () => {
       setProject(projectData);
 
       // Load proposals for this project
-      const proposalsData = await db.getProposals(id);
+      let proposalsData = await db.getProposals(id);
       
-      // Filter out proposals from freelancers who were previously assigned (have work submissions)
+      // Filter out proposals from freelancers who were previously assigned
       // This prevents showing old proposals from kicked-off freelancers
       // Only check if project is currently active (no freelancer assigned)
       if (projectData.status === 'active' && !projectData.freelancer_id) {
@@ -96,11 +97,23 @@ const ViewProposals = () => {
           );
           
           // Filter out proposals from freelancers who have work submissions (were previously assigned)
-          const filteredProposals = proposalsData.filter(
+          const validProposals = proposalsData.filter(
             proposal => !proposal.freelancer_id || !freelancerIdsWithWork.has(proposal.freelancer_id)
           );
           
-          setProposals(filteredProposals);
+          // Also delete any proposals from freelancers with work submissions (cleanup)
+          const proposalsToDelete = proposalsData.filter(
+            proposal => proposal.freelancer_id && freelancerIdsWithWork.has(proposal.freelancer_id)
+          );
+          
+          // Delete proposals in background (don't wait for it)
+          if (proposalsToDelete.length > 0) {
+            Promise.all(
+              proposalsToDelete.map(p => db.deleteProposal(p.id).catch(err => console.error('Error deleting proposal:', err)))
+            ).catch(() => {});
+          }
+          
+          setProposals(validProposals);
         } catch (error) {
           // If error checking work submissions, show all proposals to be safe
           console.error('Error checking work submissions:', error);
@@ -168,6 +181,48 @@ const ViewProposals = () => {
       });
     } finally {
       setAcceptingProposal(null);
+    }
+  };
+
+  const handleRejectProposal = async (proposal: Proposal) => {
+    if (!project || !id || !proposal.id) return;
+
+    setRejectingProposal(proposal.id);
+    try {
+      // Delete the proposal
+      await db.deleteProposal(proposal.id);
+
+      // Send notification message to freelancer
+      try {
+        if (proposal.freelancer?.wallet_address && project && address) {
+          await db.createMessage({
+            sender_id: address,
+            recipient_id: proposal.freelancer.wallet_address,
+            subject: `Proposal Not Selected for "${project.title}"`,
+            content: `Thank you for your interest. Your proposal for "${project.title}" was not selected for this project. We encourage you to apply to other projects that match your skills.`
+          });
+        }
+      } catch (messageError) {
+        // Don't fail the proposal rejection if message fails
+        console.error('Error sending notification message:', messageError);
+      }
+
+      // Remove proposal from local state
+      setProposals(prev => prev.filter(p => p.id !== proposal.id));
+
+      toast({
+        title: "Proposal Rejected",
+        description: `The proposal from ${proposal.freelancer?.full_name || 'the freelancer'} has been removed`,
+      });
+    } catch (error) {
+      console.error('Error rejecting proposal:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reject proposal. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setRejectingProposal(null);
     }
   };
 
@@ -395,47 +450,87 @@ const ViewProposals = () => {
                             </Link>
                           )}
 
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button 
-                                className="w-full" 
-                                disabled={acceptingProposal === proposal.id}
-                              >
-                                {acceptingProposal === proposal.id ? (
-                                  "Accepting..."
-                                ) : (
-                                  <>
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Accept Proposal
-                                  </>
-                                )}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Accept This Proposal?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  You're about to hire {proposal.freelancer?.full_name || 'this freelancer'} for {formatUSDC(proposal.proposed_budget)}. This will:
-                                  <ul className="list-disc list-inside mt-2 space-y-1">
-                                    <li>Start the project immediately</li>
-                                    <li>Set up escrow with the proposed budget</li>
-                                    <li>Reject all other proposals</li>
-                                    <li>Begin milestone tracking</li>
-                                  </ul>
-                                  This action cannot be undone easily.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleAcceptProposal(proposal)}
-                                  disabled={acceptingProposal === proposal.id}
+                          <div className="flex gap-2">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  variant="destructive"
+                                  size="sm"
+                                  className="flex-1" 
+                                  disabled={rejectingProposal === proposal.id}
                                 >
-                                  Accept & Hire
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                                  {rejectingProposal === proposal.id ? (
+                                    "Rejecting..."
+                                  ) : (
+                                    <>
+                                      <XCircle className="w-4 h-4 mr-2" />
+                                      Reject
+                                    </>
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Reject This Proposal?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to reject the proposal from {proposal.freelancer?.full_name || 'this freelancer'}? This will remove the proposal and notify the freelancer. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleRejectProposal(proposal)}
+                                    disabled={rejectingProposal === proposal.id}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Reject Proposal
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  className="flex-1" 
+                                  disabled={acceptingProposal === proposal.id || rejectingProposal === proposal.id}
+                                >
+                                  {acceptingProposal === proposal.id ? (
+                                    "Accepting..."
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="w-4 h-4 mr-2" />
+                                      Accept
+                                    </>
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Accept This Proposal?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    You're about to hire {proposal.freelancer?.full_name || 'this freelancer'} for {formatUSDC(proposal.proposed_budget)}. This will:
+                                    <ul className="list-disc list-inside mt-2 space-y-1">
+                                      <li>Start the project immediately</li>
+                                      <li>Set up escrow with the proposed budget</li>
+                                      <li>Reject all other proposals</li>
+                                      <li>Begin milestone tracking</li>
+                                    </ul>
+                                    This action cannot be undone easily.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleAcceptProposal(proposal)}
+                                    disabled={acceptingProposal === proposal.id}
+                                  >
+                                    Accept & Hire
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </div>
                       </div>
                     </div>

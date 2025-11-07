@@ -464,6 +464,18 @@ export const db = {
       .eq('project_id', projectId)
       .eq('freelancer_id', freelancerId);
     
+    if (error) {
+      console.error('Error deleting proposals:', error);
+      throw error;
+    }
+  },
+
+  async deleteProposal(proposalId: string) {
+    const { error } = await supabase
+      .from('proposals')
+      .delete()
+      .eq('id', proposalId);
+    
     if (error) throw error;
   },
 
