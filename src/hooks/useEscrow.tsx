@@ -614,14 +614,32 @@ export const useEscrow = (): UseEscrowReturn => {
         throw new Error(`Escrow is not in funded state. Current status: ${escrow.status}`);
       }
 
-      // Security: Verify caller is authorized (project owner)
+      // Security: Verify caller is authorized (project owner or freelancer when work is approved)
       if (!address) {
         throw new Error('Wallet not connected');
       }
 
       const project = await db.getProject(escrow.project_id);
-      if (project.client_id !== address) {
-        throw new Error('Unauthorized: Only the project owner can release payment');
+      const isProjectOwner = project.client_id === address;
+      
+      // If caller is freelancer, verify work is approved (backend will also verify this)
+      if (!isProjectOwner) {
+        const workSubmissions = await db.getWorkSubmissions(escrow.project_id);
+        const hasApprovedWork = workSubmissions?.some(sub => sub.status === 'approved');
+        
+        if (!hasApprovedWork) {
+          throw new Error('Unauthorized: Work must be approved before freelancer can collect payment');
+        }
+        
+        // Verify caller is the assigned freelancer
+        if (project.freelancer_id) {
+          const freelancerProfile = await db.getProfile(project.freelancer_id);
+          if (freelancerProfile?.wallet_address !== address) {
+            throw new Error('Unauthorized: Only the assigned freelancer can collect payment');
+          }
+        } else {
+          throw new Error('Unauthorized: No freelancer assigned to this project');
+        }
       }
 
       // Security: Verify project is in valid state for completion

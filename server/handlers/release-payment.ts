@@ -58,11 +58,56 @@ export async function releasePaymentHandler(
       });
     }
 
-    // Security: Verify caller is project owner
+    // Security: Verify caller is project owner or freelancer (when work is approved)
     const project = escrow.projects as any;
-    if (!project || project.client_id !== walletAddress) {
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const isProjectOwner = project.client_id === walletAddress;
+    let isFreelancer = false;
+    let freelancerProfile: any = null;
+
+    // Security: Verify freelancer wallet matches project freelancer
+    if (project.freelancer_id) {
+      const { data: profile } = await supabaseClient
+        .from('profiles')
+        .select('wallet_address')
+        .eq('id', project.freelancer_id)
+        .single();
+
+      freelancerProfile = profile;
+      if (freelancerProfile?.wallet_address === walletAddress) {
+        isFreelancer = true;
+      }
+
+      if (freelancerProfile?.wallet_address !== freelancerWallet) {
+        return res.status(400).json({
+          error: 'Freelancer wallet address does not match project freelancer'
+        });
+      }
+    }
+
+    // If caller is freelancer, verify work is approved
+    if (isFreelancer && !isProjectOwner) {
+      const { data: workSubmissions } = await supabaseClient
+        .from('work_submissions')
+        .select('status')
+        .eq('project_id', escrow.project_id)
+        .eq('status', 'approved')
+        .limit(1);
+
+      if (!workSubmissions || workSubmissions.length === 0) {
+        return res.status(403).json({
+          error: 'Unauthorized: Work must be approved before freelancer can collect payment'
+        });
+      }
+    }
+
+    // If caller is neither project owner nor freelancer, deny access
+    if (!isProjectOwner && !isFreelancer) {
       return res.status(403).json({
-        error: 'Unauthorized: Only the project owner can release payment'
+        error: 'Unauthorized: Only the project owner or assigned freelancer (when work is approved) can release payment'
       });
     }
 
@@ -71,21 +116,6 @@ export async function releasePaymentHandler(
       return res.status(400).json({
         error: `Project must be in progress to complete. Current status: ${project.status}`
       });
-    }
-
-    // Security: Verify freelancer wallet matches project freelancer
-    if (project.freelancer_id) {
-      const { data: freelancerProfile } = await supabaseClient
-        .from('profiles')
-        .select('wallet_address')
-        .eq('id', project.freelancer_id)
-        .single();
-
-      if (freelancerProfile?.wallet_address !== freelancerWallet) {
-        return res.status(400).json({
-          error: 'Freelancer wallet address does not match project freelancer'
-        });
-      }
     }
 
     // Get payment currency from escrow

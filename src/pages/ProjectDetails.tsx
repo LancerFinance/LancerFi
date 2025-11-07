@@ -206,11 +206,16 @@ const ProjectDetails = () => {
   const handleCompleteProject = async () => {
     if (!project || !id) return;
     
-    // Security: Verify user is authorized (project owner)
-    if (!isProjectOwner) {
+    // Security: Verify user is authorized (project owner or freelancer when work is approved)
+    const hasApprovedWork = workSubmissions.some(sub => sub.status === 'approved');
+    const canComplete = isProjectOwner || (isAssignedFreelancer && hasApprovedWork);
+    
+    if (!canComplete) {
       toast({
         title: "Unauthorized",
-        description: "Only the project owner can complete this project",
+        description: isAssignedFreelancer 
+          ? "Work must be approved before you can collect payment"
+          : "Only the project owner can complete this project",
         variant: "destructive"
       });
       return;
@@ -697,12 +702,61 @@ const ProjectDetails = () => {
                        />
                      )}
 
-                     {/* Freelancer: Submit Work Button */}
+                     {/* Freelancer: Submit Work or Collect Payment Button */}
                      {project.status === 'in_progress' && isAssignedFreelancer && freelancer?.id && (() => {
-                       // Check if there's a pending or approved submission
+                       const hasApprovedWork = workSubmissions.some(sub => sub.status === 'approved');
                        const hasActiveSubmission = workSubmissions.some(
                          sub => sub.status === 'pending' || sub.status === 'approved'
                        );
+                       
+                       // Show "Collect Payment" if work is approved, otherwise show "Submit Work"
+                       if (hasApprovedWork) {
+                         return (
+                           <AlertDialog>
+                             <AlertDialogTrigger asChild>
+                               <Button 
+                                 variant="default" 
+                                 size="sm" 
+                                 className="w-full"
+                                 disabled={completing || escrowLoading}
+                               >
+                                 <CheckCircle className="w-4 h-4 mr-2" />
+                                 Collect Payment
+                               </Button>
+                             </AlertDialogTrigger>
+                             <AlertDialogContent>
+                               <AlertDialogHeader>
+                                 <AlertDialogTitle>Collect Payment</AlertDialogTitle>
+                                 <AlertDialogDescription>
+                                   Your work has been approved! Collecting payment will:
+                                   <ul className="list-disc list-inside mt-2 space-y-1">
+                                     <li>Release the escrow funds to your wallet</li>
+                                     <li>Mark the project as completed</li>
+                                     <li>Update your earnings and project count</li>
+                                   </ul>
+                                   This action cannot be undone.
+                                 </AlertDialogDescription>
+                               </AlertDialogHeader>
+                               <AlertDialogFooter>
+                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                 <AlertDialogAction
+                                   onClick={handleCompleteProject}
+                                   disabled={completing || escrowLoading}
+                                 >
+                                   {(completing || escrowLoading) ? (
+                                     <>
+                                       <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
+                                       Processing Payment...
+                                     </>
+                                   ) : (
+                                     "Collect Payment"
+                                   )}
+                                 </AlertDialogAction>
+                               </AlertDialogFooter>
+                             </AlertDialogContent>
+                           </AlertDialog>
+                         );
+                       }
                        
                        return (
                          <SubmitWorkDialog
