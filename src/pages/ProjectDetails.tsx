@@ -345,6 +345,16 @@ const ProjectDetails = () => {
     
     setKickingOffFreelancer(true);
     try {
+      // Delete all proposals from this freelancer for this project to prevent duplicate notifications
+      if (freelancer?.id) {
+        try {
+          await db.deleteProposalsByFreelancer(id, freelancer.id);
+        } catch (proposalError) {
+          console.error('Error deleting proposals:', proposalError);
+          // Don't fail the kick-off if proposal deletion fails
+        }
+      }
+
       // Update project to remove freelancer and set status back to active
       await db.updateProject(id, {
         freelancer_id: null,

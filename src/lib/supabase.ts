@@ -457,6 +457,16 @@ export const db = {
     return data;
   },
 
+  async deleteProposalsByFreelancer(projectId: string, freelancerId: string) {
+    const { error } = await supabase
+      .from('proposals')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('freelancer_id', freelancerId);
+    
+    if (error) throw error;
+  },
+
   // Work Submissions
   async createWorkSubmission(submission: Omit<WorkSubmission, 'id' | 'created_at' | 'updated_at' | 'submitted_at'>) {
     const { data, error } = await supabase
