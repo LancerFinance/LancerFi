@@ -313,7 +313,7 @@ const Messages = () => {
                                     {isReceived ? 'From' : 'To'}
                                   </Badge>
                                   {isReceived && !message.is_read && (
-                                    <Badge variant="default" className="text-xs bg-web3-primary">
+                                    <Badge className="text-xs bg-destructive text-destructive-foreground">
                                       New
                                     </Badge>
                                   )}
