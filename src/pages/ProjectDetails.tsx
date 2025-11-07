@@ -383,23 +383,6 @@ const ProjectDetails = () => {
       return;
     }
 
-    // Check if freelancer is currently revising work (only if not all work is rejected)
-    const hasRevisionRequested = workSubmissions.some(
-      sub => sub.status === 'revision_requested'
-    );
-    const allWorkRejected = workSubmissions.length > 0 && workSubmissions.every(
-      sub => sub.status === 'rejected'
-    );
-
-    // Only block if there's a revision requested AND not all work is rejected
-    if (hasRevisionRequested && !allWorkRejected) {
-      toast({
-        title: "Cannot Kick Off Freelancer",
-        description: "The freelancer is currently working on revisions. Please wait for them to submit the revised work before removing them.",
-        variant: "destructive"
-      });
-      return;
-    }
     
     setKickingOffFreelancer(true);
     try {
@@ -939,20 +922,6 @@ const ProjectDetails = () => {
             const hasApprovedWork = workSubmissions.some(
               sub => sub.status === 'approved'
             );
-            // Only disable if there are work submissions that are NOT rejected
-            // Allow kicking off if all work submissions are rejected
-            const hasActiveWorkSubmissions = workSubmissions.some(
-              sub => sub.status !== 'rejected'
-            );
-            // Check if there's a revision requested, but only block if not all work is rejected
-            const hasRevisionRequested = workSubmissions.some(
-              sub => sub.status === 'revision_requested'
-            );
-            const allWorkRejected = workSubmissions.length > 0 && workSubmissions.every(
-              sub => sub.status === 'rejected'
-            );
-            // Only disable for revision requested if not all work is rejected
-            const shouldDisableForRevision = hasRevisionRequested && !allWorkRejected;
             
             // Don't show if work is approved
             if (hasApprovedWork) {
@@ -966,7 +935,7 @@ const ProjectDetails = () => {
                     variant="outline" 
                     size="sm" 
                     className="w-full"
-                    disabled={shouldDisableForRevision || kickingOffFreelancer || hasActiveWorkSubmissions}
+                    disabled={kickingOffFreelancer}
                   >
                     <User className="w-4 h-4 mr-2" />
                     Kick Off Freelancer
@@ -976,29 +945,21 @@ const ProjectDetails = () => {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Kick Off Freelancer</AlertDialogTitle>
                     <AlertDialogDescription>
-                      {hasActiveWorkSubmissions ? (
-                        <span className="text-destructive font-medium">
-                          Cannot remove freelancer: There are work submissions that need to be reviewed first. Please approve, request revision, or reject all work submissions before removing the freelancer.
-                        </span>
-                      ) : (
-                        <>
-                          Are you sure you want to remove the current freelancer from this project? This will:
-                          <ul className="list-disc list-inside mt-2 space-y-1">
-                            <li>Remove the freelancer from the project</li>
-                            <li>Set the project status back to "Active"</li>
-                            <li>Make the project available for other freelancers to apply</li>
-                            <li>Send a notification to the removed freelancer</li>
-                          </ul>
-                          This action cannot be undone.
-                        </>
-                      )}
+                      Are you sure you want to remove the current freelancer from this project? This will:
+                      <ul className="list-disc list-inside mt-2 space-y-1">
+                        <li>Remove the freelancer from the project</li>
+                        <li>Set the project status back to "Active"</li>
+                        <li>Make the project available for other freelancers to apply</li>
+                        <li>Send a notification to the removed freelancer</li>
+                      </ul>
+                      This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel disabled={kickingOffFreelancer || hasActiveWorkSubmissions}>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel disabled={kickingOffFreelancer}>Cancel</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleKickOffFreelancer}
-                      disabled={kickingOffFreelancer || hasActiveWorkSubmissions}
+                      disabled={kickingOffFreelancer}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
                       {kickingOffFreelancer ? (
