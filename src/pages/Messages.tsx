@@ -284,8 +284,8 @@ const Messages = () => {
                           selectedMessage?.id === message.id ? 'border-web3-primary' : ''
                         } ${
                           isReceived && !message.is_read 
-                            ? 'border-l-4 border-l-web3-primary bg-background' 
-                            : 'bg-muted/30'
+                            ? 'border-l-4 border-l-web3-primary !bg-white' 
+                            : '!bg-muted/30'
                         }`}
                         onClick={() => {
                           setSelectedMessage(message);
