@@ -497,6 +497,9 @@ const PostProject = () => {
                     <p className="text-xs text-muted-foreground">Upload an image that represents your project (required)</p>
                   </div>
 
+                  {/* Spacer for alignment */}
+                  <div className="h-4"></div>
+
                   <Button 
                     variant="default" 
                     size="lg" 
