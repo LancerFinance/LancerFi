@@ -84,7 +84,32 @@ const ViewProposals = () => {
 
       // Load proposals for this project
       const proposalsData = await db.getProposals(id);
-      setProposals(proposalsData);
+      
+      // Filter out proposals from freelancers who were previously assigned (have work submissions)
+      // This prevents showing old proposals from kicked-off freelancers
+      // Only check if project is currently active (no freelancer assigned)
+      if (projectData.status === 'active' && !projectData.freelancer_id) {
+        try {
+          const workSubmissions = await db.getWorkSubmissions(id);
+          const freelancerIdsWithWork = new Set(
+            workSubmissions.map(sub => sub.freelancer_id).filter(Boolean)
+          );
+          
+          // Filter out proposals from freelancers who have work submissions (were previously assigned)
+          const filteredProposals = proposalsData.filter(
+            proposal => !proposal.freelancer_id || !freelancerIdsWithWork.has(proposal.freelancer_id)
+          );
+          
+          setProposals(filteredProposals);
+        } catch (error) {
+          // If error checking work submissions, show all proposals to be safe
+          console.error('Error checking work submissions:', error);
+          setProposals(proposalsData);
+        }
+      } else {
+        // If project has a freelancer assigned, show all proposals (normal case)
+        setProposals(proposalsData);
+      }
 
     } catch (error) {
       console.error('Error loading project and proposals:', error);
