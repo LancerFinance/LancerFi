@@ -103,9 +103,16 @@ const MessageDialog = ({
           Send Message
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Send Message to {recipientName}</DialogTitle>
+          <DialogTitle className="break-words">
+            Send Message to{' '}
+            <span className="font-normal text-muted-foreground">
+              {recipientName.length > 30 
+                ? `${recipientName.slice(0, 30)}...` 
+                : recipientName}
+            </span>
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -115,7 +122,9 @@ const MessageDialog = ({
               value={formData.subject}
               onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
               placeholder="Message subject"
-              className={errors.subject ? "border-destructive" : ""}
+              className={`${errors.subject ? "border-destructive" : ""} min-w-0`}
+              maxLength={200}
+              title={formData.subject}
             />
             {errors.subject && (
               <p className="text-sm text-destructive mt-1">{errors.subject}</p>

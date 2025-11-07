@@ -405,9 +405,17 @@ const Messages = () => {
                         recipientId={selectedMessage.sender_id === address 
                           ? selectedMessage.recipient_id 
                           : selectedMessage.sender_id}
-                        recipientName={selectedMessage.sender_id === address 
-                          ? selectedMessage.recipient_name || 'User'
-                          : selectedMessage.sender_name || 'User'}
+                        recipientName={
+                          selectedMessage.sender_id === address 
+                            ? selectedMessage.recipient_name || 
+                              (selectedMessage.recipient_id.length > 20
+                                ? `${selectedMessage.recipient_id.slice(0, 6)}...${selectedMessage.recipient_id.slice(-4)}`
+                                : selectedMessage.recipient_id)
+                            : selectedMessage.sender_name || 
+                              (selectedMessage.sender_id.length > 20
+                                ? `${selectedMessage.sender_id.slice(0, 6)}...${selectedMessage.sender_id.slice(-4)}`
+                                : selectedMessage.sender_id)
+                        }
                         projectTitle={selectedMessage.subject ? `Re: ${selectedMessage.subject}` : undefined}
                         triggerVariant="default"
                         triggerClassName="flex-1"
