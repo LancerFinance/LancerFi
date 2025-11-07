@@ -37,6 +37,11 @@ const PostProject = () => {
     skills: ''
   });
   const [paymentCurrency, setPaymentCurrency] = useState<PaymentCurrency>('SOLANA');
+  
+  // DEBUG: Log whenever paymentCurrency changes
+  useEffect(() => {
+    console.log('🔵🔵🔵 paymentCurrency STATE CHANGED TO:', paymentCurrency);
+  }, [paymentCurrency]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFreelancer, setSelectedFreelancer] = useState<any>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -617,8 +622,10 @@ const PostProject = () => {
                   amount={budget}
                   selectedCurrency={paymentCurrency}
                   onCurrencyChange={(currency) => {
-                    console.log('🔵 PaymentCurrencySelector - Currency changed to:', currency);
+                    console.log('🔵🔵🔵 PaymentCurrencySelector - Currency changed to:', currency);
+                    console.log('🔵🔵🔵 About to call setPaymentCurrency with:', currency);
                     setPaymentCurrency(currency);
+                    console.log('🔵🔵🔵 setPaymentCurrency called');
                   }}
                 />
               )}

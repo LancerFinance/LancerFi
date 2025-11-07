@@ -149,9 +149,13 @@ const PaymentCurrencySelector = ({
           {/* X402 Option - Collapsed when not selected */}
           <Button
             variant={selectedCurrency === 'X402' ? 'default' : 'outline'}
-            onClick={() => {
-              console.log('🔵 X402 BUTTON CLICKED - Setting currency to X402');
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🔵🔵🔵 X402 BUTTON CLICKED - Setting currency to X402');
+              console.log('🔵🔵🔵 Calling onCurrencyChange with X402');
               onCurrencyChange('X402');
+              console.log('🔵🔵🔵 onCurrencyChange called');
             }}
             className={`p-4 flex flex-col items-start space-y-2 transition-all duration-200 ${
               selectedCurrency === 'X402' ? 'h-auto' : 'h-16'
