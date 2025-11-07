@@ -210,11 +210,13 @@ export async function verifyX402Payment(
     const platformWallet = platformKeypair.publicKey;
 
     // Check if transaction fee payer matches expected sender
-    const feePayer = transaction.transaction.message.accountKeys[0];
-    if (feePayer.pubkey.toString() !== expectedSender) {
+    // For VersionedTransaction, use getAccountKeys() method
+    const accountKeys = transaction.transaction.message.getAccountKeys();
+    const feePayer = accountKeys.get(0);
+    if (!feePayer || feePayer.toString() !== expectedSender) {
       return {
         verified: false,
-        error: `Transaction fee payer (${feePayer.pubkey.toString()}) does not match expected sender (${expectedSender})`
+        error: `Transaction fee payer (${feePayer?.toString() || 'unknown'}) does not match expected sender (${expectedSender})`
       };
     }
 
