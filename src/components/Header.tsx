@@ -22,11 +22,11 @@ const Header = () => {
     if (isConnected && connectedAddress) {
       checkUnreadMessages();
       checkDashboardNotifications();
-      // Check for new messages every 30 seconds
+      // Check for new messages and notifications every 10 seconds
       const interval = setInterval(() => {
         checkUnreadMessages();
         checkDashboardNotifications();
-      }, 30000);
+      }, 10000);
 
       // Listen for message read events to update count immediately
       const handleMessageRead = () => checkUnreadMessages();
