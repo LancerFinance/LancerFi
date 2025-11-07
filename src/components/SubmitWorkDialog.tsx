@@ -41,6 +41,7 @@ const SubmitWorkDialog = ({
   const [fileUrls, setFileUrls] = useState<string[]>([]);
   const [linkUrls, setLinkUrls] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
@@ -64,6 +65,34 @@ const SubmitWorkDialog = ({
     });
 
     setFiles(prev => [...prev, ...validFiles]);
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const droppedFiles = e.dataTransfer.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      handleFileSelect(droppedFiles);
+    }
   };
 
   const removeFile = (index: number) => {
@@ -289,7 +318,17 @@ const SubmitWorkDialog = ({
           {/* File Upload */}
           <div className="space-y-2">
             <Label>Files (Optional)</Label>
-            <div className="border-2 border-dashed border-border rounded-lg p-4">
+            <div 
+              className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
+                isDragging 
+                  ? 'border-primary bg-primary/5' 
+                  : 'border-border'
+              }`}
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
               <input
                 ref={fileInputRef}
                 type="file"
@@ -308,7 +347,7 @@ const SubmitWorkDialog = ({
                   Select Files
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
-                  Upload files (max 10MB per file)
+                  Drag and drop files here or click to select (max 10MB per file)
                 </p>
               </div>
             </div>
