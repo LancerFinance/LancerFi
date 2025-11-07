@@ -104,7 +104,32 @@ const ServiceDetails = () => {
         return;
       }
 
-      // Check if there's already a proposal from this user for this project
+      // Get project details to check if freelancer was previously kicked off
+      const project = await db.getProject(projectId);
+      
+      // If project has started_at but no current freelancer_id, freelancer was kicked off
+      // In this case, allow resubmission even if old proposal still exists (it should be deleted)
+      if (project?.started_at && !project?.freelancer_id) {
+        // Check if there's a VALID proposal (not an old one from before kick-off)
+        const proposals = await db.getProposals(projectId);
+        const myProposals = proposals.filter(p => p.freelancer_id === profile.id);
+        
+        // If project was started, filter out proposals created before started_at
+        const startedAtDate = new Date(project.started_at);
+        const validProposals = myProposals.filter(proposal => {
+          // Exclude proposals created before project started (old proposals)
+          if (proposal.created_at && new Date(proposal.created_at) < startedAtDate) {
+            return false;
+          }
+          return true;
+        });
+        
+        // Only block if there's a valid (new) proposal
+        setHasSubmittedProposal(validProposals.length > 0);
+        return;
+      }
+
+      // Normal case: Check if there's already a proposal from this user for this project
       const { data: proposals, error } = await supabase
         .from('proposals')
         .select('id')
