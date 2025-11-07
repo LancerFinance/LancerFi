@@ -148,6 +148,11 @@ const ProjectDashboard = () => {
   };
 
   const filteredPostedProjects = postedProjects.filter(project => {
+    // Exclude completed projects from "Projects Posted" tab
+    if (project.status === 'completed') {
+      return false;
+    }
+    
     const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          project.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
@@ -182,13 +187,16 @@ const ProjectDashboard = () => {
     return matchesSearch && matchesCategory;
   });
 
+  // Filter out completed projects for stats (they should only appear in Completed tab)
+  const activePostedProjects = postedProjects.filter(p => p.status !== 'completed');
+  
   const postedStats = {
-    total: postedProjects.length,
-    active: postedProjects.filter(p => p.status === 'active').length,
-    inProgress: postedProjects.filter(p => p.status === 'in_progress').length,
-    completed: postedProjects.filter(p => p.status === 'completed').length,
+    total: activePostedProjects.length,
+    active: activePostedProjects.filter(p => p.status === 'active').length,
+    inProgress: activePostedProjects.filter(p => p.status === 'in_progress').length,
+    completed: 0, // Completed projects are not shown in this tab
     totalEscrowed: Object.entries(escrows)
-      .filter(([projectId]) => postedProjects.some(p => p.id === projectId))
+      .filter(([projectId]) => activePostedProjects.some(p => p.id === projectId))
       .reduce((sum, [_, escrow]) => {
         // Convert SOL to USD if payment currency is SOLANA
         if (escrow.payment_currency === 'SOLANA' && solPrice) {
@@ -285,7 +293,7 @@ const ProjectDashboard = () => {
                 <Briefcase className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                 <span className="hidden sm:inline">Projects Posted</span>
                 <span className="sm:hidden">Posted</span>
-                <span className="ml-0.5">({postedProjects.length})</span>
+                <span className="ml-0.5">({activePostedProjects.length})</span>
               </TabsTrigger>
               <TabsTrigger value="working" className="flex items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs md:text-sm px-2 sm:px-4 py-2 flex-1 sm:flex-initial whitespace-nowrap">
                 <Wrench className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -384,9 +392,9 @@ const ProjectDashboard = () => {
               <div className="text-center py-12">
                 <Briefcase className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
                 <div className="text-muted-foreground mb-4">
-                  {postedProjects.length === 0 ? 'No projects posted yet' : 'No projects match your filters'}
+                  {activePostedProjects.length === 0 ? 'No projects posted yet' : 'No projects match your filters'}
                 </div>
-                {postedProjects.length === 0 && (
+                {activePostedProjects.length === 0 && (
                   <Link to="/post-project">
                     <Button variant="outline">
                       <Plus className="w-4 h-4 mr-2" />

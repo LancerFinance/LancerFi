@@ -271,28 +271,13 @@ const PostProject = () => {
         throw new Error('Failed to create escrow. Please try again.');
       }
 
-      const toastResult = toast({
+      toast({
         title: "Project Posted Successfully!",
         description: `Your project "${formData.title}" is now live. Escrow of ${paymentCurrency === 'USDC' || paymentCurrency === 'X402' ? formatUSDC(totalEscrow) : formatSOL(solAmount || totalEscrow / (solPrice || 100))} has been funded and secured.`,
-        onClick: () => {
-          toastResult.dismiss();
-          navigate(`/project/${project.id}`);
-        },
-        className: "cursor-pointer hover:bg-muted/50 transition-colors",
-        duration: 3000, // Auto-dismiss after 3 seconds
       });
       
-      // Reset form
-      setFormData({
-        title: '',
-        category: '',
-        description: '',
-        budget: '',
-        timeline: '',
-        skills: ''
-      });
-      setProjectImage(null);
-      setProjectImagePreview('');
+      // Redirect to the new project page
+      navigate(`/project/${project.id}`);
       
     } catch (error) {
       console.error('Error posting project:', error);
