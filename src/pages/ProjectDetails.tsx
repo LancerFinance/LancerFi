@@ -164,18 +164,24 @@ const ProjectDetails = () => {
                 ...Array.from(freelancerIdsFromEscrow)
               ]);
               
-              // Filter out proposals from previously assigned freelancers
-              // Also filter out proposals created before started_at
+              // Filter out only OLD proposals from previously assigned freelancers (created before started_at)
+              // Allow NEW proposals from previously assigned freelancers (created after started_at)
               const startedAtDate = new Date(projectData.started_at);
               const validProposals = proposals.filter(proposal => {
                 if (!proposal.freelancer_id) return true;
                 
-                // Exclude if freelancer was previously assigned
+                // If this freelancer was previously assigned, only exclude OLD proposals
                 if (previouslyAssignedFreelancerIds.has(proposal.freelancer_id)) {
-                  return false;
+                  const proposalDate = proposal.created_at ? new Date(proposal.created_at) : null;
+                  // Exclude if proposal was created before project started (it's an old proposal)
+                  if (proposalDate && proposalDate < startedAtDate) {
+                    return false;
+                  }
+                  // Allow if proposal was created after project started (it's a new proposal)
+                  return true;
                 }
                 
-                // Exclude if proposal was created before project started
+                // Exclude if proposal was created before project started (old proposals from any freelancer)
                 if (proposal.created_at && new Date(proposal.created_at) < startedAtDate) {
                   return false;
                 }
