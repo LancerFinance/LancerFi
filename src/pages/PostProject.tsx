@@ -243,6 +243,7 @@ const PostProject = () => {
       const budgetAmount = parseFloat(formData.budget);
       let escrowAmount = budgetAmount;
       
+      // CRITICAL: If x402 is selected, don't convert to SOL - x402 uses USDC
       if (paymentCurrency === 'SOLANA') {
         // Always recalculate SOL amount from current budget to ensure accuracy
         const priceData = await getSolanaPrice();
@@ -259,7 +260,22 @@ const PostProject = () => {
           solAmount: converted,
           expectedSOL: budgetAmount / priceData.price_usd
         });
+      } else if (paymentCurrency === 'X402' || paymentCurrency === 'USDC') {
+        // For x402 and USDC, keep amount in USD (they use USDC, not SOL)
+        escrowAmount = budgetAmount;
+        console.log('Using USDC/x402 - keeping amount in USD:', escrowAmount);
       }
+      
+      // DEBUG: Log before calling createProjectEscrow
+      console.log('🔍 PostProject - Calling createProjectEscrow:', {
+        projectId: project.id,
+        escrowAmount,
+        paymentCurrency,
+        paymentCurrencyType: typeof paymentCurrency,
+        isX402: paymentCurrency === 'X402',
+        isUSDC: paymentCurrency === 'USDC',
+        isSOLANA: paymentCurrency === 'SOLANA'
+      });
       
       const escrowId = await createProjectEscrow(
         project.id, 
@@ -600,7 +616,10 @@ const PostProject = () => {
                 <PaymentCurrencySelector
                   amount={budget}
                   selectedCurrency={paymentCurrency}
-                  onCurrencyChange={setPaymentCurrency}
+                  onCurrencyChange={(currency) => {
+                    console.log('🔵 PaymentCurrencySelector - Currency changed to:', currency);
+                    setPaymentCurrency(currency);
+                  }}
                 />
               )}
             </div>

@@ -174,3 +174,101 @@ export async function releasePaymentFromPlatform(
   return signature;
 }
 
+/**
+ * Verify x402 payment transaction on Solana
+ * Checks if a transaction sent USDC to the platform wallet
+ */
+export async function verifyX402Payment(
+  transactionSignature: string,
+  expectedSender: string,
+  expectedAmount: number
+): Promise<{ verified: boolean; amount?: number; error?: string }> {
+  try {
+    // Get transaction details from Solana
+    const transaction = await connection.getTransaction(transactionSignature, {
+      commitment: 'confirmed',
+      maxSupportedTransactionVersion: 0
+    });
+
+    if (!transaction) {
+      return {
+        verified: false,
+        error: 'Transaction not found on Solana network'
+      };
+    }
+
+    // Check if transaction has errors
+    if (transaction.meta?.err) {
+      return {
+        verified: false,
+        error: `Transaction failed: ${JSON.stringify(transaction.meta.err)}`
+      };
+    }
+
+    // Get platform wallet address
+    const platformKeypair = getPlatformKeypair();
+    const platformWallet = platformKeypair.publicKey;
+
+    // Check if transaction fee payer matches expected sender
+    const feePayer = transaction.transaction.message.accountKeys[0];
+    if (feePayer.pubkey.toString() !== expectedSender) {
+      return {
+        verified: false,
+        error: `Transaction fee payer (${feePayer.pubkey.toString()}) does not match expected sender (${expectedSender})`
+      };
+    }
+
+    // Check token transfers in the transaction
+    const preBalances = transaction.meta?.preTokenBalances || [];
+    const postBalances = transaction.meta?.postTokenBalances || [];
+
+    // Find USDC transfers to platform wallet
+    let totalUSDCReceived = 0;
+    const expectedMicroUSDC = Math.round(expectedAmount * Math.pow(10, 6)); // USDC has 6 decimals
+
+    // Check post-token balances for platform wallet
+    for (const balance of postBalances) {
+      if (balance.owner === platformWallet.toString() && balance.mint === USDC_MINT.toString()) {
+        const postAmount = BigInt(balance.uiTokenAmount.amount);
+        
+        // Find corresponding pre-balance
+        const preBalance = preBalances.find(
+          b => b.owner === platformWallet.toString() && b.mint === USDC_MINT.toString()
+        );
+        const preAmount = preBalance ? BigInt(preBalance.uiTokenAmount.amount) : BigInt(0);
+        
+        const received = postAmount - preAmount;
+        if (received > 0) {
+          totalUSDCReceived += Number(received);
+        }
+      }
+    }
+
+    // Verify amount matches (allow small tolerance for rounding)
+    const tolerance = 1000; // 0.001 USDC tolerance
+    if (Math.abs(totalUSDCReceived - expectedMicroUSDC) > tolerance) {
+      return {
+        verified: false,
+        error: `Payment amount mismatch. Expected: ${expectedMicroUSDC} micro-USDC, Received: ${totalUSDCReceived} micro-USDC`
+      };
+    }
+
+    return {
+      verified: true,
+      amount: totalUSDCReceived / Math.pow(10, 6) // Convert back to USDC
+    };
+  } catch (error: any) {
+    console.error('Error verifying x402 payment:', error);
+    return {
+      verified: false,
+      error: error.message || 'Failed to verify payment transaction'
+    };
+  }
+}
+
+// Export platform wallet address getter
+export function getPlatformWalletAddress(): string {
+  const platformKeypair = getPlatformKeypair();
+  return platformKeypair.publicKey.toString();
+}
+

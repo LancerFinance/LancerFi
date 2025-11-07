@@ -208,7 +208,7 @@ const ViewProposals = () => {
         setProposals(proposalsData);
       } else {
         // Project has a freelancer assigned, show all proposals (normal case)
-        setProposals(proposalsData);
+      setProposals(proposalsData);
       }
 
     } catch (error) {
@@ -538,48 +538,48 @@ const ViewProposals = () => {
                           )}
 
                           <div className="flex gap-2">
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button 
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
                                   className="flex-1" 
                                   size="sm"
                                   disabled={acceptingProposal === proposal.id || rejectingProposal === proposal.id}
-                                >
-                                  {acceptingProposal === proposal.id ? (
-                                    "Accepting..."
-                                  ) : (
-                                    <>
-                                      <CheckCircle className="w-4 h-4 mr-2" />
+                              >
+                                {acceptingProposal === proposal.id ? (
+                                  "Accepting..."
+                                ) : (
+                                  <>
+                                    <CheckCircle className="w-4 h-4 mr-2" />
                                       Accept
-                                    </>
-                                  )}
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Accept This Proposal?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    You're about to hire {proposal.freelancer?.full_name || 'this freelancer'} for {formatUSDC(proposal.proposed_budget)}. This will:
-                                    <ul className="list-disc list-inside mt-2 space-y-1">
-                                      <li>Start the project immediately</li>
-                                      <li>Set up escrow with the proposed budget</li>
-                                      <li>Reject all other proposals</li>
-                                      <li>Begin milestone tracking</li>
-                                    </ul>
-                                    This action cannot be undone easily.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleAcceptProposal(proposal)}
-                                    disabled={acceptingProposal === proposal.id}
-                                  >
-                                    Accept & Hire
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                                  </>
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Accept This Proposal?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  You're about to hire {proposal.freelancer?.full_name || 'this freelancer'} for {formatUSDC(proposal.proposed_budget)}. This will:
+                                  <ul className="list-disc list-inside mt-2 space-y-1">
+                                    <li>Start the project immediately</li>
+                                    <li>Set up escrow with the proposed budget</li>
+                                    <li>Reject all other proposals</li>
+                                    <li>Begin milestone tracking</li>
+                                  </ul>
+                                  This action cannot be undone easily.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleAcceptProposal(proposal)}
+                                  disabled={acceptingProposal === proposal.id}
+                                >
+                                  Accept & Hire
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
 
                             <AlertDialog>
                               <AlertDialogTrigger asChild>

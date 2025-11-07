@@ -5,6 +5,7 @@ import { createEscrowAccount, fundEscrowWithCurrency, releaseEscrowPayment, conn
 import { db } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { releasePaymentToFreelancer as releasePaymentAPI } from '@/lib/api-client';
+import { requestX402Payment, processX402Payment, verifyX402Payment, X402PaymentChallenge } from '@/lib/x402-payment';
 
 interface UseEscrowReturn {
   createProjectEscrow: (projectId: string, amount: number, paymentCurrency: PaymentCurrency) => Promise<string | null>;
@@ -52,17 +53,149 @@ export const useEscrow = (): UseEscrowReturn => {
       const clientWallet = new PublicKey(solAddress);
       const platformFeePercent = 10; // 10% platform fee
       
-      // Skip balance check - backend RPC is unreliable
-      // Transaction will fail on-chain if balance is insufficient, which is the correct behavior
-      console.log('Skipping balance check - proceeding with transaction creation');
-      console.log('Wallet address:', clientWallet.toString());
-      console.log('Current Solana network:', import.meta.env.MODE === 'production' ? 'mainnet-beta' : 'devnet');
+      // DEBUG: Log payment currency to verify it's being passed correctly
+      console.log('🔍 Payment Currency Check:', {
+        paymentCurrency,
+        type: typeof paymentCurrency,
+        isX402: paymentCurrency === 'X402',
+        isUSDC: paymentCurrency === 'USDC',
+        isSOLANA: paymentCurrency === 'SOLANA'
+      });
       
       let finalAmount = amount;
       let actualCurrency: PaymentCurrency = paymentCurrency;
       
       const platformFee = (finalAmount * platformFeePercent) / 100;
       const totalLocked = finalAmount + platformFee;
+
+      // Handle x402 payment flow
+      // Use strict comparison and also check for string equality
+      const isX402 = paymentCurrency === 'X402' || String(paymentCurrency).toUpperCase() === 'X402';
+      
+      // CRITICAL DEBUG: Log x402 check result
+      console.log('🔍 X402 CHECK:', {
+        paymentCurrency,
+        isX402,
+        strictMatch: paymentCurrency === 'X402',
+        upperCaseMatch: String(paymentCurrency).toUpperCase() === 'X402',
+        willEnterX402Block: isX402
+      });
+      
+      if (isX402) {
+        console.log('✅✅✅ ENTERING X402 PAYMENT PROTOCOL ✅✅✅');
+        console.log('Wallet address:', clientWallet.toString());
+        console.log('Current Solana network:', import.meta.env.MODE === 'production' ? 'mainnet-beta' : 'devnet');
+        console.log('Transaction details:', {
+          amount: finalAmount,
+          platformFee,
+          totalLocked,
+          currency: 'X402 (USDC)'
+        });
+
+        // Step 1: Request payment challenge from backend (HTTP 402)
+        toast({
+          title: "Requesting payment...",
+          description: "Please wait while we prepare your payment.",
+        });
+
+        let paymentChallenge: X402PaymentChallenge;
+        try {
+          paymentChallenge = await requestX402Payment(
+            projectId,
+            finalAmount,
+            clientWallet.toString()
+          );
+          console.log('x402 Payment challenge received:', paymentChallenge);
+        } catch (x402Error: any) {
+          console.error('❌ x402 Payment challenge failed:', x402Error);
+          setIsLoading(false);
+          throw new Error(`x402 payment request failed: ${x402Error.message || 'Unknown error'}. Please try again or use a different payment method.`);
+        }
+
+        // Step 2: Process payment with user's wallet
+        toast({
+          title: "Processing payment...",
+          description: "Please approve the transaction in your wallet.",
+        });
+
+        let transactionSignature: string;
+        try {
+          transactionSignature = await processX402Payment(paymentChallenge, ph);
+          console.log('x402 Payment transaction sent:', transactionSignature);
+        } catch (x402PaymentError: any) {
+          console.error('❌ x402 Payment processing failed:', x402PaymentError);
+          setIsLoading(false);
+          throw new Error(`x402 payment processing failed: ${x402PaymentError.message || 'Unknown error'}. Please try again or use a different payment method.`);
+        }
+
+        // Step 3: Verify payment with backend
+        toast({
+          title: "Verifying payment...",
+          description: "Please wait while we verify your payment on-chain.",
+        });
+
+        // Wait a bit for transaction to be confirmed
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        const verification = await verifyX402Payment(
+          projectId,
+          transactionSignature,
+          clientWallet.toString(),
+          parseFloat(paymentChallenge.amount)
+        );
+
+        if (!verification.success) {
+          throw new Error(verification.error || 'Payment verification failed');
+        }
+
+        console.log('x402 Payment verified successfully');
+
+        // Step 4: Create escrow record in database (payment already made to platform wallet)
+        // For x402, the escrow is the platform wallet, and payment is already there
+        const escrowData = {
+          project_id: projectId,
+          client_wallet: clientWallet.toString(),
+          amount_usdc: finalAmount, // x402 uses USDC
+          platform_fee: platformFee,
+          total_locked: totalLocked,
+          transaction_signature: transactionSignature,
+          payment_currency: 'USDC', // x402 uses USDC
+          status: 'funded' as const,
+          funded_at: new Date().toISOString(),
+        };
+
+        const { data: escrow, error: escrowError } = await db.createEscrow(escrowData);
+
+        if (escrowError || !escrow) {
+          throw new Error(escrowError?.message || 'Failed to create escrow record');
+        }
+
+        console.log('✅ x402 Escrow created:', escrow.id);
+
+        toast({
+          title: "Payment Successful!",
+          description: `Your x402 payment of ${formatUSDC(totalLocked)} has been processed and escrow is funded.`,
+        });
+
+        setIsLoading(false);
+        return escrow.id;
+      }
+
+      // CRITICAL SAFEGUARD: If we reach here and paymentCurrency is X402, something went wrong
+      // This should NEVER happen - the x402 block should always return or throw
+      if (String(paymentCurrency).toUpperCase() === 'X402') {
+        console.error('❌ CRITICAL BUG: x402 payment flow did not return or throw! This should never happen.');
+        setIsLoading(false);
+        throw new Error('x402 payment flow failed unexpectedly. The payment flow did not complete properly. Please try again or use a different payment method.');
+      }
+
+      // Original flow for SOLANA and USDC
+      // Skip balance check - backend RPC is unreliable
+      // Transaction will fail on-chain if balance is insufficient, which is the correct behavior
+      console.log('Using standard payment flow');
+      console.log('Skipping balance check - proceeding with transaction creation');
+      console.log('Wallet address:', clientWallet.toString());
+      console.log('Current Solana network:', import.meta.env.MODE === 'production' ? 'mainnet-beta' : 'devnet');
 
       console.log('Transaction details:', {
         amount: finalAmount,
@@ -390,16 +523,28 @@ export const useEscrow = (): UseEscrowReturn => {
       });
 
       return escrow.id;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating escrow:', error);
+      
+      // If this was an x402 payment, make sure we don't fall through to SOL
+      if (String(paymentCurrency).toUpperCase() === 'X402') {
+        console.error('❌ x402 payment failed - preventing fallthrough to SOL flow');
+        toast({
+          title: "x402 Payment Failed",
+          description: error?.message || "x402 payment failed. Please try again or use a different payment method.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return null;
+      }
+      
       toast({
         title: "Escrow Creation Failed",
-        description: "Failed to create escrow. Please try again.",
+        description: error?.message || "Failed to create escrow. Please try again.",
         variant: "destructive",
       });
-      return null;
-    } finally {
       setIsLoading(false);
+      return null;
     }
   }, [provider, address, toast]);
 
@@ -614,32 +759,14 @@ export const useEscrow = (): UseEscrowReturn => {
         throw new Error(`Escrow is not in funded state. Current status: ${escrow.status}`);
       }
 
-      // Security: Verify caller is authorized (project owner or freelancer when work is approved)
+      // Security: Verify caller is authorized (project owner)
       if (!address) {
         throw new Error('Wallet not connected');
       }
 
       const project = await db.getProject(escrow.project_id);
-      const isProjectOwner = project.client_id === address;
-      
-      // If caller is freelancer, verify work is approved (backend will also verify this)
-      if (!isProjectOwner) {
-        const workSubmissions = await db.getWorkSubmissions(escrow.project_id);
-        const hasApprovedWork = workSubmissions?.some(sub => sub.status === 'approved');
-        
-        if (!hasApprovedWork) {
-          throw new Error('Unauthorized: Work must be approved before freelancer can collect payment');
-        }
-        
-        // Verify caller is the assigned freelancer
-        if (project.freelancer_id) {
-          const freelancerProfile = await db.getProfile(project.freelancer_id);
-          if (freelancerProfile?.wallet_address !== address) {
-            throw new Error('Unauthorized: Only the assigned freelancer can collect payment');
-          }
-        } else {
-          throw new Error('Unauthorized: No freelancer assigned to this project');
-        }
+      if (project.client_id !== address) {
+        throw new Error('Unauthorized: Only the project owner can release payment');
       }
 
       // Security: Verify project is in valid state for completion
