@@ -698,14 +698,22 @@ const ProjectDetails = () => {
                      )}
 
                      {/* Freelancer: Submit Work Button */}
-                     {project.status === 'in_progress' && isAssignedFreelancer && freelancer?.id && (
-                       <SubmitWorkDialog
-                         projectId={project.id}
-                         freelancerId={freelancer.id}
-                         projectTitle={project.title}
-                         onSubmissionComplete={loadWorkSubmissions}
-                       />
-                     )}
+                     {project.status === 'in_progress' && isAssignedFreelancer && freelancer?.id && (() => {
+                       // Check if there's a pending or approved submission
+                       const hasActiveSubmission = workSubmissions.some(
+                         sub => sub.status === 'pending' || sub.status === 'approved'
+                       );
+                       
+                       return (
+                         <SubmitWorkDialog
+                           projectId={project.id}
+                           freelancerId={freelancer.id}
+                           projectTitle={project.title}
+                           onSubmissionComplete={loadWorkSubmissions}
+                           disabled={hasActiveSubmission}
+                         />
+                       );
+                     })()}
 
                      {/* Client: Complete Project Button (only if work is approved) */}
                      {project.status === 'in_progress' && isProjectOwner && (

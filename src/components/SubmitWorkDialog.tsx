@@ -17,6 +17,7 @@ interface SubmitWorkDialogProps {
   triggerVariant?: "outline" | "default" | "ghost";
   triggerSize?: "sm" | "default" | "lg";
   triggerClassName?: string;
+  disabled?: boolean;
 }
 
 const SubmitWorkDialog = ({ 
@@ -26,7 +27,8 @@ const SubmitWorkDialog = ({
   onSubmissionComplete,
   triggerVariant = "default",
   triggerSize = "sm",
-  triggerClassName = "w-full"
+  triggerClassName = "w-full",
+  disabled = false
 }: SubmitWorkDialogProps) => {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -250,7 +252,7 @@ const SubmitWorkDialog = ({
           variant={triggerVariant} 
           size={triggerSize} 
           className={triggerClassName}
-          disabled={!isConnected}
+          disabled={!isConnected || disabled}
         >
           <Upload className="w-4 h-4 mr-2" />
           Submit Work

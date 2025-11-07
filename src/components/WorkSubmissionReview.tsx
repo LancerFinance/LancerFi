@@ -165,9 +165,9 @@ const WorkSubmissionReview = ({
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Description */}
-          <div>
+          <div className="min-w-0">
             <Label className="text-sm font-medium mb-2 block">Description</Label>
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{submission.description}</p>
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words overflow-hidden">{submission.description}</p>
           </div>
 
           {/* Files */}
@@ -224,9 +224,9 @@ const WorkSubmissionReview = ({
 
           {/* Review Notes (if reviewed) */}
           {submission.review_notes && (
-            <div>
+            <div className="min-w-0">
               <Label className="text-sm font-medium mb-2 block">Review Notes</Label>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{submission.review_notes}</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words overflow-hidden">{submission.review_notes}</p>
             </div>
           )}
 
