@@ -873,9 +873,6 @@ const ProjectDetails = () => {
                                    <li>Make the project available for other freelancers to apply</li>
                                    <li>Send a notification to the removed freelancer</li>
                                  </ul>
-                                 <strong className="text-destructive mt-2 block">
-                                   Note: The escrow funds will remain locked. You can create a new escrow when you hire a new freelancer.
-                                 </strong>
                                  This action cannot be undone.
                                </AlertDialogDescription>
                              </AlertDialogHeader>
