@@ -120,34 +120,48 @@ const ViewProposals = () => {
             ...Array.from(freelancerIdsFromEscrow)
           ]);
           
-          console.log(`Project was previously started (started_at: ${projectData.started_at}). Filtering out proposals from previously assigned freelancers:`, Array.from(previouslyAssignedFreelancerIds));
+          const startedAtDate = new Date(projectData.started_at);
+          
+          console.log(`Project was previously started (started_at: ${projectData.started_at}). Previously assigned freelancers:`, Array.from(previouslyAssignedFreelancerIds));
           console.log(`Found ${proposalsData.length} total proposals. Checking which ones to filter...`);
           
-          // Filter out ALL proposals from freelancers who were previously assigned
+          // Filter out only OLD proposals from previously assigned freelancers (created before started_at)
+          // Allow NEW proposals from previously assigned freelancers (created after started_at)
           const validProposals = proposalsData.filter(
             proposal => {
               if (!proposal.freelancer_id) return true;
               
-              // If this freelancer was previously assigned, NEVER show their proposal
+              // If this freelancer was previously assigned, only filter out OLD proposals
               if (previouslyAssignedFreelancerIds.has(proposal.freelancer_id)) {
-                console.log(`❌ Filtering out proposal ${proposal.id} from previously assigned freelancer: ${proposal.freelancer_id}`);
-                return false;
+                const proposalDate = proposal.created_at ? new Date(proposal.created_at) : null;
+                // If proposal was created before project started, it's an old proposal - filter it out
+                if (proposalDate && proposalDate < startedAtDate) {
+                  console.log(`❌ Filtering out OLD proposal ${proposal.id} from previously assigned freelancer: ${proposal.freelancer_id} (created: ${proposal.created_at} < started_at: ${projectData.started_at})`);
+                  return false;
+                }
+                // If proposal was created after project started, it's a NEW proposal - allow it
+                console.log(`✅ Allowing NEW proposal ${proposal.id} from previously assigned freelancer: ${proposal.freelancer_id} (created: ${proposal.created_at} > started_at: ${projectData.started_at})`);
               }
               
               return true;
             }
           );
           
-          // PERMANENTLY DELETE all proposals from previously assigned freelancers
+          // PERMANENTLY DELETE only OLD proposals from previously assigned freelancers
           // Also delete ANY proposal created before started_at (the accepted proposal was created before project started)
-          const startedAtDate = new Date(projectData.started_at);
           const proposalsToDelete = proposalsData.filter(
             proposal => {
-              // Delete if freelancer was previously assigned
+              // Delete if freelancer was previously assigned AND proposal was created before project started
               if (proposal.freelancer_id && previouslyAssignedFreelancerIds.has(proposal.freelancer_id)) {
-                return true;
+                const proposalDate = proposal.created_at ? new Date(proposal.created_at) : null;
+                if (proposalDate && proposalDate < startedAtDate) {
+                  console.log(`🗑️ Deleting OLD proposal ${proposal.id} from previously assigned freelancer ${proposal.freelancer_id} (created: ${proposal.created_at} < started_at: ${projectData.started_at})`);
+                  return true;
+                }
+                // Don't delete NEW proposals from previously assigned freelancers
+                return false;
               }
-              // Also delete if proposal was created before project started (it's an old proposal)
+              // Also delete if proposal was created before project started (it's an old proposal from any freelancer)
               if (proposal.created_at && new Date(proposal.created_at) < startedAtDate) {
                 console.log(`🗑️ Proposal ${proposal.id} was created before project started (${proposal.created_at} < ${projectData.started_at}) - deleting`);
                 return true;
