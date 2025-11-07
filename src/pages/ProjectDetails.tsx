@@ -131,17 +131,71 @@ const ProjectDetails = () => {
         }
       } else {
         // Load proposal count if no freelancer assigned
+        // Apply the same filtering logic as ViewProposals to exclude old proposals from kicked-off freelancers
         try {
-          const { data: proposals, error } = await supabase
-            .from('proposals')
-            .select('id', { count: 'exact' })
-            .eq('project_id', id);
+          const proposals = await db.getProposals(id);
           
-          if (!error && proposals) {
+          // If project has started_at, filter out proposals from previously assigned freelancers
+          if (projectData.started_at) {
+            try {
+              // Get all work submissions to find which freelancers were previously assigned
+              const workSubmissions = await db.getWorkSubmissions(id);
+              const freelancerIdsFromWork = new Set(
+                workSubmissions.map(sub => sub.freelancer_id).filter(Boolean)
+              );
+              
+              // Check escrow to find the previously assigned freelancer's wallet
+              let freelancerIdsFromEscrow = new Set<string>();
+              try {
+                const escrow = await db.getEscrow(id);
+                if (escrow && escrow.freelancer_wallet) {
+                  const freelancerProfile = await db.getProfileByWallet(escrow.freelancer_wallet);
+                  if (freelancerProfile?.id) {
+                    freelancerIdsFromEscrow.add(freelancerProfile.id);
+                  }
+                }
+              } catch (escrowError) {
+                // Ignore escrow errors
+              }
+              
+              // Combine both strategies
+              const previouslyAssignedFreelancerIds = new Set([
+                ...Array.from(freelancerIdsFromWork),
+                ...Array.from(freelancerIdsFromEscrow)
+              ]);
+              
+              // Filter out proposals from previously assigned freelancers
+              // Also filter out proposals created before started_at
+              const startedAtDate = new Date(projectData.started_at);
+              const validProposals = proposals.filter(proposal => {
+                if (!proposal.freelancer_id) return true;
+                
+                // Exclude if freelancer was previously assigned
+                if (previouslyAssignedFreelancerIds.has(proposal.freelancer_id)) {
+                  return false;
+                }
+                
+                // Exclude if proposal was created before project started
+                if (proposal.created_at && new Date(proposal.created_at) < startedAtDate) {
+                  return false;
+                }
+                
+                return true;
+              });
+              
+              setProposalCount(validProposals.length);
+            } catch (filterError) {
+              // If filtering fails, show all proposals count (fallback)
+              console.error('Error filtering proposals for count:', filterError);
+              setProposalCount(proposals.length);
+            }
+          } else {
+            // Project never had a freelancer assigned, show all proposals
             setProposalCount(proposals.length);
           }
         } catch (error) {
           console.log('Error loading proposal count:', error);
+          setProposalCount(0);
         }
       }
 
