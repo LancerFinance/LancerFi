@@ -141,7 +141,7 @@ const ProjectCard = ({ project, escrow, onViewProject, proposalCount = 0 }: Proj
           <div className="bg-accent-amber/10 border border-accent-amber/20 rounded-lg p-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-accent-amber">
-                {proposalCount} Freelancer{proposalCount > 1 ? 's' : ''} interested in this project
+                There {proposalCount === 1 ? 'is a' : 'are'} Freelancer{proposalCount > 1 ? 's' : ''} Interested in the Project
               </span>
               <Badge className="bg-accent-amber text-white">
                 {proposalCount}
