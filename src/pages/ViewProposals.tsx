@@ -183,7 +183,6 @@ const ViewProposals = () => {
             setProposals(validProposals);
             console.log(`✅ Showing ${validProposals.length} valid proposal(s) (filtered out ${proposalsData.length - validProposals.length})`);
           }
-          
         } catch (error) {
           // If error checking, show all proposals to be safe
           console.error('❌ Error checking for previously assigned freelancers:', error);
