@@ -350,7 +350,7 @@ const PostProject = () => {
                 <CardHeader className="p-4 sm:p-6">
                   <CardTitle className="text-lg sm:text-xl md:text-2xl text-foreground">Project Details</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+                <CardContent className="space-y-4 sm:space-y-5 p-4 sm:p-6">
                   <div className="space-y-1.5 sm:space-y-2">
                     <Label htmlFor="title" className="text-xs sm:text-sm">Project Title</Label>
                     <Input 
@@ -496,9 +496,6 @@ const PostProject = () => {
                     )}
                     <p className="text-xs text-muted-foreground">Upload an image that represents your project (required)</p>
                   </div>
-
-                  {/* Spacer for alignment */}
-                  <div className="h-2"></div>
 
                   <Button 
                     variant="default" 
