@@ -450,7 +450,7 @@ const ProjectDetails = () => {
             sender_id: address!,
             recipient_id: freelancer.wallet_address,
             subject: `Removed from "${project.title}"`,
-            content: `You have been removed from the project "${project.title}". The project is now open for other freelancers to apply.`
+            content: `You have been removed from the project "${project.title}".`
           });
         } catch (notificationError) {
           console.error('Error sending notification:', notificationError);
