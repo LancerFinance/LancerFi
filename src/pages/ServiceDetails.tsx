@@ -116,13 +116,26 @@ const ServiceDetails = () => {
         
         // If project was started, filter out proposals created before started_at
         const startedAtDate = new Date(project.started_at);
+        const oldProposals: any[] = [];
         const validProposals = myProposals.filter(proposal => {
           // Exclude proposals created before project started (old proposals)
           if (proposal.created_at && new Date(proposal.created_at) < startedAtDate) {
+            oldProposals.push(proposal);
             return false;
           }
           return true;
         });
+        
+        // Delete any old proposals that shouldn't exist
+        if (oldProposals.length > 0) {
+          console.log(`🗑️ Found ${oldProposals.length} old proposal(s) from before kick-off. Deleting...`);
+          await Promise.all(
+            oldProposals.map(p => db.deleteProposal(p.id).catch(err => {
+              console.error(`Error deleting old proposal ${p.id}:`, err);
+              return null;
+            }))
+          );
+        }
         
         // Only block if there's a valid (new) proposal
         setHasSubmittedProposal(validProposals.length > 0);

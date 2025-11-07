@@ -139,8 +139,8 @@ const ViewProposals = () => {
                   console.log(`❌ Filtering out OLD proposal ${proposal.id} from previously assigned freelancer: ${proposal.freelancer_id} (created: ${proposal.created_at} < started_at: ${projectData.started_at})`);
                   return false;
                 }
-                // If proposal was created after project started, it's a NEW proposal - allow it
-                console.log(`✅ Allowing NEW proposal ${proposal.id} from previously assigned freelancer: ${proposal.freelancer_id} (created: ${proposal.created_at} > started_at: ${projectData.started_at})`);
+                // If proposal was created after or at the same time as project started, it's a NEW proposal - allow it
+                console.log(`✅ Allowing NEW proposal ${proposal.id} from previously assigned freelancer: ${proposal.freelancer_id} (created: ${proposal.created_at}, started_at: ${projectData.started_at})`);
               }
               
               return true;
