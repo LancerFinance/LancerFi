@@ -789,58 +789,50 @@ const ProjectDetails = () => {
                      })()}
 
                      {/* Client: Complete Project Button (only if work is approved) */}
-                     {project.status === 'in_progress' && isProjectOwner && (
-                       <>
-                         {workSubmissions.some(sub => sub.status === 'approved') ? (
-                           <AlertDialog>
-                             <AlertDialogTrigger asChild>
-                               <Button 
-                                 variant="default" 
-                                 size="sm" 
-                                 className="w-full"
-                                 disabled={completing}
-                               >
-                                 <CheckCircle className="w-4 h-4 mr-2" />
-                                 Complete Project
-                               </Button>
-                             </AlertDialogTrigger>
-                             <AlertDialogContent>
-                               <AlertDialogHeader>
-                                 <AlertDialogTitle>Complete Project</AlertDialogTitle>
-                                 <AlertDialogDescription>
-                                   Are you sure you want to mark this project as completed? This will:
-                                   <ul className="list-disc list-inside mt-2 space-y-1">
-                                     <li>Update the project status to "Completed"</li>
-                                     <li>Release the escrow funds to the freelancer</li>
-                                     <li>Update the freelancer's earnings and project count</li>
-                                   </ul>
-                                   This action cannot be undone.
-                                 </AlertDialogDescription>
-                               </AlertDialogHeader>
-                               <AlertDialogFooter>
-                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                 <AlertDialogAction
-                                   onClick={handleCompleteProject}
-                                   disabled={completing || escrowLoading}
-                                 >
-                                   {(completing || escrowLoading) ? (
-                                     <>
-                                       <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
-                                       Processing Payment...
-                                     </>
-                                   ) : (
-                                     "Complete Project"
-                                   )}
-                                 </AlertDialogAction>
-                               </AlertDialogFooter>
-                             </AlertDialogContent>
-                           </AlertDialog>
-                         ) : (
-                           <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
-                             Waiting for work submission to be approved before completing project.
-                           </div>
-                         )}
-                       </>
+                     {project.status === 'in_progress' && isProjectOwner && workSubmissions.some(sub => sub.status === 'approved') && (
+                       <AlertDialog>
+                         <AlertDialogTrigger asChild>
+                           <Button 
+                             variant="default" 
+                             size="sm" 
+                             className="w-full"
+                             disabled={completing}
+                           >
+                             <CheckCircle className="w-4 h-4 mr-2" />
+                             Complete Project
+                           </Button>
+                         </AlertDialogTrigger>
+                         <AlertDialogContent>
+                           <AlertDialogHeader>
+                             <AlertDialogTitle>Complete Project</AlertDialogTitle>
+                             <AlertDialogDescription>
+                               Are you sure you want to mark this project as completed? This will:
+                               <ul className="list-disc list-inside mt-2 space-y-1">
+                                 <li>Update the project status to "Completed"</li>
+                                 <li>Release the escrow funds to the freelancer</li>
+                                 <li>Update the freelancer's earnings and project count</li>
+                               </ul>
+                               This action cannot be undone.
+                             </AlertDialogDescription>
+                           </AlertDialogHeader>
+                           <AlertDialogFooter>
+                             <AlertDialogCancel>Cancel</AlertDialogCancel>
+                             <AlertDialogAction
+                               onClick={handleCompleteProject}
+                               disabled={completing || escrowLoading}
+                             >
+                               {(completing || escrowLoading) ? (
+                                 <>
+                                   <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
+                                   Processing Payment...
+                                 </>
+                               ) : (
+                                 "Complete Project"
+                               )}
+                             </AlertDialogAction>
+                           </AlertDialogFooter>
+                         </AlertDialogContent>
+                       </AlertDialog>
                      )}
 
                      {/* Client: Kick Off Freelancer Button */}
@@ -848,6 +840,14 @@ const ProjectDetails = () => {
                        const hasRevisionRequested = workSubmissions.some(
                          sub => sub.status === 'revision_requested'
                        );
+                       const hasApprovedWork = workSubmissions.some(
+                         sub => sub.status === 'approved'
+                       );
+                       
+                       // Don't show if work is approved
+                       if (hasApprovedWork) {
+                         return null;
+                       }
                        
                        return (
                          <AlertDialog open={showKickOffDialog} onOpenChange={setShowKickOffDialog}>
