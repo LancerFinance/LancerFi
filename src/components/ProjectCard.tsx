@@ -140,13 +140,18 @@ const ProjectCard = ({ project, escrow, onViewProject, proposalCount = 0 }: Proj
         {!project.freelancer_id && proposalCount > 0 && (
           <div className="bg-accent-amber/10 border border-accent-amber/20 rounded-lg p-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-accent-amber">
-                {proposalCount} New Proposal{proposalCount > 1 ? 's' : ''}
-              </span>
-              <Badge className="bg-accent-amber text-white">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-accent-amber">
+                  🎯 {proposalCount} Freelancer{proposalCount > 1 ? 's' : ''} Interested
+                </span>
+              </div>
+              <Badge className="bg-accent-amber text-white font-semibold">
                 {proposalCount}
               </Badge>
             </div>
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Review {proposalCount > 1 ? 'proposals' : 'proposal'} to find the perfect match
+            </p>
           </div>
         )}
 
