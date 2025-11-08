@@ -289,10 +289,11 @@ export async function releasePaymentFromPlatform(
   
   // Simulate transaction first to catch errors before sending
   try {
-    const simulation = await connection.simulateTransaction(transaction, {
-      commitment: 'confirmed',
-      replaceRecentBlockhash: true
-    });
+    // Get a fresh blockhash for simulation
+    const { blockhash: simBlockhash } = await connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = simBlockhash;
+    
+    const simulation = await connection.simulateTransaction(transaction);
     
     console.log(`[USDC Release] Simulation result:`, {
       err: simulation.value.err,
@@ -301,6 +302,11 @@ export async function releasePaymentFromPlatform(
     });
     
     if (simulation.value.err) {
+      const errorDetails = {
+        err: simulation.value.err,
+        logs: simulation.value.logs || []
+      };
+      console.error(`[USDC Release] Simulation failed with details:`, errorDetails);
       throw new Error(`Transaction simulation failed: ${JSON.stringify(simulation.value.err)}. Logs: ${simulation.value.logs?.join('\n') || 'No logs'}`);
     }
   } catch (simError: any) {
