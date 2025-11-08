@@ -67,6 +67,12 @@ export async function releasePaymentFromPlatform(
   const platformKeypair = getPlatformKeypair();
   const escrowAccount = platformKeypair.publicKey;
   
+  // Verify we're using the correct platform wallet
+  console.log(`[USDC Release] Platform wallet: ${escrowAccount.toString()}`);
+  if (escrowAccount.toString() !== 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U') {
+    throw new Error(`Platform wallet mismatch! Expected AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U, got ${escrowAccount.toString()}`);
+  }
+  
   // Security: Verify wallet balance before attempting transfer
   // Note: For USDC, we'll verify the token account exists and has balance in the transfer section below
   // This avoids duplicate checks and ensures we have the token account address available
