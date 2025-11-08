@@ -203,6 +203,103 @@ router.post('/account-balance', async (req, res) => {
 });
 
 /**
+ * Get token balance (e.g., USDC) via MAINNET RPC
+ */
+router.options('/token-balance', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(204);
+});
+
+router.post('/token-balance', async (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  
+  try {
+    const { tokenAccount, mint } = req.body;
+    
+    if (!tokenAccount || typeof tokenAccount !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Token account address is required'
+      });
+    }
+
+    const { PublicKey } = await import('@solana/web3.js');
+    const { getTokenAccountBalance } = await import('@solana/spl-token');
+    const tokenAccountPubkey = new PublicKey(tokenAccount);
+    
+    // Try all endpoints in parallel with timeout
+    const TIMEOUT_MS = 3000;
+    
+    type TokenBalanceResult = {
+      success?: boolean;
+      balance?: number;
+      error?: Error | string;
+      endpoint?: string;
+    };
+    
+    const balancePromises = RPC_ENDPOINTS.map(endpoint => {
+      return Promise.race([
+        (async (): Promise<TokenBalanceResult> => {
+          const testConnection = new Connection(endpoint, {
+            commitment: 'confirmed',
+            confirmTransactionInitialTimeout: 10000,
+            disableRetryOnRateLimit: false,
+          });
+          
+          try {
+            const accountInfo = await testConnection.getTokenAccountBalance(tokenAccountPubkey, 'confirmed');
+            return {
+              success: true,
+              balance: parseFloat(accountInfo.value.uiAmount?.toString() || '0')
+            };
+          } catch (err: any) {
+            // If account doesn't exist, return 0 balance (not an error)
+            if (err.message?.includes('Invalid param') || err.message?.includes('not found')) {
+              return {
+                success: true,
+                balance: 0
+              };
+            }
+            throw err;
+          }
+        })(),
+        new Promise<TokenBalanceResult>((_, reject) => 
+          setTimeout(() => reject(new Error(`Timeout after ${TIMEOUT_MS}ms`)), TIMEOUT_MS)
+        )
+      ]).catch((error): TokenBalanceResult => ({ error, endpoint }));
+    });
+    
+    // Wait for first successful response
+    const results = await Promise.all(balancePromises);
+    const success = results.find((r: TokenBalanceResult) => r.success && !r.error);
+    
+    if (success && success.success) {
+      return res.json({
+        success: true,
+        balance: success.balance
+      });
+    }
+    
+    // All failed - return 0 balance (account might not exist)
+    return res.json({
+      success: true,
+      balance: 0
+    });
+  } catch (error) {
+    console.error('Error getting token balance:', error);
+    // Return 0 balance on error (account might not exist)
+    res.json({
+      success: true,
+      balance: 0
+    });
+  }
+});
+
+/**
  * Verify transaction on MAINNET
  */
 router.options('/verify-transaction', (req, res) => {

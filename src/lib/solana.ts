@@ -578,12 +578,47 @@ export async function releasePaymentFromPlatform(
   throw new Error('SECURITY ERROR: Payment release must be done through secure backend API. This function is disabled.');
 }
 
-// Get USDC balance
-export async function getUSDCBalance(walletAddress: PublicKey): Promise<number> {
+// Get USDC balance via backend proxy (avoids RPC 403 errors)
+export async function getUSDCBalance(walletAddress: PublicKey | string): Promise<number> {
   try {
-    const tokenAccount = await getAssociatedTokenAddress(USDC_MINT, walletAddress);
-    const accountInfo = await connection.getTokenAccountBalance(tokenAccount);
-    return parseFloat(accountInfo.value.uiAmount?.toString() || '0');
+    const address = typeof walletAddress === 'string' ? walletAddress : walletAddress.toString();
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 
+      (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+    
+    // Get token account address
+    const publicKey = typeof walletAddress === 'string' ? new PublicKey(walletAddress) : walletAddress;
+    const tokenAccount = await getAssociatedTokenAddress(USDC_MINT, publicKey);
+    
+    // Try backend proxy first
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/rpc/token-balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokenAccount: tokenAccount.toString(),
+          mint: USDC_MINT.toString()
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.balance !== undefined) {
+          return parseFloat(data.balance.toString());
+        }
+      }
+    } catch (proxyError) {
+      console.warn('Backend USDC balance check failed, trying direct RPC:', proxyError);
+    }
+    
+    // Fallback to direct RPC (may fail with 403)
+    try {
+      const accountInfo = await connection.getTokenAccountBalance(tokenAccount);
+      return parseFloat(accountInfo.value.uiAmount?.toString() || '0');
+    } catch (directError) {
+      console.warn('Direct RPC USDC balance check failed:', directError);
+      // If account doesn't exist, return 0 (user has no USDC)
+      return 0;
+    }
   } catch (error) {
     console.error('Error getting USDC balance:', error);
     return 0;
