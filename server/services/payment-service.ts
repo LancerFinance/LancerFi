@@ -165,13 +165,41 @@ export async function releasePaymentFromPlatform(
       );
     }
     
+    // CRITICAL: For SPL token transfers, the authority must be the owner of the SOURCE token account
+    // The platform wallet (escrowAccount) owns the escrowTokenAccount, so it's the authority
+    // But we need to verify the escrowTokenAccount's owner is actually escrowAccount
+    // Get the token account info to verify ownership
+    const { getAccount } = await import('@solana/spl-token');
+    let escrowTokenAccountData;
+    try {
+      escrowTokenAccountData = await getAccount(connection, escrowTokenAccount);
+      console.log(`Escrow token account owner: ${escrowTokenAccountData.owner.toString()}, Platform wallet: ${escrowAccount.toString()}`);
+      
+      // Verify the owner matches
+      if (escrowTokenAccountData.owner.toString() !== escrowAccount.toString()) {
+        throw new Error(`Token account owner mismatch. Account owner: ${escrowTokenAccountData.owner.toString()}, Expected: ${escrowAccount.toString()}`);
+      }
+    } catch (error: any) {
+      console.error('Error getting token account data:', error);
+      // If getAccount fails, try to proceed anyway - might be a different error
+      if (error.message?.includes('owner mismatch')) {
+        throw error;
+      }
+    }
+    
     // Transfer tokens from escrow to freelancer
+    // Authority must be the owner of the source token account (escrowTokenAccount)
+    // Since escrowAccount owns escrowTokenAccount, escrowAccount is the authority
+    const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
+    
+    console.log(`Creating transfer: From ${escrowTokenAccount.toString()} to ${freelancerTokenAccount.toString()}, Amount: ${transferAmount.toString()}, Authority: ${escrowAccount.toString()}`);
+    
     transaction.add(
       createTransferInstruction(
-        escrowTokenAccount,
-        freelancerTokenAccount,
-        escrowAccount, // Platform wallet as authority
-        Math.round(amount * Math.pow(10, decimals)),
+        escrowTokenAccount, // Source: platform wallet's USDC token account
+        freelancerTokenAccount, // Destination: freelancer's USDC token account
+        escrowAccount, // Authority: platform wallet (owner of source token account)
+        transferAmount, // Amount in micro-USDC (use BigInt)
         [],
         TOKEN_PROGRAM_ID
       )
