@@ -54,7 +54,7 @@ router.post('/blockhash', async (req, res) => {
   
   try {
     // Try all endpoints in parallel with timeout (much faster than sequential)
-    const TIMEOUT_MS = 3000; // 3 second timeout per endpoint
+    const TIMEOUT_MS = 1500; // 1.5 second timeout per endpoint (reduced for speed)
     
     type BlockhashResult = {
       success?: boolean;

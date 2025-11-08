@@ -351,11 +351,14 @@ const PostProject = () => {
       const totalRequired = budgetAmount + platformFee;
       const transactionFeeBuffer = 0.01; // Buffer for transaction fees
       
-      // Get balance and price checks in parallel for better performance
-      const [solBalanceData, solPriceData] = await Promise.all([
+      // Run ALL balance and price checks in parallel for maximum speed
+      const balanceChecks = [
         getAccountBalanceViaProxy(address),
-        paymentCurrency === 'SOLANA' ? getSolanaPrice() : Promise.resolve(null)
-      ]);
+        paymentCurrency === 'SOLANA' ? getSolanaPrice() : Promise.resolve(null),
+        (paymentCurrency === 'X402' || paymentCurrency === 'USDC') ? getUSDCBalance(walletAddress) : Promise.resolve(null)
+      ];
+      
+      const [solBalanceData, solPriceData, usdcBalance] = await Promise.all(balanceChecks);
       
       const solBalance = solBalanceData.balanceSOL;
       
@@ -392,11 +395,9 @@ const PostProject = () => {
         }
       }
       
-      // For x402 and USDC payments, check USDC balance
+      // For x402 and USDC payments, check USDC balance (already fetched in parallel above)
       if (paymentCurrency === 'X402' || paymentCurrency === 'USDC') {
-        const usdcBalance = await getUSDCBalance(walletAddress);
-        
-        if (usdcBalance < totalRequired) {
+        if (usdcBalance !== null && usdcBalance < totalRequired) {
           setIsCheckingBalance(false);
           toast({
             title: "Insufficient USDC",

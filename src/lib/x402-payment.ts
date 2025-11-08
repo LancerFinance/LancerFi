@@ -88,17 +88,28 @@ export async function processX402Payment(
   // Create USDC transfer transaction
   const transaction = new Transaction();
 
-  // Get latest blockhash
-  const { blockhash, lastValidBlockHeight } = await getLatestBlockhashWithFallback();
+  // Get latest blockhash (optimized - use backend proxy with shorter timeout)
+  // Start blockhash fetch early while we get token accounts
+  const blockhashPromise = getLatestBlockhashWithFallback();
+  
+  // Get associated token accounts (async) - run in parallel with blockhash
+  const [tokenAccounts, blockhashData] = await Promise.all([
+    Promise.all([
+      getAssociatedTokenAddress(mint, clientWallet),
+      getAssociatedTokenAddress(mint, recipientWallet)
+    ]),
+    blockhashPromise
+  ]);
+  
+  const [clientTokenAccount, recipientTokenAccount] = tokenAccounts;
+  const { blockhash, lastValidBlockHeight } = blockhashData;
+  
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = clientWallet;
   transaction.lastValidBlockHeight = lastValidBlockHeight;
 
-  // Get associated token accounts (async)
-  const clientTokenAccount = await getAssociatedTokenAddress(mint, clientWallet);
-  const recipientTokenAccount = await getAssociatedTokenAddress(mint, recipientWallet);
-
   // Always add instruction to create recipient token account if it doesn't exist
+  // (token accounts already fetched above in parallel with blockhash)
   // Solana will handle this gracefully - if account exists, instruction is a no-op
   // This avoids needing to check account existence (which causes 403 errors)
   transaction.add(

@@ -191,6 +191,9 @@ export const useEscrow = (): UseEscrowReturn => {
       // Skip balance check - backend RPC is unreliable
       // Transaction will fail on-chain if balance is insufficient, which is the correct behavior
 
+      // Start blockhash fetch early (in parallel with escrow creation)
+      const blockhashPromise = getLatestBlockhashWithFallback();
+      
       // Create escrow account on Solana (internally using single token)
       const { escrowAccount, transaction } = await createEscrowAccount(
         clientWallet,
@@ -200,8 +203,8 @@ export const useEscrow = (): UseEscrowReturn => {
         platformFeePercent
       );
 
-      // Get the latest blockhash (with fallback RPCs if official RPC is rate-limited)
-      const { blockhash, lastValidBlockHeight } = await getLatestBlockhashWithFallback();
+      // Get blockhash (should already be ready from parallel fetch)
+      const { blockhash, lastValidBlockHeight } = await blockhashPromise;
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = clientWallet;
       transaction.lastValidBlockHeight = lastValidBlockHeight;
@@ -249,26 +252,19 @@ export const useEscrow = (): UseEscrowReturn => {
           throw new Error(`Phantom transaction failed: ${phantomError?.message || 'Unknown error'}`);
         }
         
-        // Optimized verification - check immediately, then retry quickly if needed
-        // Phantom's signAndSendTransaction should have already confirmed, so we check right away
-        let confirmed = false;
-        let attempts = 0;
-        const maxAttempts = 4; // Max 4 attempts (about 2-3 seconds total)
-        
-        while (!confirmed && attempts < maxAttempts) {
-          // First attempt is immediate, subsequent attempts wait 500ms
-          if (attempts > 0) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
+        // Phantom's signAndSendTransaction already confirms the transaction
+        // Do a quick single check (non-blocking) - if it fails, proceed anyway since Phantom confirmed it
+        // This reduces wait time from 2-3 seconds to <500ms
+        try {
+          // Quick single check (don't wait for it)
+          const quickCheck = verifyTransaction(signature);
           
-          const verification = await verifyTransaction(signature);
+          // Wait just 200ms for initial propagation, then check
+          await new Promise(resolve => setTimeout(resolve, 200));
           
-          if (verification.success && verification.confirmed) {
-            confirmed = true;
-            break; // Fast path - transaction confirmed immediately
-          }
+          const verification = await quickCheck;
           
-          // If transaction has an error (not just "not found"), it failed
+          // Only throw if transaction has a real error (not "not found" or 403)
           if (verification.error && 
               !verification.error.includes('not found') && 
               !verification.error.includes('403') &&
@@ -276,14 +272,14 @@ export const useEscrow = (): UseEscrowReturn => {
             throw new Error(`Transaction failed on-chain: ${verification.error}`);
           }
           
-          attempts++;
-        }
-        
-        // If we couldn't verify but Phantom confirmed it, proceed anyway
-        // This is safe because Phantom's signAndSendTransaction only returns after confirmation
-        if (!confirmed) {
-          // Transaction might still be confirming, but Phantom said it's sent
-          // Proceed with escrow creation - if transaction actually failed, escrow will fail too
+          // If verified or can't verify (403/not found), proceed - Phantom already confirmed it
+        } catch (verifyError: any) {
+          // If it's not a real transaction error, proceed anyway
+          if (!verifyError?.message?.includes('failed on-chain')) {
+            // Can't verify but Phantom confirmed it - proceed
+          } else {
+            throw verifyError;
+          }
         }
         
       } catch (error: any) {
