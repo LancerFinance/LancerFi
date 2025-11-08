@@ -40,7 +40,7 @@ export const connection = new Connection(RPC_ENDPOINT, {
 export async function getLatestBlockhashWithFallback(): Promise<{ blockhash: string; lastValidBlockHeight: number }> {
   // Try backend proxy first (avoids CORS and browser rate limiting)
   const API_BASE_URL = import.meta.env.VITE_API_URL || 
-    (import.meta.env.PROD ? '' : 'http://localhost:3001');
+    (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
   
   try {
     const response = await fetch(`${API_BASE_URL}/api/rpc/blockhash`, {
@@ -87,7 +87,7 @@ export async function getLatestBlockhashWithFallback(): Promise<{ blockhash: str
 // Helper function to get account balance via backend proxy (avoids CORS/403 errors)
 export async function getAccountBalanceViaProxy(address: string): Promise<{ balance: number; balanceSOL: number; accountExists: boolean; owner: string | null }> {
   const API_BASE_URL = import.meta.env.VITE_API_URL || 
-    (import.meta.env.PROD ? '' : 'http://localhost:3001');
+    (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
   
   try {
     const response = await fetch(`${API_BASE_URL}/api/rpc/account-balance`, {
@@ -139,7 +139,7 @@ export async function getAccountBalanceViaProxy(address: string): Promise<{ bala
 export async function sendRawTransactionViaProxy(serializedTransaction: Uint8Array): Promise<string> {
   // Try backend proxy first (avoids CORS and browser rate limiting)
   const API_BASE_URL = import.meta.env.VITE_API_URL || 
-    (import.meta.env.PROD ? '' : 'http://localhost:3001');
+    (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
   
   console.log('🔍 Backend URL:', API_BASE_URL);
   
@@ -202,7 +202,7 @@ export async function confirmTransactionViaProxy(
   commitment: 'confirmed' | 'finalized' = 'confirmed'
 ): Promise<{ success: boolean; slot?: number; error?: string }> {
   const API_BASE_URL = import.meta.env.VITE_API_URL || 
-    (import.meta.env.PROD ? '' : 'http://localhost:3001');
+    (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
   
   try {
     const response = await fetch(`${API_BASE_URL}/api/rpc/confirm-transaction`, {
@@ -240,7 +240,7 @@ export async function confirmTransactionViaProxy(
 export async function verifyTransaction(signature: string): Promise<{ confirmed: boolean; error?: string; success?: boolean }> {
   // Try backend proxy first (avoids CORS and browser rate limiting)
   const API_BASE_URL = import.meta.env.VITE_API_URL || 
-    (import.meta.env.PROD ? '' : 'http://localhost:3001');
+    (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
   
   try {
     const response = await fetch(`${API_BASE_URL}/api/rpc/verify-transaction`, {
