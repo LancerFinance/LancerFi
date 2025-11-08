@@ -120,11 +120,35 @@ export async function releasePaymentFromPlatform(
       escrowAccount
     );
     
-    // CRITICAL: Verify escrow token account exists before attempting transfer
+    // CRITICAL: Verify escrow token account exists and has balance before attempting transfer
     // For x402 payments, USDC should already be in the platform wallet
-    const escrowTokenAccountInfo = await connection.getAccountInfo(escrowTokenAccount);
-    if (!escrowTokenAccountInfo) {
-      throw new Error(`Platform wallet USDC token account does not exist. Cannot release payment. Token account: ${escrowTokenAccount.toString()}`);
+    let escrowTokenAccountInfo;
+    let escrowBalance;
+    try {
+      escrowTokenAccountInfo = await connection.getAccountInfo(escrowTokenAccount);
+      if (!escrowTokenAccountInfo) {
+        throw new Error(`Platform wallet USDC token account does not exist. Token account: ${escrowTokenAccount.toString()}. This may mean the x402 payment was not received.`);
+      }
+      
+      // Also check the actual balance to ensure we have enough
+      const balanceInfo = await connection.getTokenAccountBalance(escrowTokenAccount);
+      escrowBalance = parseFloat(balanceInfo.value.uiAmount?.toString() || '0');
+      
+      if (escrowBalance < amount) {
+        throw new Error(`Insufficient USDC balance in platform wallet. Required: ${amount} USDC, Available: ${escrowBalance} USDC`);
+      }
+    } catch (error: any) {
+      // If getAccountInfo fails, the account doesn't exist
+      if (error.message?.includes('does not exist') || error.message?.includes('Invalid param')) {
+        throw new Error(`Platform wallet USDC token account does not exist. Token account: ${escrowTokenAccount.toString()}. This may mean the x402 payment was not received or the token account was never created.`);
+      }
+      // If it's a balance check error, re-throw it
+      if (error.message?.includes('Insufficient')) {
+        throw error;
+      }
+      // Otherwise, it might be a different error - log it and throw
+      console.error('Error checking escrow token account:', error);
+      throw new Error(`Failed to verify platform wallet USDC token account: ${error.message || 'Unknown error'}`);
     }
     
     // Get freelancer's token account
