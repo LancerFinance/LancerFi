@@ -22,6 +22,7 @@ import { PROJECT_CATEGORIES } from "@/lib/categories";
 import { useEscrow } from "@/hooks/useEscrow";
 import { checkImageForNSFW } from "@/lib/nsfw-detection";
 import { validateProjectTextForProfanity } from "@/lib/profanity-filter";
+import { checkIPProjectLimit, recordProjectCreation } from "@/lib/api-client";
 
 const PostProject = () => {
   const navigate = useNavigate();
@@ -254,6 +255,53 @@ const PostProject = () => {
     // Show loading state immediately
     setIsCheckingBalance(true);
     
+    // Check wallet-based rate limit (24 hours between projects)
+    try {
+      const { data: recentProjects, error: walletCheckError } = await supabase
+        .from('projects')
+        .select('created_at')
+        .eq('client_id', address)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (!walletCheckError && recentProjects && recentProjects.length > 0) {
+        const lastProjectTime = new Date(recentProjects[0].created_at);
+        const now = new Date();
+        const hoursSinceLastProject = (now.getTime() - lastProjectTime.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursSinceLastProject < 24) {
+          const remainingHours = Math.ceil(24 - hoursSinceLastProject);
+          setIsCheckingBalance(false);
+          toast({
+            title: "Rate Limit Exceeded",
+            description: `You can only create one project every 24 hours. Please wait ${remainingHours} more hour${remainingHours > 1 ? 's' : ''} before creating another project.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    } catch (walletLimitError: any) {
+      console.error('Error checking wallet rate limit:', walletLimitError);
+      // Continue if check fails (fail open)
+    }
+    
+    // Check IP-based rate limit (3 projects per 6 hours)
+    try {
+      const ipLimitCheck = await checkIPProjectLimit();
+      if (!ipLimitCheck.allowed) {
+        setIsCheckingBalance(false);
+        toast({
+          title: "IP Rate Limit Exceeded",
+          description: ipLimitCheck.reason || `This IP address has created ${ipLimitCheck.count}/${ipLimitCheck.limit} projects in the last 6 hours. Please wait before creating another project.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch (ipLimitError: any) {
+      console.error('Error checking IP rate limit:', ipLimitError);
+      // Continue if check fails (fail open)
+    }
+    
     // Check wallet balances before proceeding
     // For SOL payments, check SOL balance (payment amount + platform fee + transaction fees)
     // For x402/USDC payments, check USDC balance
@@ -388,6 +436,12 @@ const PostProject = () => {
         status: selectedFreelancer ? 'in_progress' : 'active',
         project_images: [publicUrl],
         ...(selectedFreelancer ? { freelancer_id: selectedFreelancer.id } : {})
+      });
+
+      // Record project creation for IP tracking (non-blocking)
+      recordProjectCreation(project.id, address).catch(err => {
+        console.error('Failed to record project creation for IP tracking:', err);
+        // Don't fail the request if this fails
       });
 
       // Create and fund escrow immediately after project creation

@@ -110,3 +110,73 @@ export async function checkBackendHealth(): Promise<boolean> {
   }
 }
 
+/**
+ * Check if IP can create a project (3 projects per 6 hours)
+ */
+export async function checkIPProjectLimit(): Promise<{
+  allowed: boolean;
+  count: number;
+  limit: number;
+  reason: string;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/project/check-ip-limit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      // Fail open - allow if we can't check
+      return {
+        allowed: true,
+        count: 0,
+        limit: 3,
+        reason: 'Unable to verify IP limit',
+      };
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error checking IP limit:', error);
+    // Fail open - allow if there's an error
+    return {
+      allowed: true,
+      count: 0,
+      limit: 3,
+      reason: 'Error checking IP limit',
+    };
+  }
+}
+
+/**
+ * Record a project creation (called after project is successfully created)
+ */
+export async function recordProjectCreation(projectId: string, walletAddress: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/project/record-project-creation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        projectId,
+        walletAddress,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to record project creation');
+      return false;
+    }
+
+    const data = await response.json();
+    return data.success === true;
+  } catch (error) {
+    console.error('Error recording project creation:', error);
+    return false;
+  }
+}
+

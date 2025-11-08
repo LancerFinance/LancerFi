@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { releasePaymentRouter } from './routes/release-payment.js';
 import rpcProxyRouter from './routes/rpc-proxy.js';
 import x402PaymentRouter from './routes/x402-payment.js';
+import projectRateLimitRouter from './routes/project-rate-limit.js';
 
 // Load environment variables
 dotenv.config();
@@ -43,6 +44,7 @@ app.get('/health', (req, res) => {
 app.use('/api/payment', releasePaymentRouter);
 app.use('/api/rpc', rpcProxyRouter);
 app.use('/api/x402', x402PaymentRouter);
+app.use('/api/project', projectRateLimitRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
