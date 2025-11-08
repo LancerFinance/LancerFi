@@ -43,7 +43,6 @@ export async function requestX402Payment(
   // NOTE: Browser console will show 402 as an error (red), but this is CORRECT behavior for x402 protocol
   // HTTP 402 "Payment Required" is the standard response for x402 payment challenges
   if (response.status === 402) {
-    console.log('✅ x402 Payment Required response received (HTTP 402 is correct for x402 protocol)');
     const paymentDetails = await response.json();
     return paymentDetails as X402PaymentChallenge;
   }
@@ -83,18 +82,8 @@ export async function processX402Payment(
   const amount = parseFloat(paymentChallenge.amount);
   const mint = new PublicKey(paymentChallenge.mint);
 
-  // IMPORTANT: Explain what the user will see in Phantom
-  console.log('📋 X402 Payment Details:');
-  console.log('  • Amount: ' + amount + ' USDC (this is $' + amount + ' USD)');
-  console.log('  • Platform Wallet (main): ' + recipientWallet.toString());
-  console.log('  • Phantom will show: "11000000" = 11 USDC in micro-USDC format');
-  console.log('  • Phantom will show: Associated Token Account address (not the main wallet)');
-  console.log('  • This is CORRECT - tokens are stored in separate accounts on Solana');
-  console.log('  • The transaction will send 11 USDC to the platform wallet');
-
   // Note: We skip balance check here to avoid 403 RPC errors
   // Phantom wallet will validate the balance and show appropriate errors if insufficient
-  console.log('Skipping USDC balance check - Phantom will validate balance when signing');
 
   // Create USDC transfer transaction
   const transaction = new Transaction();
@@ -108,19 +97,10 @@ export async function processX402Payment(
   // Get associated token accounts (async)
   const clientTokenAccount = await getAssociatedTokenAddress(mint, clientWallet);
   const recipientTokenAccount = await getAssociatedTokenAddress(mint, recipientWallet);
-  
-  console.log('📦 Token Account Details:');
-  console.log('  • Your Main Wallet: ' + clientWallet.toString());
-  console.log('  • Your USDC Token Account: ' + clientTokenAccount.toString());
-  console.log('  • Platform Main Wallet: ' + recipientWallet.toString());
-  console.log('  • Platform USDC Token Account: ' + recipientTokenAccount.toString());
-  console.log('  • This is the address Phantom shows - it\'s the USDC account, not the main wallet');
-  console.log('  • The platform controls this account - you don\'t need access to it');
 
   // Always add instruction to create recipient token account if it doesn't exist
   // Solana will handle this gracefully - if account exists, instruction is a no-op
   // This avoids needing to check account existence (which causes 403 errors)
-  console.log('Adding create token account instruction (will be no-op if account exists)');
   transaction.add(
     createAssociatedTokenAccountInstruction(
       clientWallet, // Payer for account creation
@@ -134,14 +114,6 @@ export async function processX402Payment(
   // amount is already in USDC (e.g., 11), so multiply by 10^6 to get micro-USDC
   // Use BigInt to ensure proper token amount handling
   const microUSDC = BigInt(Math.round(amount * Math.pow(10, 6)));
-  
-  console.log('x402 Payment amount conversion:', {
-    amountUSDC: amount,
-    microUSDC: microUSDC.toString(),
-    decimals: 6,
-    calculation: `${amount} * 10^6 = ${microUSDC.toString()}`,
-    note: 'This is USDC, not SOL. Phantom should display as USDC token transfer.'
-  });
 
   // Add USDC transfer instruction
   // Using BigInt ensures Phantom recognizes this as a token transfer, not SOL
@@ -155,25 +127,16 @@ export async function processX402Payment(
       TOKEN_PROGRAM_ID
     )
   );
-  
-  console.log('Transaction instructions:', {
-    instructionCount: transaction.instructions.length,
-    firstInstruction: transaction.instructions[0]?.programId.toString(),
-    secondInstruction: transaction.instructions[1]?.programId.toString(),
-    note: 'Both instructions should use TOKEN_PROGRAM_ID, not SystemProgram'
-  });
 
   // Use Phantom's signAndSendTransaction - it handles both signing and broadcasting
   // This bypasses the backend RPC proxy and uses Phantom's own RPC connection
   // This avoids 403 errors from backend RPC endpoints
-  console.log('Signing and sending transaction via Phantom (bypasses backend RPC proxy)...');
   
   try {
     const signature = await wallet.signAndSendTransaction(transaction);
-    console.log('✅ Transaction signed and sent via Phantom, signature:', signature);
     return signature;
   } catch (error: any) {
-    console.error('Phantom signAndSendTransaction failed:', error);
+    console.error('Phantom transaction failed');
     
     // If signAndSendTransaction fails, provide helpful error message
     if (error.message?.includes('User rejected')) {

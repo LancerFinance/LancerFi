@@ -38,11 +38,6 @@ const PostProject = () => {
     skills: ''
   });
   const [paymentCurrency, setPaymentCurrency] = useState<PaymentCurrency>('SOLANA');
-  
-  // DEBUG: Log whenever paymentCurrency changes
-  useEffect(() => {
-    console.log('🔵🔵🔵 paymentCurrency STATE CHANGED TO:', paymentCurrency);
-  }, [paymentCurrency]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFreelancer, setSelectedFreelancer] = useState<any>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -247,7 +242,6 @@ const PostProject = () => {
       const totalRequired = budgetAmount + platformFee;
       
       // Always check SOL balance (needed for transaction fees)
-      console.log('Checking SOL balance for transaction fees...');
       const solBalanceData = await getAccountBalanceViaProxy(address);
       const solBalance = solBalanceData.balanceSOL;
       const minSOLRequired = 0.01; // Minimum SOL for transaction fees
@@ -263,14 +257,7 @@ const PostProject = () => {
       
       // For x402 and USDC payments, check USDC balance
       if (paymentCurrency === 'X402' || paymentCurrency === 'USDC') {
-        console.log('Checking USDC balance for x402/USDC payment...');
         const usdcBalance = await getUSDCBalance(walletAddress);
-        
-        console.log('Balance check:', {
-          required: totalRequired,
-          current: usdcBalance,
-          hasEnough: usdcBalance >= totalRequired
-        });
         
         if (usdcBalance < totalRequired) {
           toast({
@@ -280,13 +267,6 @@ const PostProject = () => {
           });
           return;
         }
-        
-        console.log('✅ Balance check passed:', {
-          usdcBalance,
-          required: totalRequired,
-          solBalance,
-          minSOLRequired
-        });
       }
     } catch (balanceError: any) {
       console.error('Error checking wallet balance:', balanceError);
@@ -350,29 +330,10 @@ const PostProject = () => {
         // Update state for UI
         setSolPrice(priceData.price_usd);
         setSolAmount(converted);
-        
-        console.log('Escrow conversion:', {
-          budgetUSD: budgetAmount,
-          solPrice: priceData.price_usd,
-          solAmount: converted,
-          expectedSOL: budgetAmount / priceData.price_usd
-        });
       } else if (paymentCurrency === 'X402' || paymentCurrency === 'USDC') {
         // For x402 and USDC, keep amount in USD (they use USDC, not SOL)
         escrowAmount = budgetAmount;
-        console.log('Using USDC/x402 - keeping amount in USD:', escrowAmount);
       }
-      
-      // DEBUG: Log before calling createProjectEscrow
-      console.log('🔍 PostProject - Calling createProjectEscrow:', {
-        projectId: project.id,
-        escrowAmount,
-        paymentCurrency,
-        paymentCurrencyType: typeof paymentCurrency,
-        isX402: paymentCurrency === 'X402',
-        isUSDC: paymentCurrency === 'USDC',
-        isSOLANA: paymentCurrency === 'SOLANA'
-      });
       
       const escrowId = await createProjectEscrow(
         project.id, 
@@ -720,10 +681,7 @@ const PostProject = () => {
                   amount={budget}
                   selectedCurrency={paymentCurrency}
                   onCurrencyChange={(currency) => {
-                    console.log('🔵🔵🔵 PaymentCurrencySelector - Currency changed to:', currency);
-                    console.log('🔵🔵🔵 About to call setPaymentCurrency with:', currency);
                     setPaymentCurrency(currency);
-                    console.log('🔵🔵🔵 setPaymentCurrency called');
                   }}
                 />
               )}

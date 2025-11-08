@@ -171,7 +171,6 @@ export async function sendRawTransactionViaProxy(serializedTransaction: Uint8Arr
     if (response.ok) {
       const data = await response.json();
       if (data.success) {
-        console.log('✅ Transaction sent via backend proxy:', data.signature);
         return data.signature;
       }
       throw new Error(data.error || 'Failed to send transaction');

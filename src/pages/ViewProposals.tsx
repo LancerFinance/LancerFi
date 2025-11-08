@@ -107,7 +107,6 @@ const ViewProposals = () => {
               const freelancerProfile = await db.getProfileByWallet(escrow.freelancer_wallet);
               if (freelancerProfile?.id) {
                 freelancerIdsFromEscrow.add(freelancerProfile.id);
-                console.log(`Found previously assigned freelancer from escrow: ${freelancerProfile.id} (wallet: ${escrow.freelancer_wallet})`);
               }
             }
           } catch (escrowError) {
