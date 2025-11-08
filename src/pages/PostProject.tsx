@@ -247,21 +247,22 @@ const PostProject = () => {
       const totalRequired = budgetAmount + platformFee;
       const transactionFeeBuffer = 0.01; // Buffer for transaction fees
       
-      // Run balance checks in parallel for better performance
-      // Add timeout to prevent hanging (10 seconds max)
-      const balanceCheckPromise = Promise.race([
-        Promise.all([
-          getAccountBalanceViaProxy(address),
-          paymentCurrency === 'SOLANA' ? getSolanaPrice() : Promise.resolve(null)
-        ]),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Balance check timed out. Please try again.')), 10000)
-        )
-      ]) as Promise<[Awaited<ReturnType<typeof getAccountBalanceViaProxy>>, Awaited<ReturnType<typeof getSolanaPrice>> | null]>;
+      // Use fast public RPC directly for balance check (much faster than backend proxy)
+      let solBalance = 0;
+      try {
+        const { Connection } = await import('@solana/web3.js');
+        // Use a fast public RPC endpoint directly
+        const fastConnection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+        const balance = await fastConnection.getBalance(walletAddress, 'confirmed');
+        solBalance = balance / 1e9;
+      } catch (directError) {
+        // Fallback to backend proxy only if direct RPC fails (should be rare)
+        const solBalanceData = await getAccountBalanceViaProxy(address);
+        solBalance = solBalanceData.balanceSOL;
+      }
       
-      const [solBalanceData, solPriceData] = await balanceCheckPromise;
-      
-      const solBalance = solBalanceData.balanceSOL;
+      // Get SOL price in parallel (only if needed for SOL payments)
+      const solPriceData = paymentCurrency === 'SOLANA' ? await getSolanaPrice() : null;
       
       // For SOL payments, check if user has enough SOL for payment + platform fee + transaction fees
       if (paymentCurrency === 'SOLANA') {
