@@ -37,7 +37,8 @@ export async function verifyWalletSignature(
       const nonceMatch = message.match(/Nonce:\s*(\w+)/);
       if (timestampMatch && nonceMatch) {
         messageToVerify = `LancerFi Payment Release Challenge\nTimestamp: ${timestampMatch[1]}\nNonce: ${nonceMatch[1]}\n\nThis signature proves you own this wallet.`;
-        console.log('⚠️ Message missing newlines - reconstructed:', messageToVerify);
+        // Don't log full message - just indicate reconstruction happened
+        console.log('⚠️ Message missing newlines - reconstructed');
       }
     }
 
@@ -46,17 +47,12 @@ export async function verifyWalletSignature(
     const messageBytes = new TextEncoder().encode(messageToVerify);
     const signatureBytes = Uint8Array.from(Buffer.from(signature, 'base64'));
 
-    // Log what we're verifying (for debugging)
+    // Log verification attempt (without sensitive data)
     console.log('🔍 Verifying signature:', {
       walletAddress,
-      originalMessageLength: message.length,
-      messageToVerifyLength: messageToVerify.length,
-      originalMessage: message,
-      messageToVerify: messageToVerify,
-      originalHasNewlines: message.includes('\n'),
-      messageToVerifyHasNewlines: messageToVerify.includes('\n'),
-      signatureLength: signatureBytes.length,
-      publicKey: publicKey.toString()
+      messageLength: messageToVerify.length,
+      hasNewlines: messageToVerify.includes('\n'),
+      signatureLength: signatureBytes.length
     });
 
     const isValid = nacl.sign.detached.verify(
@@ -66,17 +62,13 @@ export async function verifyWalletSignature(
     );
 
     if (!isValid) {
-      console.error('❌ Signature verification failed:', {
-        messageBytes: Array.from(messageBytes.slice(0, 20)),
-        signatureBytes: Array.from(signatureBytes.slice(0, 20)),
-        publicKeyBytes: Array.from(publicKey.toBytes().slice(0, 20))
-      });
+      console.error('❌ Signature verification failed for wallet:', walletAddress);
       return res.status(401).json({
         error: 'Invalid wallet signature. Authentication failed.'
       });
     }
 
-    console.log('✅ Signature verified successfully');
+    // Don't log success to avoid cluttering logs - only log failures
 
     // Attach wallet address to request for use in handlers
     req.walletAddress = walletAddress;
