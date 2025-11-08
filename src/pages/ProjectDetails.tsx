@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/useWallet";
 import { useProfile } from "@/hooks/useProfile";
 import { useEscrow } from "@/hooks/useEscrow";
+import { useRateLimit } from "@/hooks/useRateLimit";
 import MessageDialog from "@/components/MessageDialog";
 import {
   AlertDialog,
@@ -61,6 +62,8 @@ const ProjectDetails = () => {
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [kickingOffFreelancer, setKickingOffFreelancer] = useState(false);
   const [showKickOffDialog, setShowKickOffDialog] = useState(false);
+  const { canProceed: canComplete } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'completing a project' });
+  const { canProceed: canKickOff } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'kicking off a freelancer' });
 
   useEffect(() => {
     if (id) {
@@ -266,6 +269,11 @@ const ProjectDetails = () => {
   const isAssignedFreelancer = address && project && project.freelancer_id && freelancer?.wallet_address === address;
 
   const handleCompleteProject = async () => {
+    // Rate limiting check
+    if (!canComplete()) {
+      return;
+    }
+
     if (!project || !id) return;
     
     // Security: Verify user is authorized (project owner)
@@ -377,6 +385,11 @@ const ProjectDetails = () => {
   };
 
   const handleKickOffFreelancer = async () => {
+    // Rate limiting check
+    if (!canKickOff()) {
+      return;
+    }
+
     if (!project || !id) return;
     
     // Security: Verify user is authorized (project owner)

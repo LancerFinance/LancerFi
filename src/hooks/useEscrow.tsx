@@ -6,6 +6,7 @@ import { db } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { releasePaymentToFreelancer as releasePaymentAPI } from '@/lib/api-client';
 import { requestX402Payment, processX402Payment, verifyX402Payment, X402PaymentChallenge } from '@/lib/x402-payment';
+import { useRateLimit } from '@/hooks/useRateLimit';
 
 interface UseEscrowReturn {
   createProjectEscrow: (projectId: string, amount: number, paymentCurrency: PaymentCurrency) => Promise<string | null>;
@@ -19,12 +20,19 @@ export const useEscrow = (): UseEscrowReturn => {
   const [isLoading, setIsLoading] = useState(false);
   const { provider, address, signMessage } = useWallet();
   const { toast } = useToast();
+  const { canProceed: canCreateEscrow } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'creating escrow' });
+  const { canProceed: canFundEscrow } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'funding escrow' });
+  const { canProceed: canReleasePayment } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'releasing payment' });
 
   const createProjectEscrow = useCallback(async (
     projectId: string, 
     amount: number,
     paymentCurrency: PaymentCurrency = 'SOLANA'
   ): Promise<string | null> => {
+    // Rate limiting check
+    if (!canCreateEscrow()) {
+      return null;
+    }
 
     const w: any = window as any;
     const ph = w.solana;
@@ -354,6 +362,11 @@ export const useEscrow = (): UseEscrowReturn => {
     amount: number,
     paymentCurrency: PaymentCurrency = 'SOLANA'
   ): Promise<boolean> => {
+    // Rate limiting check
+    if (!canFundEscrow()) {
+      return false;
+    }
+
     const w: any = window as any;
     const ph = w.solana;
     if (!ph?.isPhantom) {
@@ -441,6 +454,11 @@ export const useEscrow = (): UseEscrowReturn => {
     escrowId: string, 
     milestoneId: string
   ): Promise<boolean> => {
+    // Rate limiting check
+    if (!canReleasePayment()) {
+      return false;
+    }
+
     const w: any = window as any;
     const ph = w.solana;
     if (!ph?.isPhantom) {
@@ -541,6 +559,11 @@ export const useEscrow = (): UseEscrowReturn => {
     escrowId: string,
     freelancerWallet: string
   ): Promise<boolean> => {
+    // Rate limiting check
+    if (!canReleasePayment()) {
+      return false;
+    }
+
     setIsLoading(true);
     try {
       const escrow = await db.getEscrowById(escrowId);

@@ -20,6 +20,7 @@ import { validateProject } from "@/lib/validation";
 import PaymentCurrencySelector from "@/components/PaymentCurrencySelector";
 import { PROJECT_CATEGORIES } from "@/lib/categories";
 import { useEscrow } from "@/hooks/useEscrow";
+import { checkImageForNSFW } from "@/lib/nsfw-detection";
 
 const PostProject = () => {
   const navigate = useNavigate();
@@ -319,6 +320,24 @@ const PostProject = () => {
     setIsSubmitting(true);
     
     try {
+      // Check image for NSFW content before uploading
+      toast({
+        title: "Checking image...",
+        description: "Verifying image content before upload",
+      });
+
+      const nsfwCheck = await checkImageForNSFW(projectImage, 0.75); // 75% confidence threshold
+      
+      if (nsfwCheck.isNSFW) {
+        setIsSubmitting(false);
+        toast({
+          title: "Image Not Allowed",
+          description: `This image contains inappropriate content (${nsfwCheck.category}, ${Math.round(nsfwCheck.confidence * 100)}% confidence). Please upload a different image.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Upload project image
       setUploadingImage(true);
       const fileExt = projectImage.name.split('.').pop();

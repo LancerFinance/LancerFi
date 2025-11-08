@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Upload, X, Link as LinkIcon, Loader2, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/useWallet";
+import { useRateLimit } from "@/hooks/useRateLimit";
 import { db, supabase } from "@/lib/supabase";
 
 interface SubmitWorkDialogProps {
@@ -46,6 +47,7 @@ const SubmitWorkDialog = ({
 
   const { toast } = useToast();
   const { address, isConnected } = useWallet();
+  const { canProceed } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'submitting work' });
 
   const handleFileSelect = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
@@ -171,6 +173,11 @@ const SubmitWorkDialog = ({
   };
 
   const handleSubmit = async () => {
+    // Rate limiting check
+    if (!canProceed()) {
+      return;
+    }
+
     if (!isConnected || !address) {
       toast({
         title: "Wallet Required",

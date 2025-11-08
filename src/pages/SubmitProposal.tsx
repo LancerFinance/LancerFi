@@ -12,6 +12,7 @@ import { ArrowLeft, Send, DollarSign, Clock, Loader2 } from "lucide-react";
 import { db, supabase } from "@/lib/supabase";
 import { useWallet } from "@/hooks/useWallet";
 import { useToast } from "@/hooks/use-toast";
+import { useRateLimit } from "@/hooks/useRateLimit";
 
 const SubmitProposal = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -31,6 +32,7 @@ const SubmitProposal = () => {
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const { canProceed } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'submitting a proposal' });
 
   useEffect(() => {
     if (projectId && address) {
@@ -180,6 +182,11 @@ const SubmitProposal = () => {
   };
 
   const handleSubmit = async () => {
+    // Rate limiting check
+    if (!canProceed()) {
+      return;
+    }
+
     if (!isConnected || !address) {
       toast({
         title: "Wallet Required",

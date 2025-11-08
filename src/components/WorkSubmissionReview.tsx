@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/useWallet";
+import { useRateLimit } from "@/hooks/useRateLimit";
 import { db, WorkSubmission } from "@/lib/supabase";
 import {
   AlertDialog,
@@ -53,6 +54,7 @@ const WorkSubmissionReview = ({
 
   const { toast } = useToast();
   const { address, isConnected } = useWallet();
+  const { canProceed } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'reviewing work' });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -70,6 +72,11 @@ const WorkSubmissionReview = ({
   };
 
   const handleReview = async (status: 'approved' | 'rejected' | 'revision_requested') => {
+    // Rate limiting check
+    if (!canProceed()) {
+      return;
+    }
+
     if (!isConnected || !address) {
       toast({
         title: "Wallet Required",

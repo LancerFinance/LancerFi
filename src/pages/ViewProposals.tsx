@@ -21,6 +21,7 @@ import { db, Project, Proposal, Profile } from "@/lib/supabase";
 import { formatUSDC } from "@/lib/solana";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/useWallet";
+import { useRateLimit } from "@/hooks/useRateLimit";
 import MessageDialog from "@/components/MessageDialog";
 import {
   AlertDialog,
@@ -45,6 +46,8 @@ const ViewProposals = () => {
   const [loading, setLoading] = useState(true);
   const [acceptingProposal, setAcceptingProposal] = useState<string | null>(null);
   const [rejectingProposal, setRejectingProposal] = useState<string | null>(null);
+  const { canProceed: canAccept } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'accepting a proposal' });
+  const { canProceed: canReject } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'rejecting a proposal' });
 
   useEffect(() => {
     if (id) {
@@ -224,6 +227,11 @@ const ViewProposals = () => {
   };
 
   const handleAcceptProposal = async (proposal: Proposal) => {
+    // Rate limiting check
+    if (!canAccept()) {
+      return;
+    }
+
     if (!project || !id || !proposal.freelancer_id) return;
 
     setAcceptingProposal(proposal.id);
@@ -271,6 +279,11 @@ const ViewProposals = () => {
   };
 
   const handleRejectProposal = async (proposal: Proposal) => {
+    // Rate limiting check
+    if (!canReject()) {
+      return;
+    }
+
     if (!project || !id || !proposal.id) return;
 
     setRejectingProposal(proposal.id);
