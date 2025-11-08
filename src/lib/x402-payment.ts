@@ -1,6 +1,6 @@
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
-import { USDC_MINT, connection } from './solana';
+import { USDC_MINT, connection, getAccountBalanceViaProxy } from './solana';
 import { getLatestBlockhashWithFallback, sendRawTransactionViaProxy } from './solana';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
@@ -40,7 +40,10 @@ export async function requestX402Payment(
   });
 
   // x402 protocol: Backend responds with HTTP 402 when payment is required
+  // NOTE: Browser console will show 402 as an error (red), but this is CORRECT behavior for x402 protocol
+  // HTTP 402 "Payment Required" is the standard response for x402 payment challenges
   if (response.status === 402) {
+    console.log('✅ x402 Payment Required response received (HTTP 402 is correct for x402 protocol)');
     const paymentDetails = await response.json();
     return paymentDetails as X402PaymentChallenge;
   }
@@ -93,11 +96,23 @@ export async function processX402Payment(
   const clientTokenAccount = await getAssociatedTokenAddress(mint, clientWallet);
   const recipientTokenAccount = await getAssociatedTokenAddress(mint, recipientWallet);
 
-  // Check if recipient token account exists, create if not
+  // Check if recipient token account exists using backend proxy (avoids 403 errors)
+  // We'll try to get balance - if it fails, the account doesn't exist
+  let recipientAccountExists = false;
   try {
-    await connection.getAccountInfo(recipientTokenAccount);
-  } catch {
-    // Account doesn't exist, add instruction to create it
+    // Use backend proxy to check if recipient has a token account
+    // This avoids 403 errors from direct RPC calls
+    const accountInfo = await getAccountBalanceViaProxy(recipientTokenAccount.toString());
+    recipientAccountExists = accountInfo.accountExists;
+  } catch (error) {
+    // If check fails, assume account doesn't exist (will create it)
+    console.log('Recipient token account check failed, will create if needed:', error);
+    recipientAccountExists = false;
+  }
+
+  // If recipient token account doesn't exist, add instruction to create it
+  if (!recipientAccountExists) {
+    console.log('Recipient token account does not exist, adding create instruction');
     transaction.add(
       createAssociatedTokenAccountInstruction(
         clientWallet, // Payer for account creation
@@ -109,7 +124,15 @@ export async function processX402Payment(
   }
 
   // Convert amount to micro-USDC (6 decimals)
+  // amount is already in USDC (e.g., 11), so multiply by 10^6 to get micro-USDC
   const microUSDC = Math.round(amount * Math.pow(10, 6));
+  
+  console.log('x402 Payment amount conversion:', {
+    amountUSDC: amount,
+    microUSDC: microUSDC,
+    decimals: 6,
+    calculation: `${amount} * 10^6 = ${microUSDC}`
+  });
 
   // Add USDC transfer instruction
   transaction.add(
