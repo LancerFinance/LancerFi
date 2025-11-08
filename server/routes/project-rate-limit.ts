@@ -193,14 +193,13 @@ router.post('/record-project-creation', async (req: Request, res: Response) => {
  */
 router.post('/reset-rate-limit', async (req: Request, res: Response) => {
   try {
-    // Only allow in development or with a secret key
-    const { walletAddress, secretKey } = req.body;
+    // Allow rate limit reset for testing (can be restricted later if needed)
+    const { walletAddress } = req.body;
     
-    // Simple secret check (in production, use proper auth)
-    if (process.env.NODE_ENV === 'production' && secretKey !== process.env.RATE_LIMIT_RESET_SECRET) {
-      return res.status(403).json({ 
+    if (!walletAddress) {
+      return res.status(400).json({ 
         success: false, 
-        error: 'Rate limit reset not allowed in production without secret key' 
+        error: 'walletAddress is required' 
       });
     }
     

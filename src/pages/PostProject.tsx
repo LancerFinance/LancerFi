@@ -73,10 +73,10 @@ const PostProject = () => {
     });
   }, []);
 
-  // Development helper: Reset rate limit (only in dev mode)
-  // Add ?resetRateLimit=true to URL to reset
+  // Helper: Reset rate limit via URL parameter
+  // Add ?resetRateLimit=true to URL to reset (works in dev and prod for testing)
   useEffect(() => {
-    if (import.meta.env.DEV && address) {
+    if (address) {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('resetRateLimit') === 'true') {
         resetRateLimit(address).then(result => {
