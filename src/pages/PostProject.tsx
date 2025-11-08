@@ -73,6 +73,32 @@ const PostProject = () => {
     });
   }, []);
 
+  // Development helper: Reset rate limit (only in dev mode)
+  // Add ?resetRateLimit=true to URL to reset
+  useEffect(() => {
+    if (import.meta.env.DEV && address) {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('resetRateLimit') === 'true') {
+        resetRateLimit(address).then(result => {
+          if (result.success) {
+            toast({
+              title: "Rate Limit Reset",
+              description: result.message,
+            });
+            // Remove the query parameter
+            window.history.replaceState({}, '', window.location.pathname);
+          } else {
+            toast({
+              title: "Reset Failed",
+              description: result.message,
+              variant: "destructive",
+            });
+          }
+        });
+      }
+    }
+  }, [address, toast]);
+
   // Load SOL price when budget changes
   useEffect(() => {
     if (formData.budget && parseFloat(formData.budget) > 0) {
