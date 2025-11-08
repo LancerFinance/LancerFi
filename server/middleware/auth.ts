@@ -27,72 +27,49 @@ export async function verifyWalletSignature(
     // Verify the signature
     const publicKey = new PublicKey(walletAddress);
     const signatureBytes = Uint8Array.from(Buffer.from(signature, 'base64'));
-    
-    // Phantom's signMessage signs the message with Solana's standard format
-    // Format: "\xffSolana Signed Message:\n" + message length (u16, little-endian) + message
     const messageBytes = new TextEncoder().encode(message);
     
-    // Build the full message that Phantom signs
-    const prefix = new TextEncoder().encode('\xffSolana Signed Message:\n');
-    const messageLengthBytes = new Uint8Array(2);
-    // Little-endian encoding
-    messageLengthBytes[0] = messageBytes.length & 0xff;
-    messageLengthBytes[1] = (messageBytes.length >> 8) & 0xff;
-    
-    const fullMessage = new Uint8Array(prefix.length + 2 + messageBytes.length);
-    fullMessage.set(prefix, 0);
-    fullMessage.set(messageLengthBytes, prefix.length);
-    fullMessage.set(messageBytes, prefix.length + 2);
-    
-    // Verify using nacl (Ed25519)
-    // Phantom's signMessage automatically adds the Solana message prefix
-    // So we need to verify against the full message format
+    // Phantom's signMessage returns a signature that signs the message AS-IS (no prefix)
+    // The signature is over the raw UTF-8 encoded message bytes
     let isValid = false;
     
-    // Method 1: Verify with Solana message prefix (standard format)
+    // Method 1: Direct message verification (Phantom signs the raw message)
     try {
       isValid = nacl.sign.detached.verify(
-        fullMessage,
+        messageBytes,
         signatureBytes,
         publicKey.toBytes()
       );
       if (isValid) {
-        console.log('Signature verified successfully with Solana prefix format');
+        console.log('✅ Signature verified with direct message format');
       }
     } catch (e) {
-      console.error('Signature verification error (prefix format):', e);
+      console.error('Direct verification error:', e);
     }
     
-    // Method 2: Try direct message verification (fallback - some wallets don't use prefix)
+    // Method 2: Try with Solana message prefix format (for compatibility)
     if (!isValid) {
       try {
+        const prefix = new TextEncoder().encode('\xffSolana Signed Message:\n');
+        const messageLengthBytes = new Uint8Array(2);
+        messageLengthBytes[0] = messageBytes.length & 0xff;
+        messageLengthBytes[1] = (messageBytes.length >> 8) & 0xff;
+        
+        const fullMessage = new Uint8Array(prefix.length + 2 + messageBytes.length);
+        fullMessage.set(prefix, 0);
+        fullMessage.set(messageLengthBytes, prefix.length);
+        fullMessage.set(messageBytes, prefix.length + 2);
+        
         isValid = nacl.sign.detached.verify(
-          messageBytes,
+          fullMessage,
           signatureBytes,
           publicKey.toBytes()
         );
         if (isValid) {
-          console.log('Signature verified successfully with direct message format');
+          console.log('✅ Signature verified with Solana prefix format');
         }
       } catch (e) {
-        console.warn('Direct verification also failed:', e);
-      }
-    }
-    
-    // Method 3: Try with just the message as string (some edge cases)
-    if (!isValid) {
-      try {
-        const messageAsBytes = Buffer.from(message, 'utf8');
-        isValid = nacl.sign.detached.verify(
-          messageAsBytes,
-          signatureBytes,
-          publicKey.toBytes()
-        );
-        if (isValid) {
-          console.log('Signature verified successfully with Buffer format');
-        }
-      } catch (e) {
-        console.warn('Buffer format verification also failed:', e);
+        console.warn('Prefix format verification failed:', e);
       }
     }
     
