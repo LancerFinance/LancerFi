@@ -166,39 +166,82 @@ export async function releasePaymentFromPlatform(
     }
     
     // CRITICAL: For SPL token transfers, the authority must be the owner of the SOURCE token account
-    // The platform wallet (escrowAccount) owns the escrowTokenAccount, so it's the authority
-    // But we need to verify the escrowTokenAccount's owner is actually escrowAccount
-    // Get the token account info to verify ownership
+    // Get the token account info to verify it's a valid token account and get the owner
     const { getAccount } = await import('@solana/spl-token');
     let escrowTokenAccountData;
+    let transferAuthority: PublicKey;
+    
     try {
       escrowTokenAccountData = await getAccount(connection, escrowTokenAccount);
-      console.log(`Escrow token account owner: ${escrowTokenAccountData.owner.toString()}, Platform wallet: ${escrowAccount.toString()}`);
+      console.log(`Escrow token account verified:`, {
+        address: escrowTokenAccount.toString(),
+        owner: escrowTokenAccountData.owner.toString(),
+        mint: escrowTokenAccountData.mint.toString(),
+        amount: escrowTokenAccountData.amount.toString(),
+        platformWallet: escrowAccount.toString()
+      });
       
-      // Verify the owner matches
-      if (escrowTokenAccountData.owner.toString() !== escrowAccount.toString()) {
-        throw new Error(`Token account owner mismatch. Account owner: ${escrowTokenAccountData.owner.toString()}, Expected: ${escrowAccount.toString()}`);
+      // The authority for the transfer must be the owner of the source token account
+      transferAuthority = escrowTokenAccountData.owner;
+      
+      // Verify the owner is the platform wallet
+      if (transferAuthority.toString() !== escrowAccount.toString()) {
+        throw new Error(`Token account owner mismatch. Account owner: ${transferAuthority.toString()}, Expected platform wallet: ${escrowAccount.toString()}`);
       }
     } catch (error: any) {
-      console.error('Error getting token account data:', error);
-      // If getAccount fails, try to proceed anyway - might be a different error
+      console.error('Error getting escrow token account data:', error);
+      // If getAccount fails, the account might not be a valid token account
+      if (error.message?.includes('Invalid param') || error.message?.includes('not found')) {
+        throw new Error(`Platform wallet USDC token account is not a valid token account: ${escrowTokenAccount.toString()}. Error: ${error.message}`);
+      }
       if (error.message?.includes('owner mismatch')) {
         throw error;
+      }
+      // If we can't verify, assume platform wallet is the owner and proceed
+      console.warn('Could not verify token account owner, assuming platform wallet is owner');
+      transferAuthority = escrowAccount;
+    }
+    
+    // Verify freelancer token account is valid (if it exists)
+    if (freelancerTokenAccountInfo) {
+      try {
+        const freelancerTokenAccountData = await getAccount(connection, freelancerTokenAccount);
+        console.log(`Freelancer token account verified:`, {
+          address: freelancerTokenAccount.toString(),
+          owner: freelancerTokenAccountData.owner.toString(),
+          mint: freelancerTokenAccountData.mint.toString()
+        });
+      } catch (error: any) {
+        console.warn('Freelancer token account might not be valid, will create it:', error.message);
+        // If it's not valid, we'll create it in the transaction
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            escrowAccount,
+            freelancerTokenAccount,
+            freelancerWallet,
+            tokenMint
+          )
+        );
       }
     }
     
     // Transfer tokens from escrow to freelancer
-    // Authority must be the owner of the source token account (escrowTokenAccount)
-    // Since escrowAccount owns escrowTokenAccount, escrowAccount is the authority
+    // Authority must be the owner of the source token account
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
     
-    console.log(`Creating transfer: From ${escrowTokenAccount.toString()} to ${freelancerTokenAccount.toString()}, Amount: ${transferAmount.toString()}, Authority: ${escrowAccount.toString()}`);
+    console.log(`Creating transfer instruction:`, {
+      source: escrowTokenAccount.toString(),
+      destination: freelancerTokenAccount.toString(),
+      authority: transferAuthority.toString(),
+      amount: transferAmount.toString(),
+      decimals: decimals
+    });
     
     transaction.add(
       createTransferInstruction(
         escrowTokenAccount, // Source: platform wallet's USDC token account
         freelancerTokenAccount, // Destination: freelancer's USDC token account
-        escrowAccount, // Authority: platform wallet (owner of source token account)
+        transferAuthority, // Authority: owner of source token account (should be platform wallet)
         transferAmount, // Amount in micro-USDC (use BigInt)
         [],
         TOKEN_PROGRAM_ID
