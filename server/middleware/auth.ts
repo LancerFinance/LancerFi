@@ -26,63 +26,14 @@ export async function verifyWalletSignature(
 
     // Verify the signature
     const publicKey = new PublicKey(walletAddress);
-    const signatureBytes = Uint8Array.from(Buffer.from(signature, 'base64'));
     const messageBytes = new TextEncoder().encode(message);
-    
-    // Phantom's signMessage returns a signature that signs the message AS-IS (no prefix)
-    // The signature is over the raw UTF-8 encoded message bytes
-    let isValid = false;
-    
-    // Method 1: Direct message verification (Phantom signs the raw message)
-    try {
-      isValid = nacl.sign.detached.verify(
-        messageBytes,
-        signatureBytes,
-        publicKey.toBytes()
-      );
-      if (isValid) {
-        console.log('✅ Signature verified with direct message format');
-      }
-    } catch (e) {
-      console.error('Direct verification error:', e);
-    }
-    
-    // Method 2: Try with Solana message prefix format (for compatibility)
-    if (!isValid) {
-      try {
-        const prefix = new TextEncoder().encode('\xffSolana Signed Message:\n');
-        const messageLengthBytes = new Uint8Array(2);
-        messageLengthBytes[0] = messageBytes.length & 0xff;
-        messageLengthBytes[1] = (messageBytes.length >> 8) & 0xff;
-        
-        const fullMessage = new Uint8Array(prefix.length + 2 + messageBytes.length);
-        fullMessage.set(prefix, 0);
-        fullMessage.set(messageLengthBytes, prefix.length);
-        fullMessage.set(messageBytes, prefix.length + 2);
-        
-        isValid = nacl.sign.detached.verify(
-          fullMessage,
-          signatureBytes,
-          publicKey.toBytes()
-        );
-        if (isValid) {
-          console.log('✅ Signature verified with Solana prefix format');
-        }
-      } catch (e) {
-        console.warn('Prefix format verification failed:', e);
-      }
-    }
-    
-    // Log for debugging if verification fails
-    if (!isValid) {
-      console.error('❌ Signature verification failed:', {
-        walletAddress,
-        messageLength: message.length,
-        signatureLength: signatureBytes.length,
-        messagePreview: message.substring(0, 50) + '...',
-        signatureHex: Array.from(signatureBytes.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join('')
-      });
-    }
+    const signatureBytes = Uint8Array.from(Buffer.from(signature, 'base64'));
+
+    const isValid = nacl.sign.detached.verify(
+      messageBytes,
+      signatureBytes,
+      publicKey.toBytes()
+    );
 
     if (!isValid) {
       return res.status(401).json({
