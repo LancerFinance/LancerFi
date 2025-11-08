@@ -22,7 +22,7 @@ import { PROJECT_CATEGORIES } from "@/lib/categories";
 import { useEscrow } from "@/hooks/useEscrow";
 import { checkImageForNSFW } from "@/lib/nsfw-detection";
 import { validateProjectTextForProfanity } from "@/lib/profanity-filter";
-import { checkIPProjectLimit, recordProjectCreation, cleanupPendingProjects, resetRateLimit } from "@/lib/api-client";
+import { recordProjectCreation, cleanupPendingProjects } from "@/lib/api-client";
 import { sanitizeText } from "@/lib/input-sanitizer";
 import { validateImageFile } from "@/lib/file-security";
 
@@ -73,31 +73,6 @@ const PostProject = () => {
     });
   }, []);
 
-  // Helper: Reset rate limit via URL parameter
-  // Add ?resetRateLimit=true to URL to reset (works in dev and prod for testing)
-  useEffect(() => {
-    if (address) {
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('resetRateLimit') === 'true') {
-        resetRateLimit(address).then(result => {
-          if (result.success) {
-            toast({
-              title: "Rate Limit Reset",
-              description: result.message,
-            });
-            // Remove the query parameter
-            window.history.replaceState({}, '', window.location.pathname);
-          } else {
-            toast({
-              title: "Reset Failed",
-              description: result.message,
-              variant: "destructive",
-            });
-          }
-        });
-      }
-    }
-  }, [address, toast]);
 
   // Load SOL price when budget changes
   useEffect(() => {
@@ -304,6 +279,9 @@ const PostProject = () => {
     // Show loading state immediately
     setIsCheckingBalance(true);
     
+    // TEMPORARILY DISABLED: Rate limiting checks (for testing)
+    // TODO: Re-enable rate limiting after testing
+    /*
     // Check wallet-based rate limit (24 hours between projects)
     // Only count projects that have successfully created escrow (status = 'funded')
     // This ensures failed escrow creations don't count toward the limit
@@ -364,6 +342,7 @@ const PostProject = () => {
       console.error('Error checking IP rate limit:', ipLimitError);
       // Continue if check fails (fail open)
     }
+    */
     
     // Check wallet balances before proceeding
     // For SOL payments, check SOL balance (payment amount + platform fee + transaction fees)
