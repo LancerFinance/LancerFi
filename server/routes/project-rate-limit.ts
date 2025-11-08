@@ -203,13 +203,6 @@ router.post('/reset-rate-limit', async (req: Request, res: Response) => {
       });
     }
     
-    if (!walletAddress) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'walletAddress is required' 
-      });
-    }
-    
     const supabase = supabaseClient;
     
     // Get all projects for this wallet that have funded escrows
