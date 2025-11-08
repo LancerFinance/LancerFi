@@ -198,10 +198,14 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
+      // Phantom's signMessage expects a Uint8Array
+      // It automatically adds the Solana message prefix: "\xffSolana Signed Message:\n" + length + message
       const encodedMessage = new TextEncoder().encode(message);
       // This will trigger Phantom popup for signature
+      // Phantom signs: "\xffSolana Signed Message:\n" + message length (u16) + message
       const signed = await ph.signMessage(encodedMessage, 'utf8');
       
+      // Phantom returns { signature: Uint8Array }
       return {
         signature: signed.signature
       };

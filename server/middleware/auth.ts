@@ -45,18 +45,25 @@ export async function verifyWalletSignature(
     fullMessage.set(messageBytes, prefix.length + 2);
     
     // Verify using nacl (Ed25519)
+    // Phantom's signMessage automatically adds the Solana message prefix
+    // So we need to verify against the full message format
     let isValid = false;
+    
+    // Method 1: Verify with Solana message prefix (standard format)
     try {
       isValid = nacl.sign.detached.verify(
         fullMessage,
         signatureBytes,
         publicKey.toBytes()
       );
+      if (isValid) {
+        console.log('Signature verified successfully with Solana prefix format');
+      }
     } catch (e) {
-      console.error('Signature verification error:', e);
+      console.error('Signature verification error (prefix format):', e);
     }
     
-    // If that fails, try direct message verification (some wallets don't use prefix)
+    // Method 2: Try direct message verification (fallback - some wallets don't use prefix)
     if (!isValid) {
       try {
         isValid = nacl.sign.detached.verify(
@@ -64,8 +71,28 @@ export async function verifyWalletSignature(
           signatureBytes,
           publicKey.toBytes()
         );
+        if (isValid) {
+          console.log('Signature verified successfully with direct message format');
+        }
       } catch (e) {
         console.warn('Direct verification also failed:', e);
+      }
+    }
+    
+    // Method 3: Try with just the message as string (some edge cases)
+    if (!isValid) {
+      try {
+        const messageAsBytes = Buffer.from(message, 'utf8');
+        isValid = nacl.sign.detached.verify(
+          messageAsBytes,
+          signatureBytes,
+          publicKey.toBytes()
+        );
+        if (isValid) {
+          console.log('Signature verified successfully with Buffer format');
+        }
+      } catch (e) {
+        console.warn('Buffer format verification also failed:', e);
       }
     }
     
@@ -75,7 +102,9 @@ export async function verifyWalletSignature(
         walletAddress,
         messageLength: message.length,
         signatureLength: signatureBytes.length,
-        messagePreview: message.substring(0, 50) + '...'
+        messagePreview: message.substring(0, 50) + '...',
+        fullMessageLength: fullMessage.length,
+        signatureHex: Array.from(signatureBytes.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join('')
       });
     }
 
