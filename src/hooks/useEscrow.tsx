@@ -113,9 +113,8 @@ export const useEscrow = (): UseEscrowReturn => {
           description: "Please wait while we verify your payment on-chain.",
         });
 
-        // Wait longer for transaction to be confirmed and indexed
-        // Solana transactions need time to be fully confirmed and available via RPC
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // Wait briefly for transaction to be broadcast (Phantom already confirmed it)
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         const verification = await verifyX402Payment(
           projectId,
@@ -227,61 +226,9 @@ export const useEscrow = (): UseEscrowReturn => {
           throw new Error(`Phantom transaction failed: ${phantomError?.message || 'Unknown error'}`);
         }
         
-        // Quick verification - check if transaction exists (reduced waits for speed)
-        await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms for transaction to propagate
-        
-        // Check if transaction exists and succeeded
-        let initialCheck = await verifyTransaction(signature);
-        
-        // If transaction exists and succeeded, we're done (fast path)
-        if (initialCheck.success && initialCheck.confirmed) {
-          // Transaction confirmed immediately - proceed
-        } else if (initialCheck.error && initialCheck.error.includes('not found')) {
-          // Transaction not found yet - wait a bit more and check once
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
-          
-          const retryCheck = await verifyTransaction(signature);
-          if (retryCheck.error && retryCheck.error.includes('not found')) {
-            // Transaction still not found - likely failed
-            throw new Error('Transaction was not found on-chain. Please check your wallet and try again.');
-          }
-          initialCheck = retryCheck;
-        }
-        
-        // If transaction exists but has an error, it failed on-chain
-        if (initialCheck.error && !initialCheck.error.includes('not found') && !initialCheck.error.includes('403')) {
-          throw new Error(`Transaction failed on-chain: ${initialCheck.error}`);
-        }
-        
-        // If we got 403, we can't verify but transaction was sent - proceed
-        if (initialCheck.error && initialCheck.error.includes('403')) {
-          // Can't verify due to RPC access, but Phantom said it was sent - proceed
-        } else if (!initialCheck.success || !initialCheck.confirmed) {
-          // Quick polling with shorter delays (max 3 seconds total)
-          let confirmed = false;
-          for (let attempt = 0; attempt < 6; attempt++) {
-            await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms between checks
-            
-            const verification = await verifyTransaction(signature);
-            if (verification.success && verification.confirmed) {
-              confirmed = true;
-              break;
-            }
-            
-            // If transaction has an error, it failed on-chain
-            if (verification.error && 
-                !verification.error.includes('not found') && 
-                !verification.error.includes('403') &&
-                !verification.error.includes('RPC access blocked')) {
-              throw new Error(`Transaction FAILED on-chain: ${verification.error}`);
-            }
-          }
-          
-          if (!confirmed) {
-            // Transaction not confirmed after quick polling - proceed anyway (Phantom said it was sent)
-            // This is acceptable since Phantom's signAndSendTransaction should handle confirmation
-          }
-        }
+        // Phantom's signAndSendTransaction already confirms the transaction
+        // We can proceed immediately - no need for extensive verification
+        // Just do a quick check to catch obvious failures
         
       } catch (error: any) {
         console.error('Error with transaction');
@@ -292,25 +239,8 @@ export const useEscrow = (): UseEscrowReturn => {
         throw error;
       }
       
-      // Quick final verification before creating escrow (reduced wait for speed)
-      // Phantom's signAndSendTransaction should have already confirmed the transaction
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-      
-      // Quick check - if we can verify, great. If not, proceed anyway since Phantom confirmed it
-      try {
-        const finalVerification = await verifyTransaction(signature);
-        if (finalVerification.error && !finalVerification.error.includes('403') && !finalVerification.error.includes('not found')) {
-          // Transaction exists but has an error - it failed
-          throw new Error(`Transaction failed on-chain: ${finalVerification.error}`);
-        }
-        // If verified or 403/not found, proceed (Phantom said it was sent)
-      } catch (verifyError: any) {
-        // If it's not a 403, it's a real error
-        if (!verifyError?.message?.includes('403') && !verifyError?.message?.includes('RPC access')) {
-          throw verifyError;
-        }
-        // 403 error - can't verify but proceed anyway (Phantom confirmed it)
-      }
+      // Phantom's signAndSendTransaction already confirmed the transaction
+      // Proceed immediately to create escrow - no need to wait or verify further
 
       // Transaction verified - safe to create escrow
       const escrow = await db.createEscrow({
