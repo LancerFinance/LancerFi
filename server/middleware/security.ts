@@ -41,20 +41,27 @@ export function sanitizeRequestBody(req: Request, res: Response, next: NextFunct
 /**
  * Recursively sanitize object values
  */
-function sanitizeObject(obj: any): any {
+function sanitizeObject(obj: any, key?: string): any {
   if (typeof obj === 'string') {
-    // Remove null bytes and control characters
-    return obj.replace(/\0/g, '').replace(/[\x00-\x1F\x7F]/g, '');
+    // CRITICAL: Don't sanitize the 'message' field - it contains newlines that are needed for signature verification
+    // The message is a controlled format from our own generateChallenge() function
+    if (key === 'message') {
+      // Only remove null bytes from message, preserve newlines and other control chars
+      return obj.replace(/\0/g, '');
+    }
+    // Remove null bytes and control characters (but preserve newlines for other fields that might need them)
+    // Remove only truly dangerous control chars, not newlines/tabs
+    return obj.replace(/\0/g, '').replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
   }
   
   if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeObject(item));
+    return obj.map(item => sanitizeObject(item, key));
   }
   
   if (obj && typeof obj === 'object') {
     const sanitized: any = {};
     for (const key in obj) {
-      sanitized[key] = sanitizeObject(obj[key]);
+      sanitized[key] = sanitizeObject(obj[key], key);
     }
     return sanitized;
   }
