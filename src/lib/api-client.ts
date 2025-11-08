@@ -187,6 +187,43 @@ export async function recordProjectCreation(projectId: string, walletAddress: st
  * Trigger cleanup of pending projects stuck for over 1 hour
  * This can be called manually or will be triggered automatically by cron
  */
+export async function resetRateLimit(walletAddress: string): Promise<{
+  success: boolean;
+  message: string;
+  reset?: number;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/project/reset-rate-limit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ walletAddress }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      return {
+        success: false,
+        message: errorData.error || `HTTP ${response.status}: ${response.statusText}`,
+      };
+    }
+
+    const data = await response.json();
+    return {
+      success: data.success || false,
+      message: data.message || 'Rate limit reset',
+      reset: data.reset || 0,
+    };
+  } catch (error: any) {
+    console.error('Error resetting rate limit:', error);
+    return {
+      success: false,
+      message: error.message || 'Error resetting rate limit',
+    };
+  }
+}
+
 export async function cleanupPendingProjects(): Promise<{
   success: boolean;
   cleaned: number;

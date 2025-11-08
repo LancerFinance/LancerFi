@@ -187,5 +187,84 @@ router.post('/record-project-creation', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Reset rate limit for testing (development only)
+ * Updates project creation times to be older than 24 hours
+ */
+router.post('/reset-rate-limit', async (req: Request, res: Response) => {
+  try {
+    // Only allow in development or with a secret key
+    const { walletAddress, secretKey } = req.body;
+    
+    // Simple secret check (in production, use proper auth)
+    if (process.env.NODE_ENV === 'production' && secretKey !== process.env.RATE_LIMIT_RESET_SECRET) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Rate limit reset not allowed in production without secret key' 
+      });
+    }
+    
+    if (!walletAddress) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'walletAddress is required' 
+      });
+    }
+    
+    const supabase = supabaseClient;
+    
+    // Get all projects for this wallet that have funded escrows
+    const { data: projects, error: projectsError } = await supabase
+      .from('projects')
+      .select('id, created_at')
+      .eq('client_id', walletAddress)
+      .gte('created_at', new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString()); // Last 25 hours
+    
+    if (projectsError) {
+      return res.status(500).json({ 
+        success: false, 
+        error: projectsError.message 
+      });
+    }
+    
+    if (!projects || projects.length === 0) {
+      return res.json({ 
+        success: true, 
+        message: 'No recent projects found to reset',
+        reset: 0
+      });
+    }
+    
+    // Update project creation times to be 25 hours ago (older than 24 hour limit)
+    const oldDate = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    const projectIds = projects.map(p => p.id);
+    
+    const { error: updateError } = await supabase
+      .from('projects')
+      .update({ created_at: oldDate })
+      .in('id', projectIds)
+      .eq('client_id', walletAddress);
+    
+    if (updateError) {
+      return res.status(500).json({ 
+        success: false, 
+        error: updateError.message 
+      });
+    }
+    
+    return res.json({ 
+      success: true, 
+      message: `Reset rate limit for ${projects.length} project(s)`,
+      reset: projects.length
+    });
+  } catch (error: any) {
+    console.error('Error resetting rate limit:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Unknown error' 
+    });
+  }
+});
+
 export default router;
 
