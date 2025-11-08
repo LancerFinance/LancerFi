@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,8 @@ import Header from "@/components/Header";
 import { validateProfile } from "@/lib/validation";
 import { useProfile } from "@/hooks/useProfile";
 import { handleError, handleSuccess } from "@/lib/error-handler";
+import { checkImageForNSFW } from "@/lib/nsfw-detection";
+import { validateImageFile } from "@/lib/file-security";
 
 const EditProfile = () => {
   const [loading, setLoading] = useState(false);
@@ -43,6 +45,12 @@ const EditProfile = () => {
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string>('');
+  const [bannerPreview, setBannerPreview] = useState<string>('');
+  const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
+  const [isDraggingBanner, setIsDraggingBanner] = useState(false);
+  const profilePhotoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
   
   const { toast } = useToast();
   const { address, isConnected, isConnecting, connectWallet } = useWallet();
@@ -71,6 +79,56 @@ const EditProfile = () => {
       });
     }
   }, [profile]);
+
+  const processProfilePhoto = async (file: File) => {
+    // Validate file security
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      toast({
+        title: "Invalid file",
+        description: validation.error || "File validation failed",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Additional check: validate extension matches MIME type
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    if (!extension || !validExtensions.includes(extension)) {
+      toast({
+        title: "Invalid file extension",
+        description: "Please upload a valid image file (JPG, PNG, GIF, or WEBP)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check for NSFW content
+    toast({
+      title: "Checking image...",
+      description: "Verifying image content before upload",
+    });
+
+    const nsfwCheck = await checkImageForNSFW(file, 0.75); // 75% confidence threshold
+    
+    if (nsfwCheck.isNSFW) {
+      toast({
+        title: "Image Not Allowed",
+        description: `This image contains inappropriate content (${nsfwCheck.category}, ${Math.round(nsfwCheck.confidence * 100)}% confidence). Please upload a different image.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Set file and preview
+    setProfilePhotoFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfilePhotoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const uploadProfilePhoto = async (file: File): Promise<string | null> => {
     if (!address) return null;
@@ -126,6 +184,56 @@ const EditProfile = () => {
     } finally {
       setUploadingPhoto(false);
     }
+  };
+
+  const processBanner = async (file: File) => {
+    // Validate file security
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      toast({
+        title: "Invalid file",
+        description: validation.error || "File validation failed",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Additional check: validate extension matches MIME type
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    if (!extension || !validExtensions.includes(extension)) {
+      toast({
+        title: "Invalid file extension",
+        description: "Please upload a valid image file (JPG, PNG, GIF, or WEBP)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check for NSFW content
+    toast({
+      title: "Checking image...",
+      description: "Verifying image content before upload",
+    });
+
+    const nsfwCheck = await checkImageForNSFW(file, 0.75); // 75% confidence threshold
+    
+    if (nsfwCheck.isNSFW) {
+      toast({
+        title: "Image Not Allowed",
+        description: `This image contains inappropriate content (${nsfwCheck.category}, ${Math.round(nsfwCheck.confidence * 100)}% confidence). Please upload a different image.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Set file and preview
+    setBannerFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setBannerPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const uploadBanner = async (file: File): Promise<string | null> => {
@@ -253,9 +361,11 @@ const EditProfile = () => {
       // Reload profile to get updated data
       await loadProfile();
       
-      // Clear file selections
+      // Clear file selections and previews
       setProfilePhotoFile(null);
       setBannerFile(null);
+      setProfilePhotoPreview('');
+      setBannerPreview('');
       
       navigate('/');
     } catch (error) {
@@ -387,78 +497,180 @@ const EditProfile = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="profile_photo">Profile Photo</Label>
-                <div className="flex items-center gap-4">
-                  {formData.profile_photo_url && !profilePhotoFile && (
-                    <img 
-                      src={formData.profile_photo_url} 
-                      alt="Profile preview" 
-                      className="h-20 w-20 rounded-full object-cover"
+                <div className="flex items-start gap-4">
+                  <div className="flex-1">
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                        isDraggingPhoto
+                          ? 'border-primary bg-primary/5'
+                          : 'border-muted-foreground/25 hover:border-primary/50'
+                      }`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsDraggingPhoto(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsDraggingPhoto(false);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsDraggingPhoto(false);
+                        const file = e.dataTransfer.files?.[0];
+                        if (file && file.type.startsWith('image/')) {
+                          processProfilePhoto(file);
+                        } else {
+                          toast({
+                            title: "Invalid file type",
+                            description: "Please upload an image file",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      onClick={() => profilePhotoInputRef.current?.click()}
+                    >
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        Drag and drop an image here, or click to select
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        JPG, PNG, GIF, or WEBP (max 10MB)
+                      </p>
+                    </div>
+                    <Input
+                      ref={profilePhotoInputRef}
+                      id="profile_photo"
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) processProfilePhoto(file);
+                      }}
+                      className="hidden"
                     />
-                  )}
-                  {profilePhotoFile && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">{profilePhotoFile.name}</span>
-                      <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => setProfilePhotoFile(null)}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
+                    {uploadingPhoto && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-sm text-muted-foreground">Uploading...</span>
+                      </div>
+                    )}
+                  </div>
+                  {(profilePhotoPreview || (formData.profile_photo_url && !profilePhotoFile)) && (
+                    <div className="relative">
+                      <img
+                        src={profilePhotoPreview || formData.profile_photo_url}
+                        alt="Profile preview"
+                        className="h-32 w-32 rounded-full object-cover border-2 border-border"
+                      />
+                      {profilePhotoFile && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute -top-2 -right-2 rounded-full h-6 w-6 p-0"
+                          onClick={() => {
+                            setProfilePhotoFile(null);
+                            setProfilePhotoPreview('');
+                          }}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   )}
-                  <Input
-                    id="profile_photo"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) setProfilePhotoFile(file);
-                    }}
-                    className="max-w-xs"
-                  />
-                  {uploadingPhoto && <Loader2 className="w-4 h-4 animate-spin" />}
                 </div>
-                <p className="text-xs text-muted-foreground">Upload a profile photo (JPG, PNG, max 5MB)</p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="banner">Banner Image</Label>
-                <div className="flex items-center gap-4">
-                  {formData.banner_url && !bannerFile && (
-                    <img 
-                      src={formData.banner_url} 
-                      alt="Banner preview" 
-                      className="h-20 w-40 rounded object-cover"
+                <div className="flex items-start gap-4">
+                  <div className="flex-1">
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                        isDraggingBanner
+                          ? 'border-primary bg-primary/5'
+                          : 'border-muted-foreground/25 hover:border-primary/50'
+                      }`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsDraggingBanner(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsDraggingBanner(false);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsDraggingBanner(false);
+                        const file = e.dataTransfer.files?.[0];
+                        if (file && file.type.startsWith('image/')) {
+                          processBanner(file);
+                        } else {
+                          toast({
+                            title: "Invalid file type",
+                            description: "Please upload an image file",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      onClick={() => bannerInputRef.current?.click()}
+                    >
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        Drag and drop an image here, or click to select
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        JPG, PNG, GIF, or WEBP (max 10MB)
+                      </p>
+                    </div>
+                    <Input
+                      ref={bannerInputRef}
+                      id="banner"
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) processBanner(file);
+                      }}
+                      className="hidden"
                     />
-                  )}
-                  {bannerFile && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">{bannerFile.name}</span>
-                      <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => setBannerFile(null)}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
+                    {uploadingBanner && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-sm text-muted-foreground">Uploading...</span>
+                      </div>
+                    )}
+                  </div>
+                  {(bannerPreview || (formData.banner_url && !bannerFile)) && (
+                    <div className="relative">
+                      <img
+                        src={bannerPreview || formData.banner_url}
+                        alt="Banner preview"
+                        className="h-32 w-48 rounded object-cover border-2 border-border"
+                      />
+                      {bannerFile && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute -top-2 -right-2 rounded-full h-6 w-6 p-0"
+                          onClick={() => {
+                            setBannerFile(null);
+                            setBannerPreview('');
+                          }}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   )}
-                  <Input
-                    id="banner"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) setBannerFile(file);
-                    }}
-                    className="max-w-xs"
-                  />
-                  {uploadingBanner && <Loader2 className="w-4 h-4 animate-spin" />}
                 </div>
-                <p className="text-xs text-muted-foreground">Upload a banner image (JPG, PNG, max 5MB)</p>
               </div>
 
               <div>
