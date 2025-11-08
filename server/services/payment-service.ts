@@ -68,28 +68,16 @@ export async function releasePaymentFromPlatform(
   const escrowAccount = platformKeypair.publicKey;
   
   // Security: Verify wallet balance before attempting transfer
+  // Note: For USDC, we'll verify the token account exists and has balance in the transfer section below
+  // This avoids duplicate checks and ensures we have the token account address available
   if (currency === 'SOLANA') {
     const balance = await connection.getBalance(escrowAccount);
     const requiredLamports = Math.round(amount * LAMPORTS_PER_SOL);
     if (balance < requiredLamports) {
       throw new Error(`Insufficient SOL balance. Required: ${amount} SOL, Available: ${balance / LAMPORTS_PER_SOL} SOL`);
     }
-  } else {
-    // For USDC, check token account balance
-    const tokenMint = USDC_MINT;
-    const decimals = 6;
-    const escrowTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
-    try {
-      const balance = await connection.getTokenAccountBalance(escrowTokenAccount);
-      const requiredAmount = Math.round(amount * Math.pow(10, decimals));
-      const availableAmount = BigInt(balance.value.amount);
-      if (availableAmount < BigInt(requiredAmount)) {
-        throw new Error(`Insufficient ${currency} balance in escrow account`);
-      }
-    } catch (error) {
-      throw new Error(`Failed to verify ${currency} balance: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
   }
+  // For USDC, balance check is done in the transfer section below where we have the token account address
   
   const transaction = new Transaction();
   
