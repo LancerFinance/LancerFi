@@ -83,34 +83,9 @@ export async function processX402Payment(
   const amount = parseFloat(paymentChallenge.amount);
   const mint = new PublicKey(paymentChallenge.mint);
 
-  // Verify user has enough USDC before creating transaction
-  console.log('Checking USDC balance before creating transaction...');
-  try {
-    const clientTokenAccount = await getAssociatedTokenAddress(mint, clientWallet);
-    const tokenAccountInfo = await connection.getTokenAccountBalance(clientTokenAccount);
-    const currentBalance = parseFloat(tokenAccountInfo.value.uiAmount?.toString() || '0');
-    
-    console.log('USDC balance check:', {
-      required: amount,
-      current: currentBalance,
-      hasEnough: currentBalance >= amount
-    });
-    
-    if (currentBalance < amount) {
-      throw new Error(`Insufficient USDC balance. You have ${currentBalance.toFixed(2)} USDC but need ${amount.toFixed(2)} USDC. Please add more USDC to your wallet.`);
-    }
-  } catch (error: any) {
-    // If token account doesn't exist, user has 0 USDC
-    if (error.message?.includes('could not find account') || error.message?.includes('Invalid param')) {
-      throw new Error(`You don't have a USDC token account or have 0 USDC. You need ${amount.toFixed(2)} USDC. Please add USDC to your wallet first.`);
-    }
-    // If it's our custom error, rethrow it
-    if (error.message?.includes('Insufficient USDC')) {
-      throw error;
-    }
-    // Otherwise, log and continue (might be RPC error)
-    console.warn('Could not verify USDC balance, proceeding anyway:', error);
-  }
+  // Note: We skip balance check here to avoid 403 RPC errors
+  // Phantom wallet will validate the balance and show appropriate errors if insufficient
+  console.log('Skipping USDC balance check - Phantom will validate balance when signing');
 
   // Create USDC transfer transaction
   const transaction = new Transaction();
