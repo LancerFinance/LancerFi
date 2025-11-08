@@ -256,28 +256,42 @@ const PostProject = () => {
     setIsCheckingBalance(true);
     
     // Check wallet-based rate limit (24 hours between projects)
+    // Only count projects that have successfully created escrow (status = 'funded')
+    // This ensures failed escrow creations don't count toward the limit
     try {
-      const { data: recentProjects, error: walletCheckError } = await supabase
-        .from('projects')
-        .select('created_at')
-        .eq('client_id', address)
+      // First, get all escrows for this wallet that are funded
+      const { data: fundedEscrows, error: escrowError } = await supabase
+        .from('escrows')
+        .select('project_id, created_at')
+        .eq('client_wallet', address)
+        .eq('status', 'funded')
         .order('created_at', { ascending: false })
         .limit(1);
       
-      if (!walletCheckError && recentProjects && recentProjects.length > 0) {
-        const lastProjectTime = new Date(recentProjects[0].created_at);
-        const now = new Date();
-        const hoursSinceLastProject = (now.getTime() - lastProjectTime.getTime()) / (1000 * 60 * 60);
+      if (!escrowError && fundedEscrows && fundedEscrows.length > 0) {
+        // Get the project creation time for the most recent funded escrow
+        const { data: project, error: projectError } = await supabase
+          .from('projects')
+          .select('created_at')
+          .eq('id', fundedEscrows[0].project_id)
+          .eq('client_id', address)
+          .single();
         
-        if (hoursSinceLastProject < 24) {
-          const remainingHours = Math.ceil(24 - hoursSinceLastProject);
-          setIsCheckingBalance(false);
-          toast({
-            title: "Rate Limit Exceeded",
-            description: `You can only create one project every 24 hours. Please wait ${remainingHours} more hour${remainingHours > 1 ? 's' : ''} before creating another project.`,
-            variant: "destructive",
-          });
-          return;
+        if (!projectError && project) {
+          const lastProjectTime = new Date(project.created_at);
+          const now = new Date();
+          const hoursSinceLastProject = (now.getTime() - lastProjectTime.getTime()) / (1000 * 60 * 60);
+          
+          if (hoursSinceLastProject < 24) {
+            const remainingHours = Math.ceil(24 - hoursSinceLastProject);
+            setIsCheckingBalance(false);
+            toast({
+              title: "Rate Limit Exceeded",
+              description: `You can only create one project every 24 hours. Please wait ${remainingHours} more hour${remainingHours > 1 ? 's' : ''} before creating another project.`,
+              variant: "destructive",
+            });
+            return;
+          }
         }
       }
     } catch (walletLimitError: any) {

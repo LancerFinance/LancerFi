@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getSupabaseClient } from '../services/supabase.js';
+import { supabaseClient } from '../services/supabase.js';
 
 const router = Router();
 
@@ -35,25 +35,50 @@ function getClientIP(req: Request): string {
 router.post('/check-ip-limit', async (req: Request, res: Response) => {
   try {
     const clientIP = getClientIP(req);
-    const supabase = getSupabaseClient();
+    const supabase = supabaseClient;
     
     // Get current timestamp and 6 hours ago
     const now = new Date();
     const sixHoursAgo = new Date(now.getTime() - 6 * 60 * 60 * 1000);
     
     // Count projects created by this IP in the last 6 hours
+    // Only count projects that have successfully created escrow (status = 'funded')
+    // This ensures failed escrow creations don't count toward the limit
     // Note: client_ip column may not exist yet - handle gracefully
     let count = 0;
     let error = null;
     
     try {
-      const result = await supabase
+      // First, get projects by IP in the last 6 hours
+      const { data: projects, error: projectsError } = await supabase
         .from('projects')
-        .select('*', { count: 'exact', head: true })
+        .select('id')
         .eq('client_ip', clientIP)
         .gte('created_at', sixHoursAgo.toISOString());
-      count = result.count || 0;
-      error = result.error;
+      
+      if (projectsError) {
+        // If column doesn't exist, return 0 count (fail open)
+        if (projectsError.message?.includes('column') || projectsError.message?.includes('does not exist')) {
+          console.log('client_ip column not found, allowing request');
+          count = 0;
+        } else {
+          error = projectsError;
+        }
+      } else if (projects && projects.length > 0) {
+        // Check which of these projects have funded escrows
+        const projectIds = projects.map(p => p.id);
+        const { count: fundedCount, error: escrowError } = await supabase
+          .from('escrows')
+          .select('*', { count: 'exact', head: true })
+          .in('project_id', projectIds)
+          .eq('status', 'funded');
+        
+        if (escrowError) {
+          error = escrowError;
+        } else {
+          count = fundedCount || 0;
+        }
+      }
     } catch (e: any) {
       // If column doesn't exist, return 0 count (fail open)
       if (e.message?.includes('column') || e.message?.includes('does not exist')) {
@@ -105,7 +130,7 @@ router.post('/record-project-creation', async (req: Request, res: Response) => {
   try {
     const { projectId, walletAddress } = req.body;
     const clientIP = getClientIP(req);
-    const supabase = getSupabaseClient();
+    const supabase = supabaseClient;
     
     if (!projectId || !walletAddress) {
       return res.status(400).json({ 
