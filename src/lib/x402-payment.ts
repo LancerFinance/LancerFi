@@ -4,7 +4,7 @@ import { USDC_MINT, connection, getAccountBalanceViaProxy } from './solana';
 import { getLatestBlockhashWithFallback } from './solana';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+  (import.meta.env.PROD ? '' : 'http://localhost:3001');
 
 export interface X402PaymentChallenge {
   amount: string;

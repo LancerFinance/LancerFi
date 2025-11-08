@@ -113,8 +113,9 @@ export const useEscrow = (): UseEscrowReturn => {
           description: "Please wait while we verify your payment on-chain.",
         });
 
-        // Wait a bit for transaction to be confirmed
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Wait longer for transaction to be confirmed and indexed
+        // Solana transactions need time to be fully confirmed and available via RPC
+        await new Promise(resolve => setTimeout(resolve, 5000));
 
         const verification = await verifyX402Payment(
           projectId,
