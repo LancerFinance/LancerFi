@@ -122,13 +122,19 @@ export async function releasePaymentFromPlatform(
       const balanceInfo = await connection.getTokenAccountBalance(escrowTokenAccount);
       escrowBalance = parseFloat(balanceInfo.value.uiAmount?.toString() || '0');
       
+      console.log(`Platform wallet USDC token account verified: ${escrowTokenAccount.toString()}, Balance: ${escrowBalance} USDC, Required: ${amount} USDC`);
+      
       if (escrowBalance < amount) {
         throw new Error(`Insufficient USDC balance in platform wallet. Required: ${amount} USDC, Available: ${escrowBalance} USDC`);
       }
     } catch (error: any) {
-      // If getAccountInfo fails, the account doesn't exist
-      if (error.message?.includes('does not exist') || error.message?.includes('Invalid param')) {
-        throw new Error(`Platform wallet USDC token account does not exist. Token account: ${escrowTokenAccount.toString()}. This may mean the x402 payment was not received or the token account was never created.`);
+      // If getAccountInfo returns null, the account doesn't exist
+      if (!escrowTokenAccountInfo) {
+        throw new Error(`Platform wallet USDC token account does not exist. Token account: ${escrowTokenAccount.toString()}. This may mean the x402 payment was not received or the token account was never created. Please verify the x402 payment transaction was successful.`);
+      }
+      // If getTokenAccountBalance fails, it might be because account doesn't exist or is invalid
+      if (error.message?.includes('Invalid param') || error.message?.includes('not found') || error.message?.includes('does not exist')) {
+        throw new Error(`Platform wallet USDC token account does not exist or is invalid. Token account: ${escrowTokenAccount.toString()}. This may mean the x402 payment was not received.`);
       }
       // If it's a balance check error, re-throw it
       if (error.message?.includes('Insufficient')) {
