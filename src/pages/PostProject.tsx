@@ -39,6 +39,7 @@ const PostProject = () => {
   });
   const [paymentCurrency, setPaymentCurrency] = useState<PaymentCurrency>('SOLANA');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [selectedFreelancer, setSelectedFreelancer] = useState<any>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [projectImage, setProjectImage] = useState<File | null>(null);
@@ -231,6 +232,9 @@ const PostProject = () => {
 
     setFormErrors({});
     
+    // Show loading state immediately
+    setIsCheckingBalance(true);
+    
     // Check wallet balances before proceeding
     // For SOL payments, check SOL balance (payment amount + platform fee + transaction fees)
     // For x402/USDC payments, check USDC balance
@@ -241,20 +245,37 @@ const PostProject = () => {
       const platformFeePercent = 10;
       const platformFee = (budgetAmount * platformFeePercent) / 100;
       const totalRequired = budgetAmount + platformFee;
-      
-      // Get SOL balance
-      const solBalanceData = await getAccountBalanceViaProxy(address);
-      const solBalance = solBalanceData.balanceSOL;
       const transactionFeeBuffer = 0.01; // Buffer for transaction fees
+      
+      // Run balance checks in parallel for better performance
+      // Add timeout to prevent hanging (10 seconds max)
+      const balanceCheckPromise = Promise.race([
+        Promise.all([
+          getAccountBalanceViaProxy(address),
+          paymentCurrency === 'SOLANA' ? getSolanaPrice() : Promise.resolve(null)
+        ]),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Balance check timed out. Please try again.')), 10000)
+        )
+      ]) as Promise<[Awaited<ReturnType<typeof getAccountBalanceViaProxy>>, Awaited<ReturnType<typeof getSolanaPrice>> | null]>;
+      
+      const [solBalanceData, solPriceData] = await balanceCheckPromise;
+      
+      const solBalance = solBalanceData.balanceSOL;
       
       // For SOL payments, check if user has enough SOL for payment + platform fee + transaction fees
       if (paymentCurrency === 'SOLANA') {
-        // Convert USD amount to SOL
-        const solAmount = await convertUSDToSOL(budgetAmount);
-        const solPlatformFee = await convertUSDToSOL(platformFee);
+        if (!solPriceData) {
+          throw new Error('Failed to fetch SOL price');
+        }
+        
+        // Convert USD amount to SOL (both can use the same price data)
+        const solAmount = budgetAmount / solPriceData.price_usd;
+        const solPlatformFee = platformFee / solPriceData.price_usd;
         const totalSOLRequired = solAmount + solPlatformFee + transactionFeeBuffer;
         
         if (solBalance < totalSOLRequired) {
+          setIsCheckingBalance(false);
           toast({
             title: "Insufficient SOL",
             description: `You need at least ${formatSOL(totalSOLRequired)} SOL to post this project (${formatSOL(solAmount)} + ${formatSOL(solPlatformFee)} platform fee + ${formatSOL(transactionFeeBuffer)} transaction fees). You currently have ${formatSOL(solBalance)} SOL. Please add more SOL to your wallet.`,
@@ -265,6 +286,7 @@ const PostProject = () => {
       } else {
         // For USDC/X402 payments, check minimum SOL for transaction fees
         if (solBalance < transactionFeeBuffer) {
+          setIsCheckingBalance(false);
           toast({
             title: "Insufficient SOL",
             description: `You need at least ${formatSOL(transactionFeeBuffer)} SOL for transaction fees. You currently have ${formatSOL(solBalance)} SOL. Please add more SOL to your wallet.`,
@@ -279,6 +301,7 @@ const PostProject = () => {
         const usdcBalance = await getUSDCBalance(walletAddress);
         
         if (usdcBalance < totalRequired) {
+          setIsCheckingBalance(false);
           toast({
             title: "Insufficient USDC",
             description: `You need at least ${formatUSDC(totalRequired)} USDC to post this project (${formatUSDC(budgetAmount)} + ${formatUSDC(platformFee)} platform fee). You currently have ${formatUSDC(usdcBalance)} USDC. Please add more USDC to your wallet.`,
@@ -287,7 +310,11 @@ const PostProject = () => {
           return;
         }
       }
+      
+      // Balance check passed, proceed with submission
+      setIsCheckingBalance(false);
     } catch (balanceError: any) {
+      setIsCheckingBalance(false);
       console.error('Error checking wallet balance:', balanceError);
       toast({
         title: "Balance Check Failed",
@@ -604,20 +631,22 @@ const PostProject = () => {
                     size="lg" 
                     className="w-full"
                     onClick={handleSubmit}
-                    disabled={!isConnected || isSubmitting || escrowLoading}
+                    disabled={!isConnected || isSubmitting || escrowLoading || isCheckingBalance}
                   >
-                    {(isSubmitting || escrowLoading) ? (
+                    {(isSubmitting || escrowLoading || isCheckingBalance) ? (
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                     ) : (
                       <Wallet className="w-5 h-5 mr-2" />
                     )}
-                    {isSubmitting 
-                      ? 'Creating Project...' 
-                      : escrowLoading
-                        ? 'Setting Up Escrow...'
-                        : isConnected 
-                          ? 'Post Project & Setup Escrow'
-                          : 'Connect Wallet First'
+                    {isCheckingBalance
+                      ? 'Checking Balance...'
+                      : isSubmitting 
+                        ? 'Creating Project...' 
+                        : escrowLoading
+                          ? 'Setting Up Escrow...'
+                          : isConnected 
+                            ? 'Post Project & Setup Escrow'
+                            : 'Connect Wallet First'
                     }
                   </Button>
                 </CardContent>
