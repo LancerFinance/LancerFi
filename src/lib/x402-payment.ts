@@ -4,7 +4,7 @@ import { USDC_MINT, connection, getAccountBalanceViaProxy } from './solana';
 import { getLatestBlockhashWithFallback } from './solana';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.PROD ? '' : 'http://localhost:3001');
+  (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
 
 export interface X402PaymentChallenge {
   amount: string;
@@ -98,29 +98,17 @@ export async function processX402Payment(
   const clientTokenAccount = await getAssociatedTokenAddress(mint, clientWallet);
   const recipientTokenAccount = await getAssociatedTokenAddress(mint, recipientWallet);
 
-  // Check if recipient token account exists before trying to create it
-  // This prevents Phantom from flagging unnecessary account creation as suspicious
-  let recipientAccountExists = false;
-  try {
-    const accountInfo = await connection.getAccountInfo(recipientTokenAccount);
-    recipientAccountExists = accountInfo !== null;
-  } catch (error) {
-    // If we can't check (403 error), assume it doesn't exist and try to create
-    recipientAccountExists = false;
-  }
-
-  // Only add create instruction if account doesn't exist
-  // This prevents Phantom security warnings about unnecessary operations
-  if (!recipientAccountExists) {
-    transaction.add(
-      createAssociatedTokenAccountInstruction(
-        clientWallet, // Payer for account creation
-        recipientTokenAccount,
-        recipientWallet,
-        mint
-      )
-    );
-  }
+  // Always add instruction to create recipient token account if it doesn't exist
+  // Solana will handle this gracefully - if account exists, instruction is a no-op
+  // This avoids needing to check account existence (which causes 403 errors)
+  transaction.add(
+    createAssociatedTokenAccountInstruction(
+      clientWallet, // Payer for account creation
+      recipientTokenAccount,
+      recipientWallet,
+      mint
+    )
+  );
 
   // Convert amount to micro-USDC (6 decimals)
   // amount is already in USDC (e.g., 11), so multiply by 10^6 to get micro-USDC

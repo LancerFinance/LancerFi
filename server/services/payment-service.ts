@@ -184,47 +184,82 @@ export async function verifyX402Payment(
   expectedAmount: number
 ): Promise<{ verified: boolean; amount?: number; error?: string }> {
   try {
-    // Try multiple RPC endpoints if the first one fails
-    const RPC_ENDPOINTS = [
-      process.env.SOLANA_MAINNET_RPC,
-      'https://rpc.ankr.com/solana',
-      'https://solana-api.projectserum.com',
-      'https://api.mainnet-beta.solana.com',
-    ].filter(Boolean) as string[];
-
+    // First, check transaction status (faster than getTransaction)
+    // Retry with exponential backoff if transaction not found yet
     let transaction = null;
-    let lastError: Error | null = null;
-
-    // Try each RPC endpoint
-    for (const endpoint of RPC_ENDPOINTS) {
+    let retries = 0;
+    const maxRetries = 5;
+    
+    while (!transaction && retries < maxRetries) {
       try {
-        const testConnection = new Connection(endpoint, {
-          commitment: 'confirmed',
-          confirmTransactionInitialTimeout: 30000,
-        });
+        // Try getSignatureStatus first (faster)
+        const statusResult = await connection.getSignatureStatus(transactionSignature);
         
-        transaction = await testConnection.getTransaction(transactionSignature, {
+        if (!statusResult || !statusResult.value) {
+          // Transaction not found yet - wait and retry
+          if (retries < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retries + 1))); // Exponential backoff: 1s, 2s, 3s, 4s
+            retries++;
+            continue;
+          }
+          return {
+            verified: false,
+            error: 'Transaction not found on Solana network after multiple attempts'
+          };
+        }
+        
+        // Check if transaction has errors
+        if (statusResult.value.err) {
+          return {
+            verified: false,
+            error: `Transaction failed: ${statusResult.value.err.toString()}`
+          };
+        }
+        
+        // Transaction exists and has no errors - now get full transaction details
+        transaction = await connection.getTransaction(transactionSignature, {
           commitment: 'confirmed',
           maxSupportedTransactionVersion: 0
         });
         
-        if (transaction) {
-          break; // Found it, exit loop
+        if (!transaction) {
+          // If we can't get transaction but status shows success, still verify using status
+          // This is a fallback for when getTransaction fails but status is confirmed
+          if (statusResult.value.confirmationStatus === 'confirmed' || statusResult.value.confirmationStatus === 'finalized') {
+            // We'll verify using a different method - check balance changes via RPC
+            // For now, if status is confirmed and no error, we'll trust it
+            // But we still need to verify the amount, so we'll try to get transaction one more time
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            transaction = await connection.getTransaction(transactionSignature, {
+              commitment: 'confirmed',
+              maxSupportedTransactionVersion: 0
+            });
+            
+            if (!transaction) {
+              return {
+                verified: false,
+                error: 'Transaction confirmed but could not retrieve details for amount verification'
+              };
+            }
+          } else {
+            return {
+              verified: false,
+              error: 'Transaction not found on Solana network'
+            };
+          }
         }
-      } catch (err) {
-        lastError = err instanceof Error ? err : new Error(String(err));
-        continue; // Try next endpoint
+      } catch (statusError: any) {
+        // If status check fails, try getTransaction directly
+        if (retries < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retries + 1)));
+          retries++;
+          continue;
+        }
+        throw statusError;
       }
     }
 
-    if (!transaction) {
-      return {
-        verified: false,
-        error: `Transaction not found on Solana network. ${lastError?.message || 'All RPC endpoints failed. Please wait a few seconds and try again.'}`
-      };
-    }
-
-    // Check if transaction has errors
+    // Check if transaction has errors (double-check)
     if (transaction.meta?.err) {
       return {
         verified: false,
@@ -255,60 +290,20 @@ export async function verifyX402Payment(
     let totalUSDCReceived = 0;
     const expectedMicroUSDC = Math.round(expectedAmount * Math.pow(10, 6)); // USDC has 6 decimals
 
-    // The owner field in token balances refers to the token account owner (wallet address)
-    // We need to check if any token account belongs to the platform wallet and received USDC
-    for (const postBalance of postBalances) {
-      // Check if this is a USDC token account
-      if (postBalance.mint === USDC_MINT.toString()) {
-        // Check if the owner (wallet) of this token account is the platform wallet
-        if (postBalance.owner === platformWallet.toString()) {
-          const postAmount = BigInt(postBalance.uiTokenAmount.amount || '0');
-          
-          // Find corresponding pre-balance for the same account index
-          const preBalance = preBalances.find(
-            b => b.accountIndex === postBalance.accountIndex
-          );
-          const preAmount = preBalance ? BigInt(preBalance.uiTokenAmount.amount || '0') : BigInt(0);
-          
-          const received = postAmount - preAmount;
-          if (received > 0) {
-            totalUSDCReceived += Number(received);
-          }
-        }
-      }
-    }
-    
-    // If we didn't find a balance change, check if the platform wallet's token account was created
-    // (new token accounts start with 0 balance, so we need to check account creation)
-    if (totalUSDCReceived === 0) {
-      // Check account keys to see if platform wallet's token account was involved
-      const accountKeys = transaction.transaction.message.getAccountKeys();
-      const platformWalletStr = platformWallet.toString();
-      
-      // Look for token account creation or transfers
-      // If platform wallet's token account was just created, check if it received tokens
-      for (let i = 0; i < accountKeys.length; i++) {
-        const accountKey = accountKeys.get(i);
-        if (!accountKey) continue;
+    // Check post-token balances for platform wallet
+    for (const balance of postBalances) {
+      if (balance.owner === platformWallet.toString() && balance.mint === USDC_MINT.toString()) {
+        const postAmount = BigInt(balance.uiTokenAmount.amount);
         
-        // Check if this might be the platform wallet's token account
-        // We need to verify by checking if tokens were transferred to it
-        // The postTokenBalances should have an entry for this account if it received tokens
-        const balanceEntry = postBalances.find(b => {
-          // The accountIndex corresponds to the position in accountKeys
-          // But we need to match by owner (wallet address) and mint
-          return b.owner === platformWalletStr && b.mint === USDC_MINT.toString();
-        });
+        // Find corresponding pre-balance
+        const preBalance = preBalances.find(
+          b => b.owner === platformWallet.toString() && b.mint === USDC_MINT.toString()
+        );
+        const preAmount = preBalance ? BigInt(preBalance.uiTokenAmount.amount) : BigInt(0);
         
-        if (balanceEntry) {
-          const postAmount = BigInt(balanceEntry.uiTokenAmount.amount || '0');
-          const preBalance = preBalances.find(b => b.accountIndex === balanceEntry.accountIndex);
-          const preAmount = preBalance ? BigInt(preBalance.uiTokenAmount.amount || '0') : BigInt(0);
-          const received = postAmount - preAmount;
-          if (received > 0) {
-            totalUSDCReceived += Number(received);
-            break;
-          }
+        const received = postAmount - preAmount;
+        if (received > 0) {
+          totalUSDCReceived += Number(received);
         }
       }
     }

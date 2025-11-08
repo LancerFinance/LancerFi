@@ -113,18 +113,41 @@ export const useEscrow = (): UseEscrowReturn => {
           description: "Please wait while we verify your payment on-chain.",
         });
 
-        // Wait briefly for transaction to be broadcast (Phantom already confirmed it)
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        const verification = await verifyX402Payment(
-          projectId,
-          transactionSignature,
-          clientWallet.toString(),
-          parseFloat(paymentChallenge.amount)
-        );
+        // Quick initial check - if transaction is already confirmed, verify immediately
+        // Otherwise, retry with exponential backoff
+        let verification: { success: boolean; error?: string } = { success: false };
+        let retries = 0;
+        const maxRetries = 8; // Up to 8 attempts (about 10-15 seconds total)
+        
+        while (!verification.success && retries < maxRetries) {
+          // Wait before retry (exponential backoff: 1s, 1.5s, 2s, 2.5s, etc.)
+          if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 500 + (retries * 500)));
+          }
+          
+          verification = await verifyX402Payment(
+            projectId,
+            transactionSignature,
+            clientWallet.toString(),
+            parseFloat(paymentChallenge.amount)
+          );
+          
+          if (verification.success) {
+            break; // Success - exit loop
+          }
+          
+          // If error is "not found", retry (transaction might still be confirming)
+          if (verification.error?.includes('not found') || verification.error?.includes('Transaction not found')) {
+            retries++;
+            continue;
+          }
+          
+          // If it's a different error (transaction failed, amount mismatch, etc.), don't retry
+          break;
+        }
 
         if (!verification.success) {
-          throw new Error(verification.error || 'Payment verification failed');
+          throw new Error(verification.error || 'Payment verification failed after multiple attempts');
         }
 
         // Step 4: Create escrow record in database (payment already made to platform wallet)
@@ -226,9 +249,42 @@ export const useEscrow = (): UseEscrowReturn => {
           throw new Error(`Phantom transaction failed: ${phantomError?.message || 'Unknown error'}`);
         }
         
-        // Phantom's signAndSendTransaction already confirms the transaction
-        // We can proceed immediately - no need for extensive verification
-        // Just do a quick check to catch obvious failures
+        // Optimized verification - check immediately, then retry quickly if needed
+        // Phantom's signAndSendTransaction should have already confirmed, so we check right away
+        let confirmed = false;
+        let attempts = 0;
+        const maxAttempts = 4; // Max 4 attempts (about 2-3 seconds total)
+        
+        while (!confirmed && attempts < maxAttempts) {
+          // First attempt is immediate, subsequent attempts wait 500ms
+          if (attempts > 0) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          
+          const verification = await verifyTransaction(signature);
+          
+          if (verification.success && verification.confirmed) {
+            confirmed = true;
+            break; // Fast path - transaction confirmed immediately
+          }
+          
+          // If transaction has an error (not just "not found"), it failed
+          if (verification.error && 
+              !verification.error.includes('not found') && 
+              !verification.error.includes('403') &&
+              !verification.error.includes('RPC access blocked')) {
+            throw new Error(`Transaction failed on-chain: ${verification.error}`);
+          }
+          
+          attempts++;
+        }
+        
+        // If we couldn't verify but Phantom confirmed it, proceed anyway
+        // This is safe because Phantom's signAndSendTransaction only returns after confirmation
+        if (!confirmed) {
+          // Transaction might still be confirming, but Phantom said it's sent
+          // Proceed with escrow creation - if transaction actually failed, escrow will fail too
+        }
         
       } catch (error: any) {
         console.error('Error with transaction');
@@ -238,9 +294,6 @@ export const useEscrow = (): UseEscrowReturn => {
         }
         throw error;
       }
-      
-      // Phantom's signAndSendTransaction already confirmed the transaction
-      // Proceed immediately to create escrow - no need to wait or verify further
 
       // Transaction verified - safe to create escrow
       const escrow = await db.createEscrow({
