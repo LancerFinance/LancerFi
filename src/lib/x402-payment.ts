@@ -1,7 +1,7 @@
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import { USDC_MINT, connection, getAccountBalanceViaProxy } from './solana';
-import { getLatestBlockhashWithFallback, sendRawTransactionViaProxy } from './solana';
+import { getLatestBlockhashWithFallback } from './solana';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
@@ -163,13 +163,28 @@ export async function processX402Payment(
     note: 'Both instructions should use TOKEN_PROGRAM_ID, not SystemProgram'
   });
 
-  // Sign with Phantom
-  const signedTransaction = await wallet.signTransaction(transaction);
-
-  // Send transaction
-  const signature = await sendRawTransactionViaProxy(signedTransaction.serialize());
-
-  return signature;
+  // Use Phantom's signAndSendTransaction - it handles both signing and broadcasting
+  // This bypasses the backend RPC proxy and uses Phantom's own RPC connection
+  // This avoids 403 errors from backend RPC endpoints
+  console.log('Signing and sending transaction via Phantom (bypasses backend RPC proxy)...');
+  
+  try {
+    const signature = await wallet.signAndSendTransaction(transaction);
+    console.log('✅ Transaction signed and sent via Phantom, signature:', signature);
+    return signature;
+  } catch (error: any) {
+    console.error('Phantom signAndSendTransaction failed:', error);
+    
+    // If signAndSendTransaction fails, provide helpful error message
+    if (error.message?.includes('User rejected')) {
+      throw new Error('Transaction was cancelled by user');
+    }
+    if (error.message?.includes('insufficient funds') || error.message?.includes('not enough')) {
+      throw new Error('Insufficient USDC or SOL for transaction fees. Please ensure you have at least 11 USDC and 0.01 SOL in your wallet.');
+    }
+    
+    throw new Error(`Transaction failed: ${error.message || 'Unknown error'}`);
+  }
 }
 
 /**

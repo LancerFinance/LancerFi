@@ -9,11 +9,12 @@ const router = Router();
 // ============================================
 
 // ONLY mainnet endpoints - no devnet, no conditionals
+// Prioritize free public RPCs that allow server-side requests
 const MAINNET_RPC_ENDPOINTS = [
-  process.env.SOLANA_MAINNET_RPC, // Custom env var if provided
-  'https://api.mainnet-beta.solana.com', // Official Solana mainnet RPC
+  process.env.SOLANA_MAINNET_RPC, // Custom env var if provided (highest priority)
+  'https://rpc.ankr.com/solana', // Ankr free tier (allows server requests)
   'https://solana-api.projectserum.com', // Serum mainnet RPC
-  'https://rpc.ankr.com/solana', // Ankr mainnet RPC
+  'https://api.mainnet-beta.solana.com', // Official Solana mainnet RPC (rate-limited, try last)
 ].filter(Boolean) as string[];
 
 // Ensure we always have at least one mainnet endpoint
