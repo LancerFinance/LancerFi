@@ -108,6 +108,13 @@ export async function releasePaymentFromPlatform(
       escrowAccount
     );
     
+    console.log(`[USDC Release] Starting verification:`, {
+      escrowAccount: escrowAccount.toString(),
+      escrowTokenAccount: escrowTokenAccount.toString(),
+      amount: amount,
+      freelancerWallet: freelancerWallet.toString()
+    });
+    
     // CRITICAL: Verify escrow token account exists and has balance before attempting transfer
     // For x402 payments, USDC should already be in the platform wallet
     let escrowTokenAccountInfo;
@@ -122,12 +129,18 @@ export async function releasePaymentFromPlatform(
       const balanceInfo = await connection.getTokenAccountBalance(escrowTokenAccount);
       escrowBalance = parseFloat(balanceInfo.value.uiAmount?.toString() || '0');
       
-      console.log(`Platform wallet USDC token account verified: ${escrowTokenAccount.toString()}, Balance: ${escrowBalance} USDC, Required: ${amount} USDC`);
+      console.log(`[USDC Release] Platform wallet USDC token account verified:`, {
+        address: escrowTokenAccount.toString(),
+        balance: escrowBalance,
+        required: amount,
+        hasEnough: escrowBalance >= amount
+      });
       
       if (escrowBalance < amount) {
         throw new Error(`Insufficient USDC balance in platform wallet. Required: ${amount} USDC, Available: ${escrowBalance} USDC`);
       }
     } catch (error: any) {
+      console.error(`[USDC Release] Error verifying escrow token account:`, error);
       // If getAccountInfo returns null, the account doesn't exist
       if (!escrowTokenAccountInfo) {
         throw new Error(`Platform wallet USDC token account does not exist. Token account: ${escrowTokenAccount.toString()}. This may mean the x402 payment was not received or the token account was never created. Please verify the x402 payment transaction was successful.`);
@@ -141,7 +154,6 @@ export async function releasePaymentFromPlatform(
         throw error;
       }
       // Otherwise, it might be a different error - log it and throw
-      console.error('Error checking escrow token account:', error);
       throw new Error(`Failed to verify platform wallet USDC token account: ${error.message || 'Unknown error'}`);
     }
     
@@ -151,19 +163,7 @@ export async function releasePaymentFromPlatform(
       freelancerWallet
     );
     
-    // Check if freelancer token account exists, create if not
-    const freelancerTokenAccountInfo = await connection.getAccountInfo(freelancerTokenAccount);
-    if (!freelancerTokenAccountInfo) {
-      // Freelancer doesn't have a USDC token account - create it
-      transaction.add(
-        createAssociatedTokenAccountInstruction(
-          escrowAccount, // Platform wallet pays for account creation
-          freelancerTokenAccount,
-          freelancerWallet,
-          tokenMint
-        )
-      );
-    }
+    console.log(`[USDC Release] Freelancer token account: ${freelancerTokenAccount.toString()}`);
     
     // CRITICAL: For SPL token transfers, the authority must be the owner of the SOURCE token account
     // Get the token account info to verify it's a valid token account and get the owner
@@ -173,11 +173,12 @@ export async function releasePaymentFromPlatform(
     
     try {
       escrowTokenAccountData = await getAccount(connection, escrowTokenAccount);
-      console.log(`Escrow token account verified:`, {
+      console.log(`[USDC Release] Escrow token account verified:`, {
         address: escrowTokenAccount.toString(),
         owner: escrowTokenAccountData.owner.toString(),
         mint: escrowTokenAccountData.mint.toString(),
         amount: escrowTokenAccountData.amount.toString(),
+        decimals: escrowTokenAccountData.mint.toString() === USDC_MINT.toString() ? 6 : 'unknown',
         platformWallet: escrowAccount.toString()
       });
       
@@ -188,8 +189,10 @@ export async function releasePaymentFromPlatform(
       if (transferAuthority.toString() !== escrowAccount.toString()) {
         throw new Error(`Token account owner mismatch. Account owner: ${transferAuthority.toString()}, Expected platform wallet: ${escrowAccount.toString()}`);
       }
+      
+      console.log(`[USDC Release] Transfer authority verified: ${transferAuthority.toString()}`);
     } catch (error: any) {
-      console.error('Error getting escrow token account data:', error);
+      console.error(`[USDC Release] Error getting escrow token account data:`, error);
       // If getAccount fails, the account might not be a valid token account
       if (error.message?.includes('Invalid param') || error.message?.includes('not found')) {
         throw new Error(`Platform wallet USDC token account is not a valid token account: ${escrowTokenAccount.toString()}. Error: ${error.message}`);
@@ -198,42 +201,70 @@ export async function releasePaymentFromPlatform(
         throw error;
       }
       // If we can't verify, assume platform wallet is the owner and proceed
-      console.warn('Could not verify token account owner, assuming platform wallet is owner');
+      console.warn(`[USDC Release] Could not verify token account owner, assuming platform wallet is owner`);
       transferAuthority = escrowAccount;
     }
     
-    // Verify freelancer token account is valid (if it exists)
-    if (freelancerTokenAccountInfo) {
-      try {
-        const freelancerTokenAccountData = await getAccount(connection, freelancerTokenAccount);
-        console.log(`Freelancer token account verified:`, {
-          address: freelancerTokenAccount.toString(),
-          owner: freelancerTokenAccountData.owner.toString(),
-          mint: freelancerTokenAccountData.mint.toString()
-        });
-      } catch (error: any) {
-        console.warn('Freelancer token account might not be valid, will create it:', error.message);
-        // If it's not valid, we'll create it in the transaction
+    // Check if freelancer token account exists, create if not
+    let freelancerTokenAccountInfo;
+    try {
+      freelancerTokenAccountInfo = await connection.getAccountInfo(freelancerTokenAccount);
+      if (freelancerTokenAccountInfo) {
+        // Verify it's a valid token account
+        try {
+          const freelancerTokenAccountData = await getAccount(connection, freelancerTokenAccount);
+          console.log(`[USDC Release] Freelancer token account exists and is valid:`, {
+            address: freelancerTokenAccount.toString(),
+            owner: freelancerTokenAccountData.owner.toString(),
+            mint: freelancerTokenAccountData.mint.toString()
+          });
+        } catch (error: any) {
+          console.warn(`[USDC Release] Freelancer token account exists but might not be valid, will recreate:`, error.message);
+          // Account exists but isn't valid - we'll create it anyway (will fail if it's a different type)
+          transaction.add(
+            createAssociatedTokenAccountInstruction(
+              escrowAccount,
+              freelancerTokenAccount,
+              freelancerWallet,
+              tokenMint
+            )
+          );
+        }
+      } else {
+        // Freelancer doesn't have a USDC token account - create it
+        console.log(`[USDC Release] Freelancer token account does not exist, creating it`);
         transaction.add(
           createAssociatedTokenAccountInstruction(
-            escrowAccount,
+            escrowAccount, // Platform wallet pays for account creation
             freelancerTokenAccount,
             freelancerWallet,
             tokenMint
           )
         );
       }
+    } catch (error: any) {
+      console.warn(`[USDC Release] Error checking freelancer token account, will create it:`, error.message);
+      // If check fails, create the account to be safe
+      transaction.add(
+        createAssociatedTokenAccountInstruction(
+          escrowAccount,
+          freelancerTokenAccount,
+          freelancerWallet,
+          tokenMint
+        )
+      );
     }
     
     // Transfer tokens from escrow to freelancer
     // Authority must be the owner of the source token account
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
     
-    console.log(`Creating transfer instruction:`, {
+    console.log(`[USDC Release] Creating transfer instruction:`, {
       source: escrowTokenAccount.toString(),
       destination: freelancerTokenAccount.toString(),
       authority: transferAuthority.toString(),
       amount: transferAmount.toString(),
+      amountUSDC: amount,
       decimals: decimals
     });
     
@@ -247,6 +278,8 @@ export async function releasePaymentFromPlatform(
         TOKEN_PROGRAM_ID
       )
     );
+    
+    console.log(`[USDC Release] Transaction built successfully with ${transaction.instructions.length} instruction(s)`);
   }
   
   // Sign with platform keypair
