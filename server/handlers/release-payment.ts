@@ -89,14 +89,21 @@ export async function releasePaymentHandler(
     }
 
     // Get payment currency from escrow
-    const paymentCurrency = escrow.payment_currency || 'SOLANA';
+    // For x402 payments, payment_currency is 'USDC' but we need to use 'USDC' for the release
+    let paymentCurrency = escrow.payment_currency || 'SOLANA';
+    
+    // x402 payments use USDC, so if payment_currency is 'X402' or 'USDC', use 'USDC'
+    if (paymentCurrency === 'X402' || paymentCurrency === 'USDC') {
+      paymentCurrency = 'USDC';
+    }
+    
     const amountToSend = escrow.amount_usdc;
 
     // Release payment from platform wallet
     const signature = await releasePaymentFromPlatform(
       new PublicKey(freelancerWallet),
       amountToSend,
-      paymentCurrency
+      paymentCurrency as 'USDC' | 'SOLANA'
     );
 
     // Update escrow status in database

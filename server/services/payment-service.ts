@@ -114,11 +114,18 @@ export async function releasePaymentFromPlatform(
     const tokenMint = USDC_MINT;
     const decimals = 6;
     
-    // Get escrow's token account
+    // Get escrow's token account (platform wallet's USDC token account)
     const escrowTokenAccount = await getAssociatedTokenAddress(
       tokenMint,
       escrowAccount
     );
+    
+    // CRITICAL: Verify escrow token account exists before attempting transfer
+    // For x402 payments, USDC should already be in the platform wallet
+    const escrowTokenAccountInfo = await connection.getAccountInfo(escrowTokenAccount);
+    if (!escrowTokenAccountInfo) {
+      throw new Error(`Platform wallet USDC token account does not exist. Cannot release payment. Token account: ${escrowTokenAccount.toString()}`);
+    }
     
     // Get freelancer's token account
     const freelancerTokenAccount = await getAssociatedTokenAddress(
@@ -127,9 +134,9 @@ export async function releasePaymentFromPlatform(
     );
     
     // Check if freelancer token account exists, create if not
-    try {
-      await connection.getAccountInfo(freelancerTokenAccount);
-    } catch {
+    const freelancerTokenAccountInfo = await connection.getAccountInfo(freelancerTokenAccount);
+    if (!freelancerTokenAccountInfo) {
+      // Freelancer doesn't have a USDC token account - create it
       transaction.add(
         createAssociatedTokenAccountInstruction(
           escrowAccount, // Platform wallet pays for account creation
