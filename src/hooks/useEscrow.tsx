@@ -173,8 +173,9 @@ export const useEscrow = (): UseEscrowReturn => {
 
         console.log('Creating escrow with data:', escrowData);
         
+        let escrow;
         try {
-          const { data: escrow, error: escrowError } = await db.createEscrow(escrowData);
+          const { data, error: escrowError } = await db.createEscrow(escrowData);
 
           if (escrowError) {
             console.error('Escrow creation error:', escrowError);
@@ -188,11 +189,12 @@ export const useEscrow = (): UseEscrowReturn => {
             throw new Error(escrowError.message || 'Failed to create escrow record');
           }
 
-          if (!escrow) {
+          if (!data) {
             console.error('Escrow creation returned no data');
             throw new Error('Failed to create escrow record - no data returned');
           }
 
+          escrow = data;
           console.log('Escrow created successfully:', escrow.id);
         } catch (escrowCreateError: any) {
           console.error('Exception during escrow creation:', escrowCreateError);
