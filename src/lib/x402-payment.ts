@@ -99,33 +99,25 @@ export async function processX402Payment(
   // Get associated token accounts (async)
   const clientTokenAccount = await getAssociatedTokenAddress(mint, clientWallet);
   const recipientTokenAccount = await getAssociatedTokenAddress(mint, recipientWallet);
+  
+  console.log('Token accounts:', {
+    client: clientTokenAccount.toString(),
+    recipient: recipientTokenAccount.toString(),
+    mint: mint.toString()
+  });
 
-  // Check if recipient token account exists using backend proxy (avoids 403 errors)
-  // We'll try to get balance - if it fails, the account doesn't exist
-  let recipientAccountExists = false;
-  try {
-    // Use backend proxy to check if recipient has a token account
-    // This avoids 403 errors from direct RPC calls
-    const accountInfo = await getAccountBalanceViaProxy(recipientTokenAccount.toString());
-    recipientAccountExists = accountInfo.accountExists;
-  } catch (error) {
-    // If check fails, assume account doesn't exist (will create it)
-    console.log('Recipient token account check failed, will create if needed:', error);
-    recipientAccountExists = false;
-  }
-
-  // If recipient token account doesn't exist, add instruction to create it
-  if (!recipientAccountExists) {
-    console.log('Recipient token account does not exist, adding create instruction');
-    transaction.add(
-      createAssociatedTokenAccountInstruction(
-        clientWallet, // Payer for account creation
-        recipientTokenAccount,
-        recipientWallet,
-        mint
-      )
-    );
-  }
+  // Always add instruction to create recipient token account if it doesn't exist
+  // Solana will handle this gracefully - if account exists, instruction is a no-op
+  // This avoids needing to check account existence (which causes 403 errors)
+  console.log('Adding create token account instruction (will be no-op if account exists)');
+  transaction.add(
+    createAssociatedTokenAccountInstruction(
+      clientWallet, // Payer for account creation
+      recipientTokenAccount,
+      recipientWallet,
+      mint
+    )
+  );
 
   // Convert amount to micro-USDC (6 decimals)
   // amount is already in USDC (e.g., 11), so multiply by 10^6 to get micro-USDC
