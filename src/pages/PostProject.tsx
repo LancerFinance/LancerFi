@@ -12,7 +12,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { db, supabase } from "@/lib/supabase";
-import { formatUSDC, formatSOL, PaymentCurrency } from "@/lib/solana";
+import { formatUSDC, formatSOL, PaymentCurrency, getUSDCBalance, getAccountBalanceViaProxy } from "@/lib/solana";
+import { PublicKey } from "@solana/web3.js";
 import { getSolanaPrice, convertUSDToSOL } from "@/lib/solana-price";
 import { useToast } from "@/hooks/use-toast";
 import { validateProject } from "@/lib/validation";
@@ -206,6 +207,69 @@ const PostProject = () => {
     }
 
     setFormErrors({});
+    
+    // Check wallet balances before proceeding
+    // For x402/USDC payments, check USDC balance
+    // For all payments, check SOL balance (needed for transaction fees)
+    try {
+      const walletAddress = new PublicKey(address);
+      const budgetAmount = parseFloat(formData.budget);
+      const platformFeePercent = 10;
+      const platformFee = (budgetAmount * platformFeePercent) / 100;
+      const totalRequired = budgetAmount + platformFee;
+      
+      // Always check SOL balance (needed for transaction fees)
+      console.log('Checking SOL balance for transaction fees...');
+      const solBalanceData = await getAccountBalanceViaProxy(address);
+      const solBalance = solBalanceData.balanceSOL;
+      const minSOLRequired = 0.01; // Minimum SOL for transaction fees
+      
+      if (solBalance < minSOLRequired) {
+        toast({
+          title: "Insufficient SOL",
+          description: `You need at least ${formatSOL(minSOLRequired)} SOL for transaction fees. You currently have ${formatSOL(solBalance)} SOL. Please add more SOL to your wallet.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // For x402 and USDC payments, check USDC balance
+      if (paymentCurrency === 'X402' || paymentCurrency === 'USDC') {
+        console.log('Checking USDC balance for x402/USDC payment...');
+        const usdcBalance = await getUSDCBalance(walletAddress);
+        
+        console.log('Balance check:', {
+          required: totalRequired,
+          current: usdcBalance,
+          hasEnough: usdcBalance >= totalRequired
+        });
+        
+        if (usdcBalance < totalRequired) {
+          toast({
+            title: "Insufficient USDC",
+            description: `You need at least ${formatUSDC(totalRequired)} USDC to post this project (${formatUSDC(budgetAmount)} + ${formatUSDC(platformFee)} platform fee). You currently have ${formatUSDC(usdcBalance)} USDC. Please add more USDC to your wallet.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        console.log('✅ Balance check passed:', {
+          usdcBalance,
+          required: totalRequired,
+          solBalance,
+          minSOLRequired
+        });
+      }
+    } catch (balanceError: any) {
+      console.error('Error checking wallet balance:', balanceError);
+      toast({
+        title: "Balance Check Failed",
+        description: `Unable to verify wallet balance: ${balanceError.message || 'Unknown error'}. Please try again.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
