@@ -232,8 +232,9 @@ const PostProject = () => {
     setFormErrors({});
     
     // Check wallet balances before proceeding
+    // For SOL payments, check SOL balance (payment amount + platform fee + transaction fees)
     // For x402/USDC payments, check USDC balance
-    // For all payments, check SOL balance (needed for transaction fees)
+    // For all payments, check minimum SOL balance (needed for transaction fees)
     try {
       const walletAddress = new PublicKey(address);
       const budgetAmount = parseFloat(formData.budget);
@@ -241,18 +242,36 @@ const PostProject = () => {
       const platformFee = (budgetAmount * platformFeePercent) / 100;
       const totalRequired = budgetAmount + platformFee;
       
-      // Always check SOL balance (needed for transaction fees)
+      // Get SOL balance
       const solBalanceData = await getAccountBalanceViaProxy(address);
       const solBalance = solBalanceData.balanceSOL;
-      const minSOLRequired = 0.01; // Minimum SOL for transaction fees
+      const transactionFeeBuffer = 0.01; // Buffer for transaction fees
       
-      if (solBalance < minSOLRequired) {
-        toast({
-          title: "Insufficient SOL",
-          description: `You need at least ${formatSOL(minSOLRequired)} SOL for transaction fees. You currently have ${formatSOL(solBalance)} SOL. Please add more SOL to your wallet.`,
-          variant: "destructive",
-        });
-        return;
+      // For SOL payments, check if user has enough SOL for payment + platform fee + transaction fees
+      if (paymentCurrency === 'SOLANA') {
+        // Convert USD amount to SOL
+        const solAmount = await convertUSDToSOL(budgetAmount);
+        const solPlatformFee = await convertUSDToSOL(platformFee);
+        const totalSOLRequired = solAmount + solPlatformFee + transactionFeeBuffer;
+        
+        if (solBalance < totalSOLRequired) {
+          toast({
+            title: "Insufficient SOL",
+            description: `You need at least ${formatSOL(totalSOLRequired)} SOL to post this project (${formatSOL(solAmount)} + ${formatSOL(solPlatformFee)} platform fee + ${formatSOL(transactionFeeBuffer)} transaction fees). You currently have ${formatSOL(solBalance)} SOL. Please add more SOL to your wallet.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      } else {
+        // For USDC/X402 payments, check minimum SOL for transaction fees
+        if (solBalance < transactionFeeBuffer) {
+          toast({
+            title: "Insufficient SOL",
+            description: `You need at least ${formatSOL(transactionFeeBuffer)} SOL for transaction fees. You currently have ${formatSOL(solBalance)} SOL. Please add more SOL to your wallet.`,
+            variant: "destructive",
+          });
+          return;
+        }
       }
       
       // For x402 and USDC payments, check USDC balance
