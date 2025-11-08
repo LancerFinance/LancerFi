@@ -113,11 +113,27 @@ export async function releasePaymentFromPlatform(
       platformWallet: escrowAccount.toString()
     });
     
+    // CRITICAL: Verify source account exists and is valid (platform wallet's USDC account)
+    // This must exist since x402 payment was received
+    try {
+      const sourceAccountInfo = await connection.getAccountInfo(sourceTokenAccount);
+      if (!sourceAccountInfo) {
+        throw new Error(`Platform wallet USDC token account does not exist: ${sourceTokenAccount.toString()}. The x402 payment may not have been received.`);
+      }
+      console.log(`[USDC Release] Source account verified: ${sourceTokenAccount.toString()}`);
+    } catch (error: any) {
+      console.error(`[USDC Release] Source account check failed:`, error);
+      throw new Error(`Platform wallet USDC token account is invalid or does not exist: ${sourceTokenAccount.toString()}. Error: ${error.message}`);
+    }
+    
     // Check if destination exists (same pattern as x402)
     let destAccountExists = false;
     try {
       const accountInfo = await connection.getAccountInfo(destTokenAccount);
       destAccountExists = accountInfo !== null;
+      if (destAccountExists) {
+        console.log(`[USDC Release] Destination account exists: ${destTokenAccount.toString()}`);
+      }
     } catch {
       destAccountExists = false;
     }
