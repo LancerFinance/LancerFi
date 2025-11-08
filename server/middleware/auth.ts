@@ -26,38 +26,57 @@ export async function verifyWalletSignature(
 
     // Verify the signature
     const publicKey = new PublicKey(walletAddress);
+    const signatureBytes = Uint8Array.from(Buffer.from(signature, 'base64'));
     
-    // Phantom signs messages with a Solana message prefix
-    // Format: "\xffSolana Signed Message:\n" + message length (u16) + message
-    const prefix = new TextEncoder().encode('\xffSolana Signed Message:\n');
+    // Phantom's signMessage signs the message with Solana's standard format
+    // Format: "\xffSolana Signed Message:\n" + message length (u16, little-endian) + message
     const messageBytes = new TextEncoder().encode(message);
+    
+    // Build the full message that Phantom signs
+    const prefix = new TextEncoder().encode('\xffSolana Signed Message:\n');
     const messageLengthBytes = new Uint8Array(2);
+    // Little-endian encoding
     messageLengthBytes[0] = messageBytes.length & 0xff;
     messageLengthBytes[1] = (messageBytes.length >> 8) & 0xff;
     
-    // Combine prefix + length + message
     const fullMessage = new Uint8Array(prefix.length + 2 + messageBytes.length);
     fullMessage.set(prefix, 0);
     fullMessage.set(messageLengthBytes, prefix.length);
     fullMessage.set(messageBytes, prefix.length + 2);
     
-    const signatureBytes = Uint8Array.from(Buffer.from(signature, 'base64'));
-
-    // Try verification with Solana message prefix first
-    let isValid = nacl.sign.detached.verify(
-      fullMessage,
-      signatureBytes,
-      publicKey.toBytes()
-    );
-    
-    // If that fails, try without prefix (for backwards compatibility)
-    if (!isValid) {
-      const plainMessageBytes = new TextEncoder().encode(message);
+    // Verify using nacl (Ed25519)
+    let isValid = false;
+    try {
       isValid = nacl.sign.detached.verify(
-        plainMessageBytes,
+        fullMessage,
         signatureBytes,
         publicKey.toBytes()
       );
+    } catch (e) {
+      console.error('Signature verification error:', e);
+    }
+    
+    // If that fails, try direct message verification (some wallets don't use prefix)
+    if (!isValid) {
+      try {
+        isValid = nacl.sign.detached.verify(
+          messageBytes,
+          signatureBytes,
+          publicKey.toBytes()
+        );
+      } catch (e) {
+        console.warn('Direct verification also failed:', e);
+      }
+    }
+    
+    // Log for debugging if verification fails
+    if (!isValid) {
+      console.error('Signature verification failed:', {
+        walletAddress,
+        messageLength: message.length,
+        signatureLength: signatureBytes.length,
+        messagePreview: message.substring(0, 50) + '...'
+      });
     }
 
     if (!isValid) {
