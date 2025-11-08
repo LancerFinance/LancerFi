@@ -3,9 +3,10 @@
  * Handles authentication and secure payment operations
  */
 
-// API URL - Uses Vercel environment variable or defaults to localhost for development
+// API URL - Uses Vercel environment variable or defaults to same origin for production
+// In production on Vercel, API routes are served from the same domain
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+  (import.meta.env.PROD ? '' : 'http://localhost:3001');
 
 interface ReleasePaymentRequest {
   escrowId: string;
