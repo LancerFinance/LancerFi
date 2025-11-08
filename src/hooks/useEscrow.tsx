@@ -612,9 +612,6 @@ export const useEscrow = (): UseEscrowReturn => {
       if (project.status !== 'in_progress') {
         throw new Error(`Project must be in progress to complete. Current status: ${project.status}`);
       }
-
-      // Get payment currency from escrow (default to SOLANA if not set)
-      const paymentCurrency = (escrow.payment_currency as PaymentCurrency) || 'SOLANA';
       
       // Amount to send to freelancer (project amount, excluding platform fee)
       const amountToSend = escrow.amount_usdc;
