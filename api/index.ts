@@ -2,18 +2,18 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
-import { releasePaymentRouter } from './routes/release-payment.js';
-import rpcProxyRouter from './routes/rpc-proxy.js';
-import x402PaymentRouter from './routes/x402-payment.js';
-import projectRateLimitRouter from './routes/project-rate-limit.js';
-import projectCleanupRouter from './routes/project-cleanup.js';
+import { releasePaymentRouter } from '../server/routes/release-payment.js';
+import rpcProxyRouter from '../server/routes/rpc-proxy.js';
+import x402PaymentRouter from '../server/routes/x402-payment.js';
+import projectRateLimitRouter from '../server/routes/project-rate-limit.js';
+import projectCleanupRouter from '../server/routes/project-cleanup.js';
 import { 
   validateRequestSize, 
   sanitizeRequestBody,
   generalRateLimiter,
   paymentRateLimiter,
   rpcRateLimiter
-} from './middleware/security.js';
+} from '../server/middleware/security.js';
 
 // Load environment variables
 dotenv.config();
