@@ -491,16 +491,55 @@ export const db = {
 
   // Work Submissions
   async createWorkSubmission(submission: Omit<WorkSubmission, 'id' | 'created_at' | 'updated_at' | 'submitted_at'>) {
+    // Build insert object, only including suspicious_files fields if they exist in the submission
+    const insertData: any = {
+      project_id: submission.project_id,
+      freelancer_id: submission.freelancer_id,
+      description: submission.description,
+      file_urls: submission.file_urls || [],
+      link_urls: submission.link_urls || [],
+      status: submission.status || 'pending',
+      submitted_at: new Date().toISOString()
+    };
+
+    // Only include suspicious_files fields if they're provided (and columns exist in DB)
+    if (submission.has_suspicious_files !== undefined) {
+      insertData.has_suspicious_files = submission.has_suspicious_files;
+    }
+    if (submission.suspicious_files_details !== undefined) {
+      insertData.suspicious_files_details = submission.suspicious_files_details;
+    }
+
     const { data, error } = await supabase
       .from('work_submissions')
-      .insert({
-        ...submission,
-        submitted_at: new Date().toISOString()
-      })
+      .insert(insertData)
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      // If error is about missing columns, try without suspicious_files fields
+      if (error.message?.includes('has_suspicious_files') || error.message?.includes('suspicious_files_details') || error.message?.includes('column')) {
+        console.warn('Suspicious files columns not found, creating submission without them:', error.message);
+        // Retry without suspicious_files fields
+        const { data: retryData, error: retryError } = await supabase
+          .from('work_submissions')
+          .insert({
+            project_id: submission.project_id,
+            freelancer_id: submission.freelancer_id,
+            description: submission.description,
+            file_urls: submission.file_urls || [],
+            link_urls: submission.link_urls || [],
+            status: submission.status || 'pending',
+            submitted_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (retryError) throw retryError;
+        return retryData;
+      }
+      throw error;
+    }
     return data;
   },
 
