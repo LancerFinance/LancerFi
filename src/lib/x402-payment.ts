@@ -139,18 +139,27 @@ export async function processX402Payment(
     )
   );
 
-  // Use Phantom's signAndSendTransaction - it handles both signing and broadcasting
-  // This bypasses the backend RPC proxy and uses Phantom's own RPC connection
-  // This avoids 403 errors from backend RPC endpoints
-  
+  // Use the same pattern as SOL/USDC payments: signTransaction + sendRawTransactionViaProxy
+  // This avoids Phantom's security warnings that can occur with signAndSendTransaction
+  // for certain transaction patterns (like token account creation + transfer)
   try {
-    const signature = await wallet.signAndSendTransaction(transaction);
+    // Sign with Phantom (user approves in wallet)
+    const signedTransaction = await wallet.signTransaction(transaction);
+    
+    // Serialize immediately after signing
+    const serializedTransaction = signedTransaction.serialize();
+    
+    // Send via backend proxy (same as SOL/USDC payments)
+    // This is more reliable and avoids Phantom security warnings
+    const { sendRawTransactionViaProxy } = await import('./solana');
+    const signature = await sendRawTransactionViaProxy(serializedTransaction);
+    
     return signature;
   } catch (error: any) {
     console.error('Phantom transaction failed');
     
-    // If signAndSendTransaction fails, provide helpful error message
-    if (error.message?.includes('User rejected')) {
+    // If user rejected, let them know
+    if (error?.code === 4001 || error.message?.includes('User rejected')) {
       throw new Error('Transaction was cancelled by user');
     }
     if (error.message?.includes('insufficient funds') || error.message?.includes('not enough')) {
