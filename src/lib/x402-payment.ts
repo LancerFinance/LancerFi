@@ -210,31 +210,59 @@ export async function verifyX402Payment(
   clientWallet: string,
   amount: number
 ): Promise<{ success: boolean; error?: string }> {
-  const response = await fetch(`${API_BASE_URL}/api/x402/verify-payment`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      projectId,
-      transactionSignature,
-      clientWallet,
-      amount,
-    }),
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/x402/verify-payment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        projectId,
+        transactionSignature,
+        clientWallet,
+        amount,
+      }),
+    });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText || `HTTP ${response.status}` };
+      }
+      
+      console.error('x402 verification failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData
+      });
+      
+      return {
+        success: false,
+        error: errorData.error || `HTTP ${response.status}: ${response.statusText}`
+      };
+    }
+
+    const result = await response.json();
+    
+    console.log('x402 verification result:', {
+      verified: result.verified,
+      error: result.error,
+      transactionSignature: transactionSignature.substring(0, 20) + '...'
+    });
+    
+    return {
+      success: result.verified === true,
+      error: result.error
+    };
+  } catch (error: any) {
+    console.error('x402 verification exception:', error);
     return {
       success: false,
-      error: error.error || `HTTP ${response.status}`
+      error: error.message || 'Failed to verify payment - network error'
     };
   }
-
-  const result = await response.json();
-  return {
-    success: result.verified === true,
-    error: result.error
-  };
 }
 

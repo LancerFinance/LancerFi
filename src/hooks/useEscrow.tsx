@@ -147,6 +147,13 @@ export const useEscrow = (): UseEscrowReturn => {
         }
 
         if (!verification.success) {
+          // If verification fails but transaction was sent, log the error for debugging
+          console.error('x402 payment verification failed:', {
+            transactionSignature,
+            error: verification.error,
+            projectId,
+            amount: parseFloat(paymentChallenge.amount)
+          });
           throw new Error(verification.error || 'Payment verification failed after multiple attempts');
         }
 
@@ -164,10 +171,33 @@ export const useEscrow = (): UseEscrowReturn => {
           funded_at: new Date().toISOString(),
         };
 
-        const { data: escrow, error: escrowError } = await db.createEscrow(escrowData);
+        console.log('Creating escrow with data:', escrowData);
+        
+        try {
+          const { data: escrow, error: escrowError } = await db.createEscrow(escrowData);
 
-        if (escrowError || !escrow) {
-          throw new Error(escrowError?.message || 'Failed to create escrow record');
+          if (escrowError) {
+            console.error('Escrow creation error:', escrowError);
+            // Log full error details for debugging
+            console.error('Escrow error details:', {
+              message: escrowError.message,
+              details: escrowError.details,
+              hint: escrowError.hint,
+              code: escrowError.code
+            });
+            throw new Error(escrowError.message || 'Failed to create escrow record');
+          }
+
+          if (!escrow) {
+            console.error('Escrow creation returned no data');
+            throw new Error('Failed to create escrow record - no data returned');
+          }
+
+          console.log('Escrow created successfully:', escrow.id);
+        } catch (escrowCreateError: any) {
+          console.error('Exception during escrow creation:', escrowCreateError);
+          // Re-throw with more context
+          throw new Error(`Failed to create escrow record: ${escrowCreateError.message || 'Unknown error'}`);
         }
 
         toast({
