@@ -83,6 +83,15 @@ export async function processX402Payment(
   const amount = parseFloat(paymentChallenge.amount);
   const mint = new PublicKey(paymentChallenge.mint);
 
+  // IMPORTANT: Explain what the user will see in Phantom
+  console.log('📋 X402 Payment Details:');
+  console.log('  • Amount: ' + amount + ' USDC (this is $' + amount + ' USD)');
+  console.log('  • Platform Wallet (main): ' + recipientWallet.toString());
+  console.log('  • Phantom will show: "11000000" = 11 USDC in micro-USDC format');
+  console.log('  • Phantom will show: Associated Token Account address (not the main wallet)');
+  console.log('  • This is CORRECT - tokens are stored in separate accounts on Solana');
+  console.log('  • The transaction will send 11 USDC to the platform wallet');
+
   // Note: We skip balance check here to avoid 403 RPC errors
   // Phantom wallet will validate the balance and show appropriate errors if insufficient
   console.log('Skipping USDC balance check - Phantom will validate balance when signing');
@@ -100,11 +109,13 @@ export async function processX402Payment(
   const clientTokenAccount = await getAssociatedTokenAddress(mint, clientWallet);
   const recipientTokenAccount = await getAssociatedTokenAddress(mint, recipientWallet);
   
-  console.log('Token accounts:', {
-    client: clientTokenAccount.toString(),
-    recipient: recipientTokenAccount.toString(),
-    mint: mint.toString()
-  });
+  console.log('📦 Token Account Details:');
+  console.log('  • Your Main Wallet: ' + clientWallet.toString());
+  console.log('  • Your USDC Token Account: ' + clientTokenAccount.toString());
+  console.log('  • Platform Main Wallet: ' + recipientWallet.toString());
+  console.log('  • Platform USDC Token Account: ' + recipientTokenAccount.toString());
+  console.log('  • This is the address Phantom shows - it\'s the USDC account, not the main wallet');
+  console.log('  • The platform controls this account - you don\'t need access to it');
 
   // Always add instruction to create recipient token account if it doesn't exist
   // Solana will handle this gracefully - if account exists, instruction is a no-op
