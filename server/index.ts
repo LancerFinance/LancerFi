@@ -1,16 +1,52 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
 import { releasePaymentRouter } from './routes/release-payment.js';
 import rpcProxyRouter from './routes/rpc-proxy.js';
 import x402PaymentRouter from './routes/x402-payment.js';
 import projectRateLimitRouter from './routes/project-rate-limit.js';
+import { 
+  validateRequestSize, 
+  sanitizeRequestBody,
+  generalRateLimiter,
+  paymentRateLimiter,
+  rpcRateLimiter
+} from './middleware/security.js';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Security headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net"], // Allow inline scripts for React
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      connectSrc: ["'self'", "https://api.mainnet-beta.solana.com", "https://api.devnet.solana.com", "https://*.supabase.co"],
+      fontSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Allow iframe embedding if needed
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow resources from other origins
+}));
+
+// Additional security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
 
 // Middleware
 const allowedOrigins = [
@@ -33,17 +69,25 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+
+// Request size limits and validation
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(validateRequestSize);
+app.use(sanitizeRequestBody);
+
+// Apply general rate limiting to all routes
+app.use(generalRateLimiter);
 
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// API routes
-app.use('/api/payment', releasePaymentRouter);
-app.use('/api/rpc', rpcProxyRouter);
-app.use('/api/x402', x402PaymentRouter);
+// API routes with specific rate limiting
+app.use('/api/payment', paymentRateLimiter, releasePaymentRouter);
+app.use('/api/rpc', rpcRateLimiter, rpcProxyRouter);
+app.use('/api/x402', paymentRateLimiter, x402PaymentRouter);
 app.use('/api/project', projectRateLimitRouter);
 
 // Error handling middleware

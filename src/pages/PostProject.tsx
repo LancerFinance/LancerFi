@@ -23,6 +23,8 @@ import { useEscrow } from "@/hooks/useEscrow";
 import { checkImageForNSFW } from "@/lib/nsfw-detection";
 import { validateProjectTextForProfanity } from "@/lib/profanity-filter";
 import { checkIPProjectLimit, recordProjectCreation } from "@/lib/api-client";
+import { sanitizeText } from "@/lib/input-sanitizer";
+import { validateImageFile } from "@/lib/file-security";
 
 const PostProject = () => {
   const navigate = useNavigate();
@@ -115,11 +117,24 @@ const PostProject = () => {
   };
 
   const processImageFile = (file: File) => {
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
+    // Validate file security
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
       toast({
-        title: "File too large",
-        description: "Image must be less than 5MB",
+        title: "Invalid file",
+        description: validation.error || "File validation failed",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Additional check: validate extension matches MIME type
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    if (!extension || !validExtensions.includes(extension)) {
+      toast({
+        title: "Invalid file extension",
+        description: "Please upload a valid image file (JPG, PNG, GIF, or WEBP)",
         variant: "destructive",
       });
       return;
@@ -438,13 +453,18 @@ const PostProject = () => {
 
       setUploadingImage(false);
 
+      // Sanitize inputs before saving to database
+      const sanitizedTitle = sanitizeText(formData.title.trim());
+      const sanitizedDescription = sanitizeText(formData.description.trim());
+      const sanitizedSkills = formData.skills.split(',').map(s => sanitizeText(s.trim())).filter(Boolean);
+
       // Create project in database
       const project = await db.createProject({
         client_id: address,
-        title: formData.title.trim(),
-        description: formData.description.trim(),
+        title: sanitizedTitle,
+        description: sanitizedDescription,
         category: formData.category,
-        required_skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
+        required_skills: sanitizedSkills,
         budget_usdc: parseFloat(formData.budget),
         timeline: formData.timeline,
         status: selectedFreelancer ? 'in_progress' : 'active',
