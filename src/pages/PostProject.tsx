@@ -458,27 +458,7 @@ const PostProject = () => {
       const sanitizedDescription = sanitizeText(formData.description.trim());
       const sanitizedSkills = formData.skills.split(',').map(s => sanitizeText(s.trim())).filter(Boolean);
 
-      // Create project in database
-      const project = await db.createProject({
-        client_id: address,
-        title: sanitizedTitle,
-        description: sanitizedDescription,
-        category: formData.category,
-        required_skills: sanitizedSkills,
-        budget_usdc: parseFloat(formData.budget),
-        timeline: formData.timeline,
-        status: selectedFreelancer ? 'in_progress' : 'active',
-        project_images: [publicUrl],
-        ...(selectedFreelancer ? { freelancer_id: selectedFreelancer.id } : {})
-      });
-
-      // Record project creation for IP tracking (non-blocking)
-      recordProjectCreation(project.id, address).catch(err => {
-        console.error('Failed to record project creation for IP tracking:', err);
-        // Don't fail the request if this fails
-      });
-
-      // Create and fund escrow immediately after project creation
+      // Calculate escrow amount BEFORE creating project
       // Convert amount to SOL if SOLANA is selected, otherwise use USD amount
       const budgetAmount = parseFloat(formData.budget);
       let escrowAmount = budgetAmount;
@@ -497,7 +477,24 @@ const PostProject = () => {
         // For x402 and USDC, keep amount in USD (they use USDC, not SOL)
         escrowAmount = budgetAmount;
       }
-      
+
+      // Create project with 'pending' status FIRST (escrow creation needs project_id)
+      // We'll update to 'active' only after escrow is successfully funded
+      // If escrow fails, we'll delete this project
+      const project = await db.createProject({
+        client_id: address,
+        title: sanitizedTitle,
+        description: sanitizedDescription,
+        category: formData.category,
+        required_skills: sanitizedSkills,
+        budget_usdc: parseFloat(formData.budget),
+        timeline: formData.timeline,
+        status: 'pending', // Start as pending - will update to active after escrow succeeds
+        project_images: [publicUrl],
+        ...(selectedFreelancer ? { freelancer_id: selectedFreelancer.id } : {})
+      });
+
+      // Create and fund escrow
       const escrowId = await createProjectEscrow(
         project.id, 
         escrowAmount,
@@ -505,8 +502,40 @@ const PostProject = () => {
       );
 
       if (!escrowId) {
+        // Escrow creation failed - delete the pending project and clean up image
+        try {
+          await supabase
+            .from('projects')
+            .delete()
+            .eq('id', project.id);
+          
+          await supabase.storage
+            .from('project-images')
+            .remove([filePath]);
+        } catch (cleanupError) {
+          console.error('Failed to cleanup project and image after escrow failure:', cleanupError);
+        }
         throw new Error('Failed to create escrow. Please try again.');
       }
+
+      // Escrow was successfully created and funded - update project to 'active'
+      const { error: updateError } = await supabase
+        .from('projects')
+        .update({ 
+          status: selectedFreelancer ? 'in_progress' : 'active' 
+        })
+        .eq('id', project.id);
+
+      if (updateError) {
+        console.error('Failed to update project status to active:', updateError);
+        // Don't fail - project exists and escrow is funded, just status update failed
+      }
+
+      // Record project creation for IP tracking (non-blocking)
+      recordProjectCreation(project.id, address).catch(err => {
+        console.error('Failed to record project creation for IP tracking:', err);
+        // Don't fail the request if this fails
+      });
 
       toast({
         title: "Project Posted Successfully!",

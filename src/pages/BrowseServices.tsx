@@ -80,6 +80,7 @@ const BrowseServices = () => {
           )
         `)
         .eq('status', 'active')
+        .neq('status', 'pending') // Exclude pending projects
         .eq('escrows.status', 'funded')
         .is('freelancer_id', null)
         .order('created_at', { ascending: false });
