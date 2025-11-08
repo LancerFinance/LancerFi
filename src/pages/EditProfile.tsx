@@ -597,37 +597,27 @@ const EditProfile = () => {
                 <Label htmlFor="profile_photo">Profile Photo</Label>
                 <div className="flex-1">
                   {(profilePhotoPreview || (formData.profile_photo_url && !profilePhotoFile)) ? (
-                    <div className="relative border-2 border-dashed rounded-lg p-6 min-h-[200px] flex items-center justify-center">
+                    <div className="relative border-2 border-dashed rounded-lg p-6 min-h-[300px] flex items-center justify-center">
                       <div className="relative">
                         <img
                           src={profilePhotoPreview || formData.profile_photo_url}
                           alt="Profile preview"
-                          className="h-32 w-32 rounded-full object-cover border-2 border-border mx-auto"
+                          className="h-48 w-48 rounded-full object-cover border-2 border-border mx-auto"
                         />
-                        {profilePhotoFile && (
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="absolute -top-2 -right-2 rounded-full h-6 w-6 p-0"
-                            onClick={() => {
-                              setProfilePhotoFile(null);
-                              setProfilePhotoPreview('');
-                              if (profilePhotoPreview) {
-                                URL.revokeObjectURL(profilePhotoPreview);
-                              }
-                            }}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        )}
                       </div>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         className="absolute bottom-4 right-4"
-                        onClick={() => profilePhotoInputRef.current?.click()}
+                        onClick={() => {
+                          setProfilePhotoFile(null);
+                          setProfilePhotoPreview('');
+                          if (profilePhotoPreview) {
+                            URL.revokeObjectURL(profilePhotoPreview);
+                          }
+                          profilePhotoInputRef.current?.click();
+                        }}
                       >
                         Change Photo
                       </Button>
@@ -699,37 +689,27 @@ const EditProfile = () => {
                 <Label htmlFor="banner">Banner Image</Label>
                 <div className="flex-1">
                   {(bannerPreview || (formData.banner_url && !bannerFile)) ? (
-                    <div className="relative border-2 border-dashed rounded-lg p-6 min-h-[200px] flex items-center justify-center">
-                      <div className="relative">
+                    <div className="relative border-2 border-dashed rounded-lg p-6 min-h-[300px] flex items-center justify-center">
+                      <div className="relative w-full max-w-4xl">
                         <img
                           src={bannerPreview || formData.banner_url}
                           alt="Banner preview"
-                          className="h-32 w-48 rounded object-cover border-2 border-border mx-auto"
+                          className="h-48 w-full max-w-4xl rounded object-cover border-2 border-border mx-auto"
                         />
-                        {bannerFile && (
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="absolute -top-2 -right-2 rounded-full h-6 w-6 p-0"
-                            onClick={() => {
-                              setBannerFile(null);
-                              setBannerPreview('');
-                              if (bannerPreview) {
-                                URL.revokeObjectURL(bannerPreview);
-                              }
-                            }}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        )}
                       </div>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         className="absolute bottom-4 right-4"
-                        onClick={() => bannerInputRef.current?.click()}
+                        onClick={() => {
+                          setBannerFile(null);
+                          setBannerPreview('');
+                          if (bannerPreview) {
+                            URL.revokeObjectURL(bannerPreview);
+                          }
+                          bannerInputRef.current?.click();
+                        }}
                       >
                         Change Banner
                       </Button>
