@@ -285,10 +285,34 @@ export async function releasePaymentFromPlatform(
   // Sign with platform keypair
   transaction.sign(platformKeypair);
   
+  console.log(`[USDC Release] Transaction signed, instructions: ${transaction.instructions.length}`);
+  
+  // Simulate transaction first to catch errors before sending
+  try {
+    const simulation = await connection.simulateTransaction(transaction, {
+      commitment: 'confirmed',
+      replaceRecentBlockhash: true
+    });
+    
+    console.log(`[USDC Release] Simulation result:`, {
+      err: simulation.value.err,
+      logs: simulation.value.logs?.slice(0, 10), // First 10 logs
+      accountsUsed: simulation.value.accounts?.length
+    });
+    
+    if (simulation.value.err) {
+      throw new Error(`Transaction simulation failed: ${JSON.stringify(simulation.value.err)}. Logs: ${simulation.value.logs?.join('\n') || 'No logs'}`);
+    }
+  } catch (simError: any) {
+    console.error(`[USDC Release] Simulation error:`, simError);
+    // If simulation fails, we still want to see the detailed error
+    throw simError;
+  }
+  
   // Send and confirm transaction
   const signature = await connection.sendRawTransaction(
     transaction.serialize(),
-    { skipPreflight: false, maxRetries: 3 }
+    { skipPreflight: true, maxRetries: 3 } // Skip preflight since we already simulated
   );
   
   // Confirm transaction
