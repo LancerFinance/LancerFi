@@ -210,6 +210,7 @@ export function checkForProfanity(text: string): {
 
 /**
  * Check for excessive repetition/spam in text
+ * Enhanced with stricter rules for project descriptions
  * @param text - Text to check
  * @returns Object with isSpam boolean and details
  */
@@ -225,9 +226,10 @@ export function checkForRepetition(text: string): {
   }
 
   const normalizedText = text.toLowerCase().trim();
+  const words = normalizedText.split(/\s+/).filter(w => w.length > 0);
   
   // Check for excessive character repetition (e.g., "aaaaaaa", "dsfdsfdsfdsf")
-  const charPattern = /(.)\1{10,}/; // Same character repeated 11+ times
+  const charPattern = /(.)\1{8,}/; // Same character repeated 9+ times (stricter)
   if (charPattern.test(normalizedText)) {
     return {
       isSpam: true,
@@ -236,29 +238,44 @@ export function checkForRepetition(text: string): {
   }
 
   // Check for excessive word repetition (e.g., "dsf dsf dsf dsf")
-  const words = normalizedText.split(/\s+/).filter(w => w.length > 0);
-  if (words.length > 5) {
+  if (words.length > 3) {
     // Count occurrences of each word
     const wordCounts: Record<string, number> = {};
     words.forEach(word => {
-      wordCounts[word] = (wordCounts[word] || 0) + 1;
+      const cleanWord = word.replace(/[^\w]/g, ''); // Remove punctuation
+      if (cleanWord.length > 0) {
+        wordCounts[cleanWord] = (wordCounts[cleanWord] || 0) + 1;
+      }
     });
     
-    // Check if any word appears more than 30% of the time (spam indicator)
+    // Check if any word appears more than 25% of the time (stricter: was 30%)
     const maxRepetition = Math.max(...Object.values(wordCounts));
     const repetitionRatio = maxRepetition / words.length;
     
-    if (repetitionRatio > 0.3 && maxRepetition >= 5) {
+    if (repetitionRatio > 0.25 && maxRepetition >= 4) { // Stricter: was 5
       return {
         isSpam: true,
         reason: 'Text contains excessive word repetition',
       };
     }
+    
+    // Check for multiple words repeated frequently (2+ words appearing 3+ times each)
+    const repeatedWords = Object.entries(wordCounts).filter(([_, count]) => count >= 3);
+    if (repeatedWords.length >= 2 && words.length > 10) {
+      const totalRepeated = repeatedWords.reduce((sum, [_, count]) => sum + count, 0);
+      if (totalRepeated / words.length > 0.4) {
+        return {
+          isSpam: true,
+          reason: 'Text contains multiple repeated words',
+        };
+      }
+    }
   }
 
   // Check for pattern repetition (e.g., "dsfdsfdsfdsf" - same pattern repeated)
-  const patternRegex = /(.{2,10})\1{4,}/; // Pattern of 2-10 chars repeated 5+ times
-  if (patternRegex.test(normalizedText.replace(/\s/g, ''))) {
+  const textWithoutSpaces = normalizedText.replace(/\s/g, '');
+  const patternRegex = /(.{2,10})\1{3,}/; // Pattern of 2-10 chars repeated 4+ times (stricter: was 5)
+  if (patternRegex.test(textWithoutSpaces)) {
     return {
       isSpam: true,
       reason: 'Text contains repetitive patterns',
@@ -266,18 +283,72 @@ export function checkForRepetition(text: string): {
   }
 
   // Check for very short words repeated excessively (e.g., "dsf dsf dsf")
-  const shortWords = words.filter(w => w.length <= 4);
-  if (shortWords.length > 10) {
+  const shortWords = words.filter(w => {
+    const clean = w.replace(/[^\w]/g, '');
+    return clean.length > 0 && clean.length <= 4;
+  });
+  
+  if (shortWords.length > 8) { // Stricter: was 10
     const shortWordCounts: Record<string, number> = {};
     shortWords.forEach(word => {
-      shortWordCounts[word] = (shortWordCounts[word] || 0) + 1;
+      const clean = word.replace(/[^\w]/g, '');
+      if (clean.length > 0) {
+        shortWordCounts[clean] = (shortWordCounts[clean] || 0) + 1;
+      }
     });
     
     const maxShortRepetition = Math.max(...Object.values(shortWordCounts));
-    if (maxShortRepetition >= 8) {
+    if (maxShortRepetition >= 6) { // Stricter: was 8
       return {
         isSpam: true,
         reason: 'Text contains excessive repetition of short words',
+      };
+    }
+  }
+
+  // Check for meaningless character sequences (e.g., "asdf", "qwerty", random letters)
+  const meaninglessPatterns = [
+    /(asdf|qwerty|zxcv|hjkl|fdsa|ytrewq|vcxz|lkjh){2,}/i, // Keyboard patterns
+    /([a-z])\1{4,}/, // Same letter 5+ times in a row
+    /([a-z]{2})\1{3,}/, // 2-letter pattern repeated 4+ times
+  ];
+  
+  for (const pattern of meaninglessPatterns) {
+    if (pattern.test(normalizedText)) {
+      return {
+        isSpam: true,
+        reason: 'Text contains meaningless character patterns',
+      };
+    }
+  }
+
+  // Check for low diversity (too few unique words relative to total words)
+  if (words.length > 15) {
+    const uniqueWords = new Set(words.map(w => w.replace(/[^\w]/g, '').toLowerCase()).filter(w => w.length > 0));
+    const diversityRatio = uniqueWords.size / words.length;
+    
+    // If less than 30% of words are unique, it's likely spam
+    if (diversityRatio < 0.3) {
+      return {
+        isSpam: true,
+        reason: 'Text has low word diversity (too many repeated words)',
+      };
+    }
+  }
+
+  // Check for excessive use of the same phrase (2+ word phrases)
+  if (words.length > 10) {
+    const phrases: Record<string, number> = {};
+    for (let i = 0; i < words.length - 1; i++) {
+      const phrase = `${words[i]} ${words[i + 1]}`;
+      phrases[phrase] = (phrases[phrase] || 0) + 1;
+    }
+    
+    const maxPhraseRepetition = Math.max(...Object.values(phrases));
+    if (maxPhraseRepetition >= 4) { // Same 2-word phrase 4+ times
+      return {
+        isSpam: true,
+        reason: 'Text contains excessive phrase repetition',
       };
     }
   }
