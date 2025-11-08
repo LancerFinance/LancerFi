@@ -98,20 +98,32 @@ export async function releasePaymentFromPlatform(
       })
     );
   } else {
-    // USDC token transfer - SIMPLIFIED: Just transfer from platform wallet to freelancer
-    // For x402, money is already in the platform wallet, we just need to send it
+    // USDC token transfer - Use EXACT same pattern as x402 payment (which works)
     const tokenMint = USDC_MINT;
     const decimals = 6;
     
-    // Get token accounts
+    // Get token accounts (same as x402 payment)
     const sourceTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
     const destTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
     
-    console.log(`[USDC Release] Simple transfer: ${sourceTokenAccount.toString()} -> ${destTokenAccount.toString()}, Amount: ${amount} USDC`);
+    console.log(`[USDC Release] Transfer setup:`, {
+      source: sourceTokenAccount.toString(),
+      dest: destTokenAccount.toString(),
+      amount: amount,
+      platformWallet: escrowAccount.toString()
+    });
     
-    // Check if destination account exists, create if not
-    const destAccountInfo = await connection.getAccountInfo(destTokenAccount);
-    if (!destAccountInfo) {
+    // Check if destination exists (same pattern as x402)
+    let destAccountExists = false;
+    try {
+      const accountInfo = await connection.getAccountInfo(destTokenAccount);
+      destAccountExists = accountInfo !== null;
+    } catch {
+      destAccountExists = false;
+    }
+    
+    // Create destination account if needed (BEFORE transfer instruction)
+    if (!destAccountExists) {
       console.log(`[USDC Release] Creating freelancer token account`);
       transaction.add(
         createAssociatedTokenAccountInstruction(
@@ -123,20 +135,28 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer - platform wallet is the authority (owner of source account)
+    // Transfer using EXACT same pattern as x402 payment
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
+    
+    console.log(`[USDC Release] Adding transfer instruction:`, {
+      from: sourceTokenAccount.toString(),
+      to: destTokenAccount.toString(),
+      authority: escrowAccount.toString(),
+      amount: transferAmount.toString()
+    });
+    
     transaction.add(
       createTransferInstruction(
-        sourceTokenAccount,
-        destTokenAccount,
-        escrowAccount, // Authority: platform wallet owns the source account
-        transferAmount,
+        sourceTokenAccount, // From: platform wallet USDC account
+        destTokenAccount,    // To: freelancer USDC account
+        escrowAccount,       // Authority: platform wallet (owner of source)
+        transferAmount,      // Amount in micro-USDC (BigInt)
         [],
         TOKEN_PROGRAM_ID
       )
     );
     
-    console.log(`[USDC Release] Transaction ready: ${transaction.instructions.length} instruction(s)`);
+    console.log(`[USDC Release] Transaction built: ${transaction.instructions.length} instruction(s)`);
   }
   
   // Sign with platform keypair
