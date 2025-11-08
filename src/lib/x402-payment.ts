@@ -121,26 +121,36 @@ export async function processX402Payment(
 
   // Convert amount to micro-USDC (6 decimals)
   // amount is already in USDC (e.g., 11), so multiply by 10^6 to get micro-USDC
-  const microUSDC = Math.round(amount * Math.pow(10, 6));
+  // Use BigInt to ensure proper token amount handling
+  const microUSDC = BigInt(Math.round(amount * Math.pow(10, 6)));
   
   console.log('x402 Payment amount conversion:', {
     amountUSDC: amount,
-    microUSDC: microUSDC,
+    microUSDC: microUSDC.toString(),
     decimals: 6,
-    calculation: `${amount} * 10^6 = ${microUSDC}`
+    calculation: `${amount} * 10^6 = ${microUSDC.toString()}`,
+    note: 'This is USDC, not SOL. Phantom should display as USDC token transfer.'
   });
 
   // Add USDC transfer instruction
+  // Using BigInt ensures Phantom recognizes this as a token transfer, not SOL
   transaction.add(
     createTransferInstruction(
       clientTokenAccount,
       recipientTokenAccount,
       clientWallet,
-      microUSDC,
+      microUSDC, // BigInt ensures proper token amount
       [],
       TOKEN_PROGRAM_ID
     )
   );
+  
+  console.log('Transaction instructions:', {
+    instructionCount: transaction.instructions.length,
+    firstInstruction: transaction.instructions[0]?.programId.toString(),
+    secondInstruction: transaction.instructions[1]?.programId.toString(),
+    note: 'Both instructions should use TOKEN_PROGRAM_ID, not SystemProgram'
+  });
 
   // Sign with Phantom
   const signedTransaction = await wallet.signTransaction(transaction);
