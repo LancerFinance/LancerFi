@@ -227,8 +227,7 @@ router.post('/token-balance', async (req, res) => {
       });
     }
 
-    const { PublicKey } = await import('@solana/web3.js');
-    const { getTokenAccountBalance } = await import('@solana/spl-token');
+    const { PublicKey, Connection } = await import('@solana/web3.js');
     const tokenAccountPubkey = new PublicKey(tokenAccount);
     
     // Try all endpoints in parallel with timeout
@@ -258,7 +257,7 @@ router.post('/token-balance', async (req, res) => {
             };
           } catch (err: any) {
             // If account doesn't exist, return 0 balance (not an error)
-            if (err.message?.includes('Invalid param') || err.message?.includes('not found')) {
+            if (err.message?.includes('Invalid param') || err.message?.includes('not found') || err.message?.includes('Invalid')) {
               return {
                 success: true,
                 balance: 0
