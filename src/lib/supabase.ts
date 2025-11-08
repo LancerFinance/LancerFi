@@ -121,6 +121,12 @@ export interface WorkSubmission {
   reviewed_at?: string;
   reviewed_by?: string;
   review_notes?: string;
+  has_suspicious_files?: boolean;
+  suspicious_files_details?: Array<{
+    filename: string;
+    reason: string;
+    severity: 'high' | 'medium' | 'low';
+  }>;
   created_at: string;
   updated_at: string;
 }

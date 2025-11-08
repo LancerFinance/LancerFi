@@ -11,7 +11,8 @@ import {
   ExternalLink, 
   FileText, 
   Loader2,
-  Calendar
+  Calendar,
+  AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/useWallet";
@@ -181,6 +182,48 @@ const WorkSubmissionReview = ({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Security Warning Banner */}
+          {submission.has_suspicious_files && submission.suspicious_files_details && submission.suspicious_files_details.length > 0 && (
+            <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-red-900 dark:text-red-100 mb-1">
+                    ⚠️ Security Warning: Suspicious Files Detected
+                  </h4>
+                  <p className="text-sm text-red-800 dark:text-red-200 mb-3">
+                    This submission contains {submission.suspicious_files_details.length} file{submission.suspicious_files_details.length > 1 ? 's' : ''} that {submission.suspicious_files_details.length > 1 ? 'have' : 'has'} been flagged as potentially suspicious. Please review carefully before downloading or opening any files.
+                  </p>
+                  <div className="space-y-2">
+                    {submission.suspicious_files_details.map((file, index) => (
+                      <div key={index} className="bg-white dark:bg-red-950/30 rounded p-2 border border-red-200 dark:border-red-900/30">
+                        <div className="flex items-start gap-2">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                            file.severity === 'high' 
+                              ? 'bg-red-200 dark:bg-red-900/50 text-red-900 dark:text-red-100' 
+                              : file.severity === 'medium'
+                              ? 'bg-orange-200 dark:bg-orange-900/50 text-orange-900 dark:text-orange-100'
+                              : 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-100'
+                          }`}>
+                            {file.severity.toUpperCase()}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-red-900 dark:text-red-100 truncate">
+                              {file.filename}
+                            </p>
+                            <p className="text-xs text-red-700 dark:text-red-300 mt-0.5">
+                              {file.reason}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Description */}
           <div className="min-w-0">
             <Label className="text-sm font-medium mb-2 block">Description</Label>

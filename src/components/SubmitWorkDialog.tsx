@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/hooks/useWallet";
 import { useRateLimit } from "@/hooks/useRateLimit";
 import { db, supabase } from "@/lib/supabase";
+import { scanFiles, ScanResult } from "@/lib/file-security-scanner";
 
 interface SubmitWorkDialogProps {
   projectId: string;
@@ -205,17 +206,25 @@ const SubmitWorkDialog = ({
     setErrors({});
 
     try {
+      // Scan files for suspicious content BEFORE uploading
+      let scanResult: ScanResult = { hasSuspiciousFiles: false, suspiciousFiles: [] };
+      if (files.length > 0) {
+        scanResult = await scanFiles(files);
+      }
+
       // Upload files if any
       const uploadedFileUrls = await uploadFiles();
 
-      // Create work submission
+      // Create work submission with suspicious files info
       const submission = await db.createWorkSubmission({
         project_id: projectId,
         freelancer_id: freelancerId,
         description: formData.description.trim(),
         file_urls: uploadedFileUrls,
         link_urls: linkUrls,
-        status: 'pending'
+        status: 'pending',
+        has_suspicious_files: scanResult.hasSuspiciousFiles,
+        suspicious_files_details: scanResult.suspiciousFiles
       });
 
       // Get project details for notification
@@ -232,10 +241,21 @@ const SubmitWorkDialog = ({
         );
       }
 
+      // Show success toast
       toast({
         title: "Work Submitted!",
         description: "Your work has been submitted for review. The client will be notified.",
       });
+
+      // Show warning toast if suspicious files detected
+      if (scanResult.hasSuspiciousFiles) {
+        const highSeverityCount = scanResult.suspiciousFiles.filter(f => f.severity === 'high').length;
+        toast({
+          title: "⚠️ Security Warning",
+          description: `Suspicious files detected in your submission (${scanResult.suspiciousFiles.length} file${scanResult.suspiciousFiles.length > 1 ? 's' : ''}). The client has been notified. Please ensure all files are legitimate.`,
+          variant: "destructive",
+        });
+      }
 
       // Reset form and close dialog
       setFormData({ description: '', linkUrl: '' });
