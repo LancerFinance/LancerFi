@@ -22,7 +22,7 @@ import { PROJECT_CATEGORIES } from "@/lib/categories";
 import { useEscrow } from "@/hooks/useEscrow";
 import { checkImageForNSFW } from "@/lib/nsfw-detection";
 import { validateProjectTextForProfanity } from "@/lib/profanity-filter";
-import { checkIPProjectLimit, recordProjectCreation, cleanupPendingProjects } from "@/lib/api-client";
+import { checkIPProjectLimit, recordProjectCreation, cleanupPendingProjects, resetRateLimit } from "@/lib/api-client";
 import { sanitizeText } from "@/lib/input-sanitizer";
 import { validateImageFile } from "@/lib/file-security";
 
