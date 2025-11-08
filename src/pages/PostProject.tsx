@@ -21,6 +21,7 @@ import PaymentCurrencySelector from "@/components/PaymentCurrencySelector";
 import { PROJECT_CATEGORIES } from "@/lib/categories";
 import { useEscrow } from "@/hooks/useEscrow";
 import { checkImageForNSFW } from "@/lib/nsfw-detection";
+import { validateProjectTextForProfanity } from "@/lib/profanity-filter";
 
 const PostProject = () => {
   const navigate = useNavigate();
@@ -211,6 +212,23 @@ const PostProject = () => {
         variant: "destructive"
       });
       setFormErrors({ ...formErrors, project_image: "Project image is required" });
+      return;
+    }
+
+    // Check for profanity/slurs in text fields
+    const profanityCheck = validateProjectTextForProfanity({
+      title: formData.title,
+      description: formData.description,
+      skills: formData.skills,
+    });
+
+    if (!profanityCheck.isValid) {
+      setFormErrors(profanityCheck.errors);
+      toast({
+        title: "Inappropriate Language Detected",
+        description: `Your ${profanityCheck.profaneFields.join(', ')} ${profanityCheck.profaneFields.length > 1 ? 'contain' : 'contains'} inappropriate language. Please use professional language.`,
+        variant: "destructive",
+      });
       return;
     }
 
