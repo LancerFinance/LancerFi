@@ -29,6 +29,15 @@ export async function verifyWalletSignature(
     const messageBytes = new TextEncoder().encode(message);
     const signatureBytes = Uint8Array.from(Buffer.from(signature, 'base64'));
 
+    // Log what we're verifying (for debugging)
+    console.log('🔍 Verifying signature:', {
+      walletAddress,
+      messageLength: message.length,
+      messagePreview: message.substring(0, 100),
+      signatureLength: signatureBytes.length,
+      publicKey: publicKey.toString()
+    });
+
     const isValid = nacl.sign.detached.verify(
       messageBytes,
       signatureBytes,
@@ -36,10 +45,17 @@ export async function verifyWalletSignature(
     );
 
     if (!isValid) {
+      console.error('❌ Signature verification failed:', {
+        messageBytes: Array.from(messageBytes.slice(0, 20)),
+        signatureBytes: Array.from(signatureBytes.slice(0, 20)),
+        publicKeyBytes: Array.from(publicKey.toBytes().slice(0, 20))
+      });
       return res.status(401).json({
         error: 'Invalid wallet signature. Authentication failed.'
       });
     }
+
+    console.log('✅ Signature verified successfully');
 
     // Attach wallet address to request for use in handlers
     req.walletAddress = walletAddress;
