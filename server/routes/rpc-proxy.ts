@@ -53,12 +53,54 @@ router.post('/blockhash', async (req, res) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   
   try {
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
-    res.json({
-      success: true,
-      blockhash,
-      lastValidBlockHeight
+    // Try all endpoints in parallel with timeout (much faster than sequential)
+    const TIMEOUT_MS = 3000; // 3 second timeout per endpoint
+    
+    type BlockhashResult = {
+      success?: boolean;
+      blockhash?: string;
+      lastValidBlockHeight?: number;
+      error?: Error | string;
+      endpoint?: string;
+    };
+    
+    const blockhashPromises = RPC_ENDPOINTS.map(endpoint => {
+      return Promise.race([
+        (async (): Promise<BlockhashResult> => {
+          const testConnection = new Connection(endpoint, {
+            commitment: 'confirmed',
+            confirmTransactionInitialTimeout: 10000,
+            disableRetryOnRateLimit: false,
+          });
+          
+          const { blockhash, lastValidBlockHeight } = await testConnection.getLatestBlockhash('confirmed');
+          
+          return {
+            success: true,
+            blockhash,
+            lastValidBlockHeight
+          };
+        })(),
+        new Promise<BlockhashResult>((_, reject) => 
+          setTimeout(() => reject(new Error(`Timeout after ${TIMEOUT_MS}ms`)), TIMEOUT_MS)
+        )
+      ]).catch((error): BlockhashResult => ({ error, endpoint }));
     });
+    
+    // Wait for first successful response
+    const results = await Promise.all(blockhashPromises);
+    const success = results.find((r: BlockhashResult) => r.success && !r.error);
+    
+    if (success && success.success) {
+      return res.json({
+        success: true,
+        blockhash: success.blockhash,
+        lastValidBlockHeight: success.lastValidBlockHeight
+      });
+    }
+    
+    // All failed
+    throw new Error('All RPC endpoints failed or timed out');
   } catch (error) {
     console.error('Error getting blockhash:', error);
     res.status(500).json({
