@@ -96,34 +96,61 @@ router.post('/account-balance', async (req, res) => {
     const { PublicKey } = await import('@solana/web3.js');
     const publicKey = new PublicKey(address);
     
-    // Try each MAINNET endpoint in order
-    let lastError: Error | null = null;
+    // Try all endpoints in parallel with timeout (much faster than sequential)
+    const TIMEOUT_MS = 3000; // 3 second timeout per endpoint
     
-    for (const endpoint of RPC_ENDPOINTS) {
-      try {
-        const testConnection = new Connection(endpoint, {
-          commitment: 'confirmed',
-          confirmTransactionInitialTimeout: 60000,
-          disableRetryOnRateLimit: false,
-        });
-        
-        const balance = await testConnection.getBalance(publicKey, 'confirmed');
-        const accountInfo = await testConnection.getAccountInfo(publicKey, 'confirmed');
-        
-        return res.json({
-          success: true,
-          balance,
-          balanceSOL: balance / 1e9,
-          accountExists: accountInfo !== null,
-          owner: accountInfo?.owner?.toString() || null
-        });
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        // Continue to next endpoint
-      }
+    type BalanceResult = {
+      success?: boolean;
+      balance?: number;
+      balanceSOL?: number;
+      accountExists?: boolean;
+      owner?: string | null;
+      error?: Error | string;
+      endpoint?: string;
+    };
+    
+    const balancePromises = RPC_ENDPOINTS.map(endpoint => {
+      return Promise.race([
+        (async (): Promise<BalanceResult> => {
+          const testConnection = new Connection(endpoint, {
+            commitment: 'confirmed',
+            confirmTransactionInitialTimeout: 10000,
+            disableRetryOnRateLimit: false,
+          });
+          
+          const balance = await testConnection.getBalance(publicKey, 'confirmed');
+          const accountInfo = await testConnection.getAccountInfo(publicKey, 'confirmed');
+          
+          return {
+            success: true,
+            balance,
+            balanceSOL: balance / 1e9,
+            accountExists: accountInfo !== null,
+            owner: accountInfo?.owner?.toString() || null
+          };
+        })(),
+        new Promise<BalanceResult>((_, reject) => 
+          setTimeout(() => reject(new Error(`Timeout after ${TIMEOUT_MS}ms`)), TIMEOUT_MS)
+        )
+      ]).catch((error): BalanceResult => ({ error, endpoint }));
+    });
+    
+    // Wait for first successful response
+    const results = await Promise.all(balancePromises);
+    const success = results.find((r: BalanceResult) => r.success && !r.error);
+    
+    if (success && success.success) {
+      return res.json({
+        success: true,
+        balance: success.balance,
+        balanceSOL: success.balanceSOL,
+        accountExists: success.accountExists,
+        owner: success.owner
+      });
     }
     
-    throw lastError || new Error('All RPC endpoints failed');
+    // All failed
+    throw new Error('All RPC endpoints failed or timed out');
   } catch (error) {
     console.error('Error getting account balance:', error);
     res.status(500).json({
@@ -454,3 +481,4 @@ router.post('/send-transaction', async (req, res) => {
 });
 
 export default router;
+  
