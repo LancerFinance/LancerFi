@@ -17,6 +17,10 @@ import { useProfile } from "@/hooks/useProfile";
 import { handleError, handleSuccess } from "@/lib/error-handler";
 import { checkImageForNSFW } from "@/lib/nsfw-detection";
 import { validateImageFile } from "@/lib/file-security";
+import Cropper from "react-easy-crop";
+import { createCroppedImage, blobToFile } from "@/lib/image-crop";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Slider } from "@/components/ui/slider";
 
 const EditProfile = () => {
   const [loading, setLoading] = useState(false);
@@ -51,6 +55,20 @@ const EditProfile = () => {
   const [isDraggingBanner, setIsDraggingBanner] = useState(false);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
+  
+  // Crop states for profile photo
+  const [showProfileCrop, setShowProfileCrop] = useState(false);
+  const [profileCropImage, setProfileCropImage] = useState<string>('');
+  const [profileCrop, setProfileCrop] = useState({ x: 0, y: 0 });
+  const [profileZoom, setProfileZoom] = useState(1);
+  const [profileCropArea, setProfileCropArea] = useState<any>(null);
+  
+  // Crop states for banner
+  const [showBannerCrop, setShowBannerCrop] = useState(false);
+  const [bannerCropImage, setBannerCropImage] = useState<string>('');
+  const [bannerCrop, setBannerCrop] = useState({ x: 0, y: 0 });
+  const [bannerZoom, setBannerZoom] = useState(1);
+  const [bannerCropArea, setBannerCropArea] = useState<any>(null);
   
   const { toast } = useToast();
   const { address, isConnected, isConnecting, connectWallet } = useWallet();
@@ -121,13 +139,53 @@ const EditProfile = () => {
       return;
     }
 
-    // Set file and preview
+    // Set file and open crop dialog
     setProfilePhotoFile(file);
     const reader = new FileReader();
     reader.onloadend = () => {
-      setProfilePhotoPreview(reader.result as string);
+      const imageUrl = reader.result as string;
+      setProfileCropImage(imageUrl);
+      setShowProfileCrop(true);
+      setProfileZoom(1);
+      setProfileCrop({ x: 0, y: 0 });
     };
     reader.readAsDataURL(file);
+  };
+
+  const onProfileCropComplete = async () => {
+    if (!profileCropArea || !profileCropImage) {
+      toast({
+        title: "Crop Error",
+        description: "Please adjust the crop area before applying",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const croppedImageBlob = await createCroppedImage(
+        profileCropImage,
+        profileCropArea,
+        'image/jpeg',
+        0.92
+      );
+      
+      const croppedFile = blobToFile(croppedImageBlob, profilePhotoFile?.name || 'profile-photo.jpg');
+      setProfilePhotoFile(croppedFile);
+      
+      // Create preview from cropped blob
+      const previewUrl = URL.createObjectURL(croppedImageBlob);
+      setProfilePhotoPreview(previewUrl);
+      
+      setShowProfileCrop(false);
+    } catch (error) {
+      console.error('Error cropping image:', error);
+      toast({
+        title: "Crop Failed",
+        description: "Failed to crop image. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const uploadProfilePhoto = async (file: File): Promise<string | null> => {
@@ -227,13 +285,53 @@ const EditProfile = () => {
       return;
     }
 
-    // Set file and preview
+    // Set file and open crop dialog
     setBannerFile(file);
     const reader = new FileReader();
     reader.onloadend = () => {
-      setBannerPreview(reader.result as string);
+      const imageUrl = reader.result as string;
+      setBannerCropImage(imageUrl);
+      setShowBannerCrop(true);
+      setBannerZoom(1);
+      setBannerCrop({ x: 0, y: 0 });
     };
     reader.readAsDataURL(file);
+  };
+
+  const onBannerCropComplete = async () => {
+    if (!bannerCropArea || !bannerCropImage) {
+      toast({
+        title: "Crop Error",
+        description: "Please adjust the crop area before applying",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const croppedImageBlob = await createCroppedImage(
+        bannerCropImage,
+        bannerCropArea,
+        'image/jpeg',
+        0.92
+      );
+      
+      const croppedFile = blobToFile(croppedImageBlob, bannerFile?.name || 'banner.jpg');
+      setBannerFile(croppedFile);
+      
+      // Create preview from cropped blob
+      const previewUrl = URL.createObjectURL(croppedImageBlob);
+      setBannerPreview(previewUrl);
+      
+      setShowBannerCrop(false);
+    } catch (error) {
+      console.error('Error cropping image:', error);
+      toast({
+        title: "Crop Failed",
+        description: "Failed to crop image. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const uploadBanner = async (file: File): Promise<string | null> => {
@@ -497,10 +595,46 @@ const EditProfile = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="profile_photo">Profile Photo</Label>
-                <div className="flex items-start gap-4">
-                  <div className="flex-1">
+                <div className="flex-1">
+                  {(profilePhotoPreview || (formData.profile_photo_url && !profilePhotoFile)) ? (
+                    <div className="relative border-2 border-dashed rounded-lg p-6 min-h-[200px] flex items-center justify-center">
+                      <div className="relative">
+                        <img
+                          src={profilePhotoPreview || formData.profile_photo_url}
+                          alt="Profile preview"
+                          className="h-32 w-32 rounded-full object-cover border-2 border-border mx-auto"
+                        />
+                        {profilePhotoFile && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute -top-2 -right-2 rounded-full h-6 w-6 p-0"
+                            onClick={() => {
+                              setProfilePhotoFile(null);
+                              setProfilePhotoPreview('');
+                              if (profilePhotoPreview) {
+                                URL.revokeObjectURL(profilePhotoPreview);
+                              }
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="absolute bottom-4 right-4"
+                        onClick={() => profilePhotoInputRef.current?.click()}
+                      >
+                        Change Photo
+                      </Button>
+                    </div>
+                  ) : (
                     <div
-                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors min-h-[200px] flex flex-col items-center justify-center ${
                         isDraggingPhoto
                           ? 'border-primary bg-primary/5'
                           : 'border-muted-foreground/25 hover:border-primary/50'
@@ -540,45 +674,22 @@ const EditProfile = () => {
                         JPG, PNG, GIF, or WEBP (max 10MB)
                       </p>
                     </div>
-                    <Input
-                      ref={profilePhotoInputRef}
-                      id="profile_photo"
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) processProfilePhoto(file);
-                      }}
-                      className="hidden"
-                    />
-                    {uploadingPhoto && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="text-sm text-muted-foreground">Uploading...</span>
-                      </div>
-                    )}
-                  </div>
-                  {(profilePhotoPreview || (formData.profile_photo_url && !profilePhotoFile)) && (
-                    <div className="relative">
-                      <img
-                        src={profilePhotoPreview || formData.profile_photo_url}
-                        alt="Profile preview"
-                        className="h-32 w-32 rounded-full object-cover border-2 border-border"
-                      />
-                      {profilePhotoFile && (
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          className="absolute -top-2 -right-2 rounded-full h-6 w-6 p-0"
-                          onClick={() => {
-                            setProfilePhotoFile(null);
-                            setProfilePhotoPreview('');
-                          }}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      )}
+                  )}
+                  <Input
+                    ref={profilePhotoInputRef}
+                    id="profile_photo"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) processProfilePhoto(file);
+                    }}
+                    className="hidden"
+                  />
+                  {uploadingPhoto && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Uploading...</span>
                     </div>
                   )}
                 </div>
@@ -586,10 +697,46 @@ const EditProfile = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="banner">Banner Image</Label>
-                <div className="flex items-start gap-4">
-                  <div className="flex-1">
+                <div className="flex-1">
+                  {(bannerPreview || (formData.banner_url && !bannerFile)) ? (
+                    <div className="relative border-2 border-dashed rounded-lg p-6 min-h-[200px] flex items-center justify-center">
+                      <div className="relative">
+                        <img
+                          src={bannerPreview || formData.banner_url}
+                          alt="Banner preview"
+                          className="h-32 w-48 rounded object-cover border-2 border-border mx-auto"
+                        />
+                        {bannerFile && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute -top-2 -right-2 rounded-full h-6 w-6 p-0"
+                            onClick={() => {
+                              setBannerFile(null);
+                              setBannerPreview('');
+                              if (bannerPreview) {
+                                URL.revokeObjectURL(bannerPreview);
+                              }
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="absolute bottom-4 right-4"
+                        onClick={() => bannerInputRef.current?.click()}
+                      >
+                        Change Banner
+                      </Button>
+                    </div>
+                  ) : (
                     <div
-                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors min-h-[200px] flex flex-col items-center justify-center ${
                         isDraggingBanner
                           ? 'border-primary bg-primary/5'
                           : 'border-muted-foreground/25 hover:border-primary/50'
@@ -629,45 +776,22 @@ const EditProfile = () => {
                         JPG, PNG, GIF, or WEBP (max 10MB)
                       </p>
                     </div>
-                    <Input
-                      ref={bannerInputRef}
-                      id="banner"
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) processBanner(file);
-                      }}
-                      className="hidden"
-                    />
-                    {uploadingBanner && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="text-sm text-muted-foreground">Uploading...</span>
-                      </div>
-                    )}
-                  </div>
-                  {(bannerPreview || (formData.banner_url && !bannerFile)) && (
-                    <div className="relative">
-                      <img
-                        src={bannerPreview || formData.banner_url}
-                        alt="Banner preview"
-                        className="h-32 w-48 rounded object-cover border-2 border-border"
-                      />
-                      {bannerFile && (
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          className="absolute -top-2 -right-2 rounded-full h-6 w-6 p-0"
-                          onClick={() => {
-                            setBannerFile(null);
-                            setBannerPreview('');
-                          }}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      )}
+                  )}
+                  <Input
+                    ref={bannerInputRef}
+                    id="banner"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) processBanner(file);
+                    }}
+                    className="hidden"
+                  />
+                  {uploadingBanner && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Uploading...</span>
                     </div>
                   )}
                 </div>
@@ -889,6 +1013,110 @@ const EditProfile = () => {
           </Card>
         </div>
       </main>
+
+      {/* Profile Photo Crop Dialog */}
+      <Dialog open={showProfileCrop} onOpenChange={setShowProfileCrop}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Crop Profile Photo</DialogTitle>
+          </DialogHeader>
+          <div className="relative w-full h-[400px] bg-black rounded-lg">
+            <Cropper
+              image={profileCropImage}
+              crop={profileCrop}
+              zoom={profileZoom}
+              aspect={1}
+              onCropChange={setProfileCrop}
+              onZoomChange={setProfileZoom}
+              onCropComplete={(croppedArea, croppedAreaPixels) => {
+                setProfileCropArea(croppedAreaPixels);
+              }}
+              style={{
+                containerStyle: {
+                  width: '100%',
+                  height: '100%',
+                  position: 'relative',
+                },
+              }}
+            />
+          </div>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Zoom</Label>
+              <Slider
+                value={[profileZoom]}
+                min={1}
+                max={3}
+                step={0.1}
+                onValueChange={(value) => setProfileZoom(value[0])}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowProfileCrop(false);
+              setProfilePhotoFile(null);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={onProfileCropComplete}>
+              Apply Crop
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Banner Crop Dialog */}
+      <Dialog open={showBannerCrop} onOpenChange={setShowBannerCrop}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Crop Banner Image</DialogTitle>
+          </DialogHeader>
+          <div className="relative w-full h-[400px] bg-black rounded-lg">
+            <Cropper
+              image={bannerCropImage}
+              crop={bannerCrop}
+              zoom={bannerZoom}
+              aspect={16 / 9}
+              onCropChange={setBannerCrop}
+              onZoomChange={setBannerZoom}
+              onCropComplete={(croppedArea, croppedAreaPixels) => {
+                setBannerCropArea(croppedAreaPixels);
+              }}
+              style={{
+                containerStyle: {
+                  width: '100%',
+                  height: '100%',
+                  position: 'relative',
+                },
+              }}
+            />
+          </div>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Zoom</Label>
+              <Slider
+                value={[bannerZoom]}
+                min={1}
+                max={3}
+                step={0.1}
+                onValueChange={(value) => setBannerZoom(value[0])}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowBannerCrop(false);
+              setBannerFile(null);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={onBannerCropComplete}>
+              Apply Crop
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
