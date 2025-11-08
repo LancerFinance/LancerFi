@@ -28,11 +28,20 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net"], // Allow inline scripts for React
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
-      connectSrc: ["'self'", "https://api.mainnet-beta.solana.com", "https://api.devnet.solana.com", "https://*.supabase.co"],
+      connectSrc: [
+        "'self'", 
+        "https://api.mainnet-beta.solana.com", 
+        "https://api.devnet.solana.com", 
+        "https://*.supabase.co",
+        "https://*.solana.com", // Allow all Solana RPC endpoints
+        "https://rpc.ankr.com", // Ankr RPC
+        "https://solana-api.projectserum.com", // Serum RPC
+        "https://*.vercel.app" // Backend API
+      ],
       fontSrc: ["'self'", "data:"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
+      frameSrc: ["'self'"], // Allow iframes from same origin (for wallet interactions)
     },
   },
   crossOriginEmbedderPolicy: false, // Allow iframe embedding if needed

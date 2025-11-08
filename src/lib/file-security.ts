@@ -3,8 +3,6 @@
  * Validates file types, sizes, and prevents malicious uploads
  */
 
-import { sanitizeFilename } from './input-sanitizer';
-
 // Allowed file types for different upload categories
 export const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
@@ -63,12 +61,36 @@ export function validateImageFile(file: File): {
     };
   }
 
-  // Check file name for path traversal
-  const sanitized = sanitizeFilename(file.name);
-  if (!sanitized || sanitized !== file.name) {
+  // Check file name for security risks (path traversal, null bytes, etc.)
+  // Allow common characters like spaces, parentheses, etc.
+  if (!file.name || file.name.length === 0) {
     return {
       isValid: false,
-      error: 'Invalid file name. File name contains invalid characters.',
+      error: 'File name cannot be empty.',
+    };
+  }
+  
+  // Check for path traversal attempts
+  if (file.name.includes('..') || file.name.includes('/') || file.name.includes('\\')) {
+    return {
+      isValid: false,
+      error: 'File name contains invalid path characters.',
+    };
+  }
+  
+  // Check for null bytes or control characters
+  if (file.name.includes('\0') || /[\x00-\x1F\x7F]/.test(file.name)) {
+    return {
+      isValid: false,
+      error: 'File name contains invalid control characters.',
+    };
+  }
+  
+  // Check for extremely long filenames
+  if (file.name.length > 255) {
+    return {
+      isValid: false,
+      error: 'File name is too long (maximum 255 characters).',
     };
   }
 
@@ -98,12 +120,35 @@ export function validateDocumentFile(file: File): {
     };
   }
 
-  // Check file name
-  const sanitized = sanitizeFilename(file.name);
-  if (!sanitized || sanitized !== file.name) {
+  // Check file name for security risks
+  if (!file.name || file.name.length === 0) {
     return {
       isValid: false,
-      error: 'Invalid file name. File name contains invalid characters.',
+      error: 'File name cannot be empty.',
+    };
+  }
+  
+  // Check for path traversal attempts
+  if (file.name.includes('..') || file.name.includes('/') || file.name.includes('\\')) {
+    return {
+      isValid: false,
+      error: 'File name contains invalid path characters.',
+    };
+  }
+  
+  // Check for null bytes or control characters
+  if (file.name.includes('\0') || /[\x00-\x1F\x7F]/.test(file.name)) {
+    return {
+      isValid: false,
+      error: 'File name contains invalid control characters.',
+    };
+  }
+  
+  // Check for extremely long filenames
+  if (file.name.length > 255) {
+    return {
+      isValid: false,
+      error: 'File name is too long (maximum 255 characters).',
     };
   }
 
@@ -133,12 +178,35 @@ export function validateFile(file: File, allowedTypes?: string[]): {
     };
   }
 
-  // Check file name
-  const sanitized = sanitizeFilename(file.name);
-  if (!sanitized || sanitized !== file.name) {
+  // Check file name for security risks
+  if (!file.name || file.name.length === 0) {
     return {
       isValid: false,
-      error: 'Invalid file name. File name contains invalid characters.',
+      error: 'File name cannot be empty.',
+    };
+  }
+  
+  // Check for path traversal attempts
+  if (file.name.includes('..') || file.name.includes('/') || file.name.includes('\\')) {
+    return {
+      isValid: false,
+      error: 'File name contains invalid path characters.',
+    };
+  }
+  
+  // Check for null bytes or control characters
+  if (file.name.includes('\0') || /[\x00-\x1F\x7F]/.test(file.name)) {
+    return {
+      isValid: false,
+      error: 'File name contains invalid control characters.',
+    };
+  }
+  
+  // Check for extremely long filenames
+  if (file.name.length > 255) {
+    return {
+      isValid: false,
+      error: 'File name is too long (maximum 255 characters).',
     };
   }
 
