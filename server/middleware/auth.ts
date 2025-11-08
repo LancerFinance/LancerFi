@@ -75,12 +75,11 @@ export async function verifyWalletSignature(
     
     // Log for debugging if verification fails
     if (!isValid) {
-      console.error('Signature verification failed:', {
+      console.error('❌ Signature verification failed:', {
         walletAddress,
         messageLength: message.length,
         signatureLength: signatureBytes.length,
         messagePreview: message.substring(0, 50) + '...',
-        fullMessageLength: fullMessage.length,
         signatureHex: Array.from(signatureBytes.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join('')
       });
     }
