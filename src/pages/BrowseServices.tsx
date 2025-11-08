@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import Header from "@/components/Header";
 import { Search, Filter, Star, Clock, DollarSign, Grid, List } from "lucide-react";
-import { db } from "@/lib/supabase";
+import { db, supabase } from "@/lib/supabase";
 
 interface Service {
   id: string;
@@ -68,16 +68,55 @@ const BrowseServices = () => {
   const loadServices = async () => {
     try {
       setLoading(true);
-      const projects = await db.getProjects();
-      
-      // Filter only active projects that don't have a freelancer assigned (available projects)
-      const activeServices = projects.filter(project => 
-        project.status === 'active' && !project.freelancer_id
-      );
+      // Only get projects that have successfully funded escrows
+      // This ensures we only show projects where payment was actually completed
+      const { data: projects, error } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          escrows!inner(
+            id,
+            status
+          )
+        `)
+        .eq('status', 'active')
+        .eq('escrows.status', 'funded')
+        .is('freelancer_id', null)
+        .order('created_at', { ascending: false });
 
-      setServices(activeServices as Service[]);
+      if (error) {
+        // If join fails, fallback to checking escrows separately
+        const allProjects = await db.getProjects({ status: 'active' });
+        const projectsWithEscrows = await Promise.all(
+          allProjects.map(async (project) => {
+            if (project.freelancer_id) return null; // Skip projects with freelancers
+            const escrow = await db.getEscrow(project.id);
+            return escrow && escrow.status === 'funded' ? project : null;
+          })
+        );
+        const validProjects = projectsWithEscrows.filter(p => p !== null);
+        setServices(validProjects as Service[]);
+      } else {
+        setServices((projects || []) as Service[]);
+      }
     } catch (error) {
       console.error('Error loading services:', error);
+      // Fallback: try to get projects and filter by escrow status
+      try {
+        const allProjects = await db.getProjects({ status: 'active' });
+        const projectsWithEscrows = await Promise.all(
+          allProjects.map(async (project) => {
+            if (project.freelancer_id) return null;
+            const escrow = await db.getEscrow(project.id);
+            return escrow && escrow.status === 'funded' ? project : null;
+          })
+        );
+        const validProjects = projectsWithEscrows.filter(p => p !== null);
+        setServices(validProjects as Service[]);
+      } catch (fallbackError) {
+        console.error('Fallback error loading services:', fallbackError);
+        setServices([]);
+      }
     } finally {
       setLoading(false);
     }
