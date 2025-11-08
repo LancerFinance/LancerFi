@@ -159,6 +159,8 @@ export const useEscrow = (): UseEscrowReturn => {
 
         // Step 4: Create escrow record in database (payment already made to platform wallet)
         // For x402, the escrow is the platform wallet, and payment is already there
+        // Set escrow_account to platform wallet address so release payment can find it
+        const { PLATFORM_WALLET } = await import('@/lib/solana');
         const escrowData = {
           project_id: projectId,
           client_wallet: clientWallet.toString(),
@@ -167,6 +169,7 @@ export const useEscrow = (): UseEscrowReturn => {
           total_locked: totalLocked,
           transaction_signature: transactionSignature,
           payment_currency: 'USDC', // x402 uses USDC
+          escrow_account: PLATFORM_WALLET.toString(), // Platform wallet is the escrow for x402
           status: 'funded' as const,
           funded_at: new Date().toISOString(),
         };
@@ -574,8 +577,16 @@ export const useEscrow = (): UseEscrowReturn => {
     try {
       const escrow = await db.getEscrowById(escrowId);
       
-      if (!escrow || !escrow.escrow_account) {
+      if (!escrow) {
         throw new Error('Escrow not found');
+      }
+
+      // For x402 payments, escrow_account might be null (payment goes to platform wallet)
+      // The platform wallet is the escrow for x402, so we can proceed without escrow_account
+      // For SOL/USDC, escrow_account should exist
+      const paymentCurrency = (escrow.payment_currency as PaymentCurrency) || 'SOLANA';
+      if (paymentCurrency !== 'USDC' && paymentCurrency !== 'X402' && !escrow.escrow_account) {
+        throw new Error('Escrow account not found');
       }
 
       // Security: Prevent duplicate payments
