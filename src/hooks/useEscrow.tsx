@@ -194,17 +194,9 @@ export const useEscrow = (): UseEscrowReturn => {
         // Use Phantom's signAndSendTransaction - it's more reliable
         // Phantom handles the network connection and broadcasting internally
         
-        // CRITICAL FIX: Get FRESH blockhash RIGHT before signing and sending
-        // Blockhashes expire after ~60 seconds. If blockhash expires, transaction will be dropped
-        // Strategy: Get fresh blockhash → Update transaction → Sign → Send immediately
+        // Sign with Phantom (user approves in wallet)
+        // Note: Blockhash was already set above, no need to get it again (saves 3-4 seconds)
         try {
-          // Get FRESH blockhash right before signing
-          const freshBlockhash = await getLatestBlockhashWithFallback();
-          
-          // Update transaction with fresh blockhash
-          transaction.recentBlockhash = freshBlockhash.blockhash;
-          transaction.lastValidBlockHeight = freshBlockhash.lastValidBlockHeight;
-          
           // Sign with Phantom (user approves in wallet)
           const signedTransaction = await ph.signTransaction(transaction);
           
