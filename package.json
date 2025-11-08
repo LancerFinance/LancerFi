@@ -55,6 +55,7 @@
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
     "input-otp": "^1.4.2",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "nsfwjs": "^4.2.1",

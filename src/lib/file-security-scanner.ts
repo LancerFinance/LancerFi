@@ -4,6 +4,8 @@
  * Conservative approach - only flags obvious red flags
  */
 
+import JSZip from 'jszip';
+
 export interface SuspiciousFile {
   filename: string;
   reason: string;
@@ -220,16 +222,116 @@ export async function scanFile(file: File): Promise<SuspiciousFile | null> {
 }
 
 /**
+ * Scan files inside a ZIP archive
+ */
+async function scanZipContents(zipFile: File): Promise<SuspiciousFile[]> {
+  const suspiciousFiles: SuspiciousFile[] = [];
+  
+  try {
+    const zip = new JSZip();
+    const zipData = await zip.loadAsync(zipFile);
+    
+    // Scan each file in the ZIP
+    for (const [filename, zipEntry] of Object.entries(zipData.files)) {
+      // Skip directories
+      if (zipEntry.dir) continue;
+      
+      // Check filename for suspicious patterns
+      const extension = getExtension(filename);
+      
+      // Check for double extension
+      if (hasDoubleExtension(filename)) {
+        suspiciousFiles.push({
+          filename: `[ZIP] ${filename}`,
+          reason: 'File inside ZIP has double extension (e.g., document.pdf.exe) - may be attempting to hide executable',
+          severity: 'high'
+        });
+        continue;
+      }
+      
+      // Check for executable with misleading name
+      if (hasMisleadingName(filename, extension)) {
+        suspiciousFiles.push({
+          filename: `[ZIP] ${filename}`,
+          reason: `Executable file (${extension}) with misleading name that suggests it's a document`,
+          severity: 'high'
+        });
+        continue;
+      }
+      
+      // Check for suspicious executables
+      if (EXECUTABLE_EXTENSIONS.includes(extension)) {
+        const suspiciousExecutables = ['exe', 'bat', 'cmd', 'vbs', 'scr', 'pif', 'com'];
+        if (suspiciousExecutables.includes(extension)) {
+          suspiciousFiles.push({
+            filename: `[ZIP] ${filename}`,
+            reason: `Executable file type (${extension}) detected inside ZIP - please ensure this is legitimate work`,
+            severity: 'medium'
+          });
+        }
+      }
+      
+      // Try to read file header for type spoofing (limit to first 8 bytes to avoid loading large files)
+      try {
+        const fileData = await zipEntry.async('uint8array');
+        if (fileData.length >= 8) {
+          const header = fileData.slice(0, 8);
+          
+          // Check for executable magic numbers
+          if (header[0] === 0x4D && header[1] === 0x5A) { // MZ - PE executable
+            if (!EXECUTABLE_EXTENSIONS.includes(extension)) {
+              suspiciousFiles.push({
+                filename: `[ZIP] ${filename}`,
+                reason: `File extension (${extension}) does not match actual file type (executable) - possible type spoofing`,
+                severity: 'high'
+              });
+            }
+          }
+        }
+      } catch (headerError) {
+        // If we can't read the header, skip type checking for this file
+        console.warn(`Could not read header for ${filename} in ZIP:`, headerError);
+      }
+    }
+  } catch (error) {
+    console.warn('Error scanning ZIP contents:', error);
+    // If ZIP extraction fails, don't fail the whole scan - just log it
+  }
+  
+  return suspiciousFiles;
+}
+
+/**
+ * Scan a single file for suspicious characteristics (including ZIP contents)
+ */
+export async function scanFileWithZipExtraction(file: File): Promise<SuspiciousFile[]> {
+  const suspiciousFiles: SuspiciousFile[] = [];
+  const extension = getExtension(file.name);
+  
+  // If it's a ZIP file, scan its contents
+  if (extension === 'zip' || file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+    const zipSuspicious = await scanZipContents(file);
+    suspiciousFiles.push(...zipSuspicious);
+  }
+  
+  // Also scan the file itself (for double extensions, etc.)
+  const fileResult = await scanFile(file);
+  if (fileResult) {
+    suspiciousFiles.push(fileResult);
+  }
+  
+  return suspiciousFiles;
+}
+
+/**
  * Scan multiple files for suspicious characteristics
  */
 export async function scanFiles(files: File[]): Promise<ScanResult> {
   const suspiciousFiles: SuspiciousFile[] = [];
   
   for (const file of files) {
-    const result = await scanFile(file);
-    if (result) {
-      suspiciousFiles.push(result);
-    }
+    const results = await scanFileWithZipExtraction(file);
+    suspiciousFiles.push(...results);
   }
   
   return {
