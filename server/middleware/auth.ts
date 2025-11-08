@@ -34,6 +34,8 @@ export async function verifyWalletSignature(
       walletAddress,
       messageLength: message.length,
       messagePreview: message.substring(0, 100),
+      messageFull: message, // Log full message to see newlines
+      messageHasNewlines: message.includes('\n'),
       signatureLength: signatureBytes.length,
       publicKey: publicKey.toString()
     });
