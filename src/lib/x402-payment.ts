@@ -108,18 +108,48 @@ export async function processX402Payment(
   transaction.feePayer = clientWallet;
   transaction.lastValidBlockHeight = lastValidBlockHeight;
 
-  // Always add instruction to create recipient token account if it doesn't exist
-  // (token accounts already fetched above in parallel with blockhash)
-  // Solana will handle this gracefully - if account exists, instruction is a no-op
-  // This avoids needing to check account existence (which causes 403 errors)
-  transaction.add(
-    createAssociatedTokenAccountInstruction(
-      clientWallet, // Payer for account creation
-      recipientTokenAccount,
-      recipientWallet,
-      mint
-    )
-  );
+  // Check if recipient token account exists before adding creation instruction
+  // This makes the transaction look more standard and less suspicious to Phantom
+  // Phantom's security scanner flags transactions that always create accounts unnecessarily
+  let recipientAccountExists = false;
+  try {
+    // Use backend proxy to check account existence (avoids 403 errors)
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 
+      (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+    
+    const response = await fetch(`${API_BASE_URL}/api/rpc/account-balance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: recipientTokenAccount.toString() }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      recipientAccountExists = data.accountExists === true;
+    }
+  } catch {
+    // If check fails, try direct RPC (may fail with 403, but that's okay)
+    try {
+      const accountInfo = await connection.getAccountInfo(recipientTokenAccount);
+      recipientAccountExists = accountInfo !== null;
+    } catch {
+      // If both fail, assume it doesn't exist and add creation instruction
+      recipientAccountExists = false;
+    }
+  }
+
+  // Only add token account creation if it doesn't exist
+  // This avoids Phantom flagging transactions with unnecessary account creation
+  if (!recipientAccountExists) {
+    transaction.add(
+      createAssociatedTokenAccountInstruction(
+        clientWallet, // Payer for account creation
+        recipientTokenAccount,
+        recipientWallet,
+        mint
+      )
+    );
+  }
 
   // Convert amount to micro-USDC (6 decimals)
   // amount is already in USDC (e.g., 11), so multiply by 10^6 to get micro-USDC
