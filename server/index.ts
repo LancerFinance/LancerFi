@@ -6,6 +6,7 @@ import { releasePaymentRouter } from './routes/release-payment.js';
 import rpcProxyRouter from './routes/rpc-proxy.js';
 import x402PaymentRouter from './routes/x402-payment.js';
 import projectRateLimitRouter from './routes/project-rate-limit.js';
+import projectCleanupRouter from './routes/project-cleanup.js';
 import { 
   validateRequestSize, 
   sanitizeRequestBody,
@@ -98,6 +99,7 @@ app.use('/api/payment', paymentRateLimiter, releasePaymentRouter);
 app.use('/api/rpc', rpcRateLimiter, rpcProxyRouter);
 app.use('/api/x402', paymentRateLimiter, x402PaymentRouter);
 app.use('/api/project', projectRateLimitRouter);
+app.use('/api/project', projectCleanupRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

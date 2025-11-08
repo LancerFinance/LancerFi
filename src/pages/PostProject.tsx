@@ -22,7 +22,7 @@ import { PROJECT_CATEGORIES } from "@/lib/categories";
 import { useEscrow } from "@/hooks/useEscrow";
 import { checkImageForNSFW } from "@/lib/nsfw-detection";
 import { validateProjectTextForProfanity } from "@/lib/profanity-filter";
-import { checkIPProjectLimit, recordProjectCreation } from "@/lib/api-client";
+import { checkIPProjectLimit, recordProjectCreation, cleanupPendingProjects } from "@/lib/api-client";
 import { sanitizeText } from "@/lib/input-sanitizer";
 import { validateImageFile } from "@/lib/file-security";
 
@@ -64,6 +64,14 @@ const PostProject = () => {
       loadFreelancer(preselectedFreelancerId);
     }
   }, [preselectedFreelancerId]);
+
+  // Cleanup stuck pending projects on page load (non-blocking)
+  useEffect(() => {
+    cleanupPendingProjects().catch(err => {
+      console.warn('Failed to cleanup pending projects:', err);
+      // Don't show error to user - this is a background cleanup
+    });
+  }, []);
 
   // Load SOL price when budget changes
   useEffect(() => {

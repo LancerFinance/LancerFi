@@ -180,3 +180,45 @@ export async function recordProjectCreation(projectId: string, walletAddress: st
   }
 }
 
+/**
+ * Trigger cleanup of pending projects stuck for over 1 hour
+ * This can be called manually or will be triggered automatically by cron
+ */
+export async function cleanupPendingProjects(): Promise<{
+  success: boolean;
+  cleaned: number;
+  message: string;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/project/cleanup-pending`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      return {
+        success: false,
+        cleaned: 0,
+        message: errorData.error || `HTTP ${response.status}: ${response.statusText}`,
+      };
+    }
+
+    const data = await response.json();
+    return {
+      success: data.success || false,
+      cleaned: data.cleaned || 0,
+      message: data.message || 'Cleanup completed',
+    };
+  } catch (error: any) {
+    console.error('Error cleaning up pending projects:', error);
+    return {
+      success: false,
+      cleaned: 0,
+      message: error.message || 'Error cleaning up pending projects',
+    };
+  }
+}
+

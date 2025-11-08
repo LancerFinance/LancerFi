@@ -4,12 +4,26 @@
     {
       "src": "index.ts",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/cleanup-pending.ts",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
+      "src": "/api/cleanup-pending",
+      "dest": "/api/cleanup-pending.ts"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.ts"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cleanup-pending",
+      "schedule": "0 * * * *"
     }
   ]
 }
