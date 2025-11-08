@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Wallet, Shield, Loader2, Upload, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { db, supabase } from "@/lib/supabase";
 import { formatUSDC, formatSOL, PaymentCurrency, getUSDCBalance, getAccountBalanceViaProxy } from "@/lib/solana";
@@ -49,6 +49,10 @@ const PostProject = () => {
   const [projectImage, setProjectImage] = useState<File | null>(null);
   const [projectImagePreview, setProjectImagePreview] = useState<string>('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  
+  // Rate limiting: track last submission time to prevent spam
+  const lastSubmissionTimeRef = useRef<number>(0);
+  const MIN_TIME_BETWEEN_SUBMISSIONS = 3000; // 3 seconds minimum between submissions
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [solPrice, setSolPrice] = useState<number | null>(null);
@@ -168,7 +172,31 @@ const PostProject = () => {
     setProjectImagePreview('');
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
+    // Rate limiting: prevent spam clicking
+    const now = Date.now();
+    const timeSinceLastSubmission = now - lastSubmissionTimeRef.current;
+    
+    if (timeSinceLastSubmission < MIN_TIME_BETWEEN_SUBMISSIONS) {
+      const remainingTime = Math.ceil((MIN_TIME_BETWEEN_SUBMISSIONS - timeSinceLastSubmission) / 1000);
+      toast({
+        title: "Please Wait",
+        description: `Please wait ${remainingTime} second${remainingTime > 1 ? 's' : ''} before submitting again.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Prevent multiple simultaneous submissions
+    if (isSubmitting) {
+      toast({
+        title: "Already Processing",
+        description: "Your project is being posted. Please wait...",
+        variant: "default",
+      });
+      return;
+    }
+    
     if (!isConnected || !address) {
       toast({
         title: "Wallet Required",
@@ -364,6 +392,9 @@ const PostProject = () => {
       // Redirect to the new project page
       navigate(`/project/${project.id}`);
       
+      // Update last submission time on success
+      lastSubmissionTimeRef.current = Date.now();
+      
     } catch (error) {
       console.error('Error posting project:', error);
       toast({
@@ -371,11 +402,14 @@ const PostProject = () => {
         description: error instanceof Error ? error.message : "Please check your connection and try again",
         variant: "destructive",
       });
+      
+      // Update last submission time even on error to prevent spam retries
+      lastSubmissionTimeRef.current = Date.now();
     } finally {
       setIsSubmitting(false);
       setUploadingImage(false);
     }
-  };
+  }, [isConnected, address, formData, projectImage, paymentCurrency, isSubmitting, navigate, toast]);
 
   return (
     <div className="min-h-screen bg-background">
