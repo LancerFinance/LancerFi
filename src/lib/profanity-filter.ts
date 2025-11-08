@@ -123,7 +123,7 @@ CUSTOM_BAD_WORDS.forEach(word => {
 });
 
 /**
- * Check if text contains profanity or slurs
+ * Check if text contains profanity or slurs (including embedded slurs)
  * @param text - Text to check
  * @returns Object with isProfane boolean and details
  */
@@ -153,13 +153,14 @@ export function checkForProfanity(text: string): {
     .replace(/[$]/g, 's')
     .replace(/[!]/g, 'i');
   
-  // Check if text is profane
-  const isProfane = filter.isProfane(normalizedText) || filter.isProfane(text);
+  // Check if text is profane (whole text check)
+  let isProfane = filter.isProfane(normalizedText) || filter.isProfane(text);
   
   // Get list of profane words found
   const profaneWords: string[] = [];
   const words = normalizedText.split(/\s+/);
   
+  // Check individual words
   words.forEach(word => {
     // Remove punctuation for checking
     const cleanWord = word.replace(/[^\w]/g, '');
@@ -181,6 +182,22 @@ export function checkForProfanity(text: string): {
     }
   });
 
+  // CRITICAL: Check for embedded slurs (substring matching)
+  // This catches cases like "dniggerdsf" where the slur is embedded
+  const allSlurs = [...EXTENDED_SLURS, ...CUSTOM_BAD_WORDS];
+  const textToCheck = normalizedText.replace(/[^\w]/g, ''); // Remove all non-word chars for substring check
+  
+  allSlurs.forEach(slur => {
+    const normalizedSlur = slur.toLowerCase();
+    // Check if slur appears as substring in the text
+    if (textToCheck.includes(normalizedSlur) || normalizedText.includes(normalizedSlur)) {
+      if (!profaneWords.includes(slur)) {
+        profaneWords.push(slur);
+        isProfane = true;
+      }
+    }
+  });
+
   // Get cleaned version
   const cleanText = filter.clean(text);
 
@@ -188,6 +205,86 @@ export function checkForProfanity(text: string): {
     isProfane,
     profaneWords,
     cleanText,
+  };
+}
+
+/**
+ * Check for excessive repetition/spam in text
+ * @param text - Text to check
+ * @returns Object with isSpam boolean and details
+ */
+export function checkForRepetition(text: string): {
+  isSpam: boolean;
+  reason: string;
+} {
+  if (!text || typeof text !== 'string' || text.length < 10) {
+    return {
+      isSpam: false,
+      reason: '',
+    };
+  }
+
+  const normalizedText = text.toLowerCase().trim();
+  
+  // Check for excessive character repetition (e.g., "aaaaaaa", "dsfdsfdsfdsf")
+  const charPattern = /(.)\1{10,}/; // Same character repeated 11+ times
+  if (charPattern.test(normalizedText)) {
+    return {
+      isSpam: true,
+      reason: 'Text contains excessive character repetition',
+    };
+  }
+
+  // Check for excessive word repetition (e.g., "dsf dsf dsf dsf")
+  const words = normalizedText.split(/\s+/).filter(w => w.length > 0);
+  if (words.length > 5) {
+    // Count occurrences of each word
+    const wordCounts: Record<string, number> = {};
+    words.forEach(word => {
+      wordCounts[word] = (wordCounts[word] || 0) + 1;
+    });
+    
+    // Check if any word appears more than 30% of the time (spam indicator)
+    const maxRepetition = Math.max(...Object.values(wordCounts));
+    const repetitionRatio = maxRepetition / words.length;
+    
+    if (repetitionRatio > 0.3 && maxRepetition >= 5) {
+      return {
+        isSpam: true,
+        reason: 'Text contains excessive word repetition',
+      };
+    }
+  }
+
+  // Check for pattern repetition (e.g., "dsfdsfdsfdsf" - same pattern repeated)
+  const patternRegex = /(.{2,10})\1{4,}/; // Pattern of 2-10 chars repeated 5+ times
+  if (patternRegex.test(normalizedText.replace(/\s/g, ''))) {
+    return {
+      isSpam: true,
+      reason: 'Text contains repetitive patterns',
+    };
+  }
+
+  // Check for very short words repeated excessively (e.g., "dsf dsf dsf")
+  const shortWords = words.filter(w => w.length <= 4);
+  if (shortWords.length > 10) {
+    const shortWordCounts: Record<string, number> = {};
+    shortWords.forEach(word => {
+      shortWordCounts[word] = (shortWordCounts[word] || 0) + 1;
+    });
+    
+    const maxShortRepetition = Math.max(...Object.values(shortWordCounts));
+    if (maxShortRepetition >= 8) {
+      return {
+        isSpam: true,
+        reason: 'Text contains excessive repetition of short words',
+      };
+    }
+  }
+
+  return {
+    isSpam: false,
+    reason: '',
   };
 }
 
@@ -234,7 +331,7 @@ export function checkFieldsForProfanity(fields: Record<string, string>): {
 }
 
 /**
- * Validate project form data for profanity
+ * Validate project form data for profanity and spam
  * Checks title, description, and skills
  */
 export function validateProjectTextForProfanity(formData: {
@@ -256,11 +353,20 @@ export function validateProjectTextForProfanity(formData: {
     profaneFields.push('title');
   }
 
-  // Check description
+  // Check description for profanity
   const descCheck = checkForProfanity(formData.description);
   if (descCheck.isProfane) {
     errors.description = `Description contains inappropriate language. Please use professional language.`;
     profaneFields.push('description');
+  }
+
+  // Check description for spam/repetition
+  const descSpamCheck = checkForRepetition(formData.description);
+  if (descSpamCheck.isSpam) {
+    errors.description = `Description contains excessive repetition or spam. Please provide a meaningful project description.`;
+    if (!profaneFields.includes('description')) {
+      profaneFields.push('description');
+    }
   }
 
   // Check skills (comma-separated list)
