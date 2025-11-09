@@ -119,27 +119,26 @@ export async function releasePaymentFromPlatform(
     
     const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // Verify source account exists, is valid, and owned by platform wallet
+    // Verify source account exists and is valid
     const { getAccount } = await import('@solana/spl-token');
-    let sourceAccount;
     try {
-      sourceAccount = await getAccount(connection, sourceTokenAccount);
-      // CRITICAL: Verify owner matches platform wallet
+      const sourceAccount = await getAccount(connection, sourceTokenAccount);
+      // Verify it's owned by platform wallet
       if (sourceAccount.owner.toString() !== escrowAccount.toString()) {
-        throw new Error(`Source token account owner mismatch! Owner: ${sourceAccount.owner.toString()}, Expected: ${escrowAccount.toString()}`);
+        throw new Error(`Source account owner mismatch: ${sourceAccount.owner.toString()} != ${escrowAccount.toString()}`);
       }
-      // Verify mint is USDC
+      // Verify mint
       if (sourceAccount.mint.toString() !== USDC_MINT.toString()) {
-        throw new Error(`Source token account is not USDC! Mint: ${sourceAccount.mint.toString()}, Expected: ${USDC_MINT.toString()}`);
+        throw new Error(`Source account mint mismatch: ${sourceAccount.mint.toString()} != ${USDC_MINT.toString()}`);
       }
       // Check balance
       const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
       if (balanceUSDC < amount) {
-        throw new Error(`Insufficient balance: ${balanceUSDC} USDC available, ${amount} USDC required`);
+        throw new Error(`Insufficient balance: ${balanceUSDC} < ${amount}`);
       }
     } catch (error: any) {
-      if (error.message?.includes('TokenAccountNotFoundError') || error.message?.includes('not found') || error.name === 'TokenAccountNotFoundError') {
-        throw new Error(`Source USDC token account does not exist: ${sourceTokenAccount.toString()}. The x402 payment may not have created the associated token account.`);
+      if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
+        throw new Error(`Source USDC account missing: ${sourceTokenAccount.toString()}`);
       }
       throw error;
     }
@@ -165,14 +164,14 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer - use regular number like working releaseEscrowPayment function
+    // Transfer - EXACT same as working releaseEscrowPayment
     const transferAmount = Math.round(amount * Math.pow(10, decimals));
     
     transaction.add(
       createTransferInstruction(
         sourceTokenAccount,
         destTokenAccount,
-        escrowAccount,
+        escrowAccount, // Authority - must be owner of sourceTokenAccount
         transferAmount,
         [],
         TOKEN_PROGRAM_ID
