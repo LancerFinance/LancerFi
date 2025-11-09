@@ -109,55 +109,30 @@ export async function releasePaymentFromPlatform(
       })
     );
   } else {
-    // USDC token transfer
+    // USDC token transfer - EXACT copy of working x402 pattern
     const tokenMint = USDC_MINT;
     const decimals = 6;
     
-    // Get token accounts - use sync version to ensure we get the correct address
-    const sourceTokenAccount = getAssociatedTokenAddressSync(tokenMint, escrowAccount);
-    const destTokenAccount = getAssociatedTokenAddressSync(tokenMint, freelancerWallet);
+    // Get token accounts (same as x402)
+    const sourceTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
+    const destTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
     
-    const { getAccount, createAssociatedTokenAccountInstruction: createATA } = await import('@solana/spl-token');
+    const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // CRITICAL: Verify source account exists and is valid BEFORE creating transaction
-    let sourceAccountData;
-    try {
-      sourceAccountData = await getAccount(connection, sourceTokenAccount);
-      // Verify it's USDC and owned by platform wallet
-      if (sourceAccountData.mint.toString() !== USDC_MINT.toString()) {
-        throw new Error(`Source token account is not USDC! Mint: ${sourceAccountData.mint.toString()}, Expected: ${USDC_MINT.toString()}`);
-      }
-      if (sourceAccountData.owner.toString() !== escrowAccount.toString()) {
-        throw new Error(`Source token account owner mismatch! Owner: ${sourceAccountData.owner.toString()}, Expected: ${escrowAccount.toString()}`);
-      }
-      // Check balance
-      const balanceUSDC = Number(sourceAccountData.amount) / Math.pow(10, 6);
-      if (balanceUSDC < amount) {
-        throw new Error(`Insufficient USDC balance. Available: ${balanceUSDC} USDC, Required: ${amount} USDC`);
-      }
-    } catch (error: any) {
-      // If account doesn't exist, throw clear error
-      if (error.message?.includes('Invalid param') || error.message?.includes('not found') || error.message?.includes('TokenAccountNotFoundError') || error.name === 'TokenAccountNotFoundError') {
-        throw new Error(`Platform wallet USDC token account does not exist: ${sourceTokenAccount.toString()}. The x402 payment may not have been received. Please verify the payment was successful.`);
-      }
-      // Re-throw other errors (mint mismatch, owner mismatch, insufficient balance)
-      throw error;
-    }
-    
-    // Check if destination exists
+    // Check if destination exists (same pattern as x402)
     let destAccountExists = false;
     try {
-      await getAccount(connection, destTokenAccount);
-      destAccountExists = true;
+      const accountInfo = await connection.getAccountInfo(destTokenAccount);
+      destAccountExists = accountInfo !== null;
     } catch {
       destAccountExists = false;
     }
     
-    // Create destination account if needed
+    // Create destination account if needed (same as x402)
     if (!destAccountExists) {
       transaction.add(
-        createATA(
-          escrowAccount,
+        createAssociatedTokenAccountInstruction(
+          escrowAccount, // Payer
           destTokenAccount,
           freelancerWallet,
           tokenMint
@@ -165,17 +140,16 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer - use EXACT same pattern as x402 (which works)
-    // Authority is publicKey, signers is empty array, transaction is signed separately
+    // Transfer - EXACT same as x402 payment
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
     
     transaction.add(
       createTransferInstruction(
         sourceTokenAccount,
         destTokenAccount,
-        platformKeypair.publicKey, // Authority: publicKey (same as x402 uses clientWallet)
+        platformKeypair.publicKey, // Authority (same as x402 uses clientWallet)
         transferAmount,
-        [], // Signers: empty (same as x402) - transaction will be signed with transaction.sign()
+        [],
         TOKEN_PROGRAM_ID
       )
     );
