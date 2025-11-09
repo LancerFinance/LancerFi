@@ -158,6 +158,16 @@ export async function releasePaymentFromPlatform(
         throw new Error(`ATA calculation mismatch! Calculated: ${escrowTokenAccount.toString()}, Verified: ${verifyATA.toString()}`);
       }
       console.error(`[RELEASE] ATA address verified: ${escrowTokenAccount.toString()}`);
+      
+      // CRITICAL: Verify the account actually exists on-chain by querying it directly
+      const onChainAccount = await connection.getAccountInfo(escrowTokenAccount);
+      if (!onChainAccount) {
+        throw new Error(`Source account does not exist on-chain: ${escrowTokenAccount.toString()}`);
+      }
+      if (onChainAccount.owner.toString() !== TOKEN_PROGRAM_ID.toString()) {
+        throw new Error(`Source account is not owned by Token Program! Owner: ${onChainAccount.owner.toString()}`);
+      }
+      console.error(`[RELEASE] On-chain account verified: owner=${onChainAccount.owner.toString()}, data length=${onChainAccount.data.length}`);
     } catch (error: any) {
       if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
         throw new Error(`Platform wallet USDC token account does not exist. The x402 payment may not have been received. Account: ${escrowTokenAccount.toString()}`);
