@@ -91,11 +91,11 @@ export async function releasePaymentFromPlatform(
   
   const transaction = new Transaction();
   
-  // Set fee payer FIRST (before adding instructions)
-  transaction.feePayer = escrowAccount;
-  
-  // Get latest blockhash
+  // Get latest blockhash FIRST
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+  
+  // Set fee payer and blockhash (like working releaseEscrowPayment)
+  transaction.feePayer = escrowAccount;
   transaction.recentBlockhash = blockhash;
   transaction.lastValidBlockHeight = lastValidBlockHeight;
   
