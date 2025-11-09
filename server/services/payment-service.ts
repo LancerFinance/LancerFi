@@ -125,19 +125,33 @@ export async function releasePaymentFromPlatform(
     console.error(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
     console.error(`[RELEASE] USDC Mint: ${tokenMint.toString()}`);
     
-    // CRITICAL: Verify source account exists and is valid USDC token account
-    console.error(`[RELEASE] About to call getAccount for source account`);
-    const { getAccount } = await import('@solana/spl-token');
+    // CRITICAL: Check if source account exists, create it if it doesn't
+    // This is important because x402 payments might send USDC without explicitly creating the ATA first
+    const { getAccount, createAssociatedTokenAccountInstruction } = await import('@solana/spl-token');
     let sourceAccount;
+    const sourceAccountInfo = await connection.getAccountInfo(escrowTokenAccount);
+    if (!sourceAccountInfo) {
+      // Source account doesn't exist - create it
+      // This shouldn't happen if x402 payment worked, but we handle it anyway
+      transaction.add(
+        createAssociatedTokenAccountInstruction(
+          escrowAccount, // Platform wallet as payer
+          escrowTokenAccount,
+          escrowAccount, // Owner
+          tokenMint
+        )
+      );
+      throw new Error(`Platform wallet USDC token account does not exist. The x402 payment may not have been received. Account: ${escrowTokenAccount.toString()}. Cannot create account in same transaction as transfer.`);
+    }
+    
+    // Verify source account is valid USDC token account
     try {
-      console.error(`[RELEASE] Calling getAccount(${escrowTokenAccount.toString()})`);
       sourceAccount = await getAccount(connection, escrowTokenAccount);
-      console.error(`[RELEASE] getAccount succeeded`);
       // Verify mint matches USDC
       if (sourceAccount.mint.toString() !== tokenMint.toString()) {
         throw new Error(`Source account mint mismatch! Expected USDC (${tokenMint.toString()}), got ${sourceAccount.mint.toString()}`);
       }
-      // Verify account is not closed (amount should be > 0 or account should exist)
+      // Verify account is not closed
       if (sourceAccount.amount === BigInt(0) && sourceAccount.closeAuthority !== null) {
         throw new Error(`Source account appears to be closed or invalid`);
       }
@@ -149,25 +163,7 @@ export async function releasePaymentFromPlatform(
       if (sourceAccount.owner.toString() !== escrowAccount.toString()) {
         throw new Error(`Source account owner mismatch! Account owner: ${sourceAccount.owner.toString()}, Platform wallet: ${escrowAccount.toString()}. The platform wallet must own the source account to transfer from it.`);
       }
-      
-      // Log account details for debugging - CRITICAL for debugging
-      console.error(`[RELEASE] Source account verified:`, {
-        address: escrowTokenAccount.toString(),
-        mint: sourceAccount.mint.toString(),
-        owner: sourceAccount.owner.toString(),
-        platformWallet: escrowAccount.toString(),
-        ownerMatches: sourceAccount.owner.toString() === escrowAccount.toString(),
-        amount: sourceAccount.amount.toString(),
-        balanceUSDC: balanceUSDC,
-        closeAuthority: sourceAccount.closeAuthority?.toString() || 'null'
-      });
     } catch (error: any) {
-      console.error(`[RELEASE ERROR] Source account verification failed:`, {
-        errorName: error.name,
-        errorMessage: error.message,
-        escrowTokenAccount: escrowTokenAccount.toString(),
-        escrowAccount: escrowAccount.toString()
-      });
       if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
         throw new Error(`Platform wallet USDC token account does not exist. The x402 payment may not have been received. Account: ${escrowTokenAccount.toString()}`);
       }
@@ -180,7 +176,7 @@ export async function releasePaymentFromPlatform(
       freelancerWallet
     );
     
-    const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
+    const { createTransferInstruction } = await import('@solana/spl-token');
     
     // Create freelancer token account if it doesn't exist (use platform wallet as payer)
     // EXACT match to working releaseEscrowPayment
