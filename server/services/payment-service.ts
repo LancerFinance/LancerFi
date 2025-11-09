@@ -122,16 +122,30 @@ export async function releasePaymentFromPlatform(
     
     // CRITICAL: Verify source account exists and is valid USDC token account
     const { getAccount } = await import('@solana/spl-token');
+    let sourceAccount;
     try {
-      const sourceAccount = await getAccount(connection, escrowTokenAccount);
+      sourceAccount = await getAccount(connection, escrowTokenAccount);
       // Verify mint matches USDC
       if (sourceAccount.mint.toString() !== tokenMint.toString()) {
         throw new Error(`Source account mint mismatch! Expected USDC (${tokenMint.toString()}), got ${sourceAccount.mint.toString()}`);
+      }
+      // Verify account is not closed (amount should be > 0 or account should exist)
+      if (sourceAccount.amount === BigInt(0) && sourceAccount.closeAuthority !== null) {
+        throw new Error(`Source account appears to be closed or invalid`);
       }
       const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
       if (balanceUSDC < amount) {
         throw new Error(`Insufficient USDC: ${balanceUSDC} available, ${amount} required`);
       }
+      // Log account details for debugging
+      console.error(`[RELEASE] Source account verified:`, {
+        address: escrowTokenAccount.toString(),
+        mint: sourceAccount.mint.toString(),
+        owner: sourceAccount.owner.toString(),
+        amount: sourceAccount.amount.toString(),
+        balanceUSDC: balanceUSDC,
+        closeAuthority: sourceAccount.closeAuthority?.toString() || 'null'
+      });
     } catch (error: any) {
       if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
         throw new Error(`Platform wallet USDC token account does not exist. The x402 payment may not have been received. Account: ${escrowTokenAccount.toString()}`);
