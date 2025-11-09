@@ -107,93 +107,107 @@ export async function releasePaymentHandler(
       amount: amountToSend,
       currency: paymentCurrency
     });
+    console.error(`[RELEASE HANDLER] About to call releasePaymentFromPlatform - this should appear`);
+    console.log(`[RELEASE HANDLER] About to call releasePaymentFromPlatform - this should also appear`);
 
     // Release payment from platform wallet
-    const signature = await releasePaymentFromPlatform(
-      new PublicKey(freelancerWallet),
-      amountToSend,
-      paymentCurrency as 'USDC' | 'SOLANA'
-    );
-
-    // Update escrow status in database
-    const { error: updateError } = await supabaseClient
-      .from('escrows')
-      .update({
-        status: 'released',
-        released_at: new Date().toISOString(),
-        freelancer_wallet: freelancerWallet,
-        transaction_signature: signature
-      })
-      .eq('id', escrowId);
-
-    if (updateError) {
-      console.error('Error updating escrow:', updateError);
-      // Payment was sent but database update failed - this is bad but we return success
-      // The payment is already on blockchain, so we log the error
-      return res.status(500).json({
-        error: 'Payment sent successfully but failed to update database. Transaction signature: ' + signature
-      });
-    }
-
-    // Send notifications to client and freelancer about payment release
-    // Note: Project completion notification will be sent from client after project status update
     try {
-      // Get project details for notification
-      const { data: projectData } = await supabaseClient
-        .from('projects')
-        .select('title, client_id, freelancer_id')
-        .eq('id', escrow.project_id)
-        .single();
+      console.error(`[RELEASE HANDLER] Inside try block, calling releasePaymentFromPlatform now`);
+      const signature = await releasePaymentFromPlatform(
+        new PublicKey(freelancerWallet),
+        amountToSend,
+        paymentCurrency as 'USDC' | 'SOLANA'
+      );
+      
+      // Update escrow status in database
+      const { error: updateError } = await supabaseClient
+        .from('escrows')
+        .update({
+          status: 'released',
+          released_at: new Date().toISOString(),
+          freelancer_wallet: freelancerWallet,
+          transaction_signature: signature
+        })
+        .eq('id', escrowId);
 
-      if (projectData) {
-        const systemSender = 'system@lancerfi.app';
-        const currencyDisplay = paymentCurrency === 'USDC' || paymentCurrency === 'X402'
-          ? `$${amountToSend.toLocaleString()} ${paymentCurrency}`
-          : `${amountToSend.toLocaleString()} SOL`;
-
-        const notifications = [];
-
-        // Notify client that payment has been released
-        notifications.push({
-          sender_id: systemSender,
-          recipient_id: projectData.client_id,
-          subject: 'Payment Released',
-          content: `Payment of ${currencyDisplay} has been released from escrow and sent to the freelancer for project "${projectData.title}". The project can now be marked as completed.`
+      if (updateError) {
+        console.error('Error updating escrow:', updateError);
+        // Payment was sent but database update failed - this is bad but we return success
+        // The payment is already on blockchain, so we log the error
+        return res.status(500).json({
+          error: 'Payment sent successfully but failed to update database. Transaction signature: ' + signature
         });
+      }
 
-        // Notify freelancer that payment has been received
-        if (freelancerWallet) {
+      // Send notifications to client and freelancer about payment release
+      // Note: Project completion notification will be sent from client after project status update
+      try {
+        // Get project details for notification
+        const { data: projectData } = await supabaseClient
+          .from('projects')
+          .select('title, client_id, freelancer_id')
+          .eq('id', escrow.project_id)
+          .single();
+
+        if (projectData) {
+          const systemSender = 'system@lancerfi.app';
+          const currencyDisplay = paymentCurrency === 'USDC' || paymentCurrency === 'X402'
+            ? `$${amountToSend.toLocaleString()} ${paymentCurrency}`
+            : `${amountToSend.toLocaleString()} SOL`;
+
+          const notifications = [];
+
+          // Notify client that payment has been released
           notifications.push({
             sender_id: systemSender,
-            recipient_id: freelancerWallet,
-            subject: 'Payment Received',
-            content: `Payment of ${currencyDisplay} has been released from escrow and sent to your wallet for project "${projectData.title}". Thank you for your work!`
+            recipient_id: projectData.client_id,
+            subject: 'Payment Released',
+            content: `Payment of ${currencyDisplay} has been released from escrow and sent to the freelancer for project "${projectData.title}". The project can now be marked as completed.`
           });
-        }
 
-        // Insert notifications (non-blocking)
-        try {
-          const { error } = await supabaseClient
-            .from('messages')
-            .insert(notifications);
-          if (error) {
-            console.error('Error sending payment release notifications:', error);
+          // Notify freelancer that payment has been received
+          if (freelancerWallet) {
+            notifications.push({
+              sender_id: systemSender,
+              recipient_id: freelancerWallet,
+              subject: 'Payment Received',
+              content: `Payment of ${currencyDisplay} has been released from escrow and sent to your wallet for project "${projectData.title}". Thank you for your work!`
+            });
           }
-        } catch (err) {
-          console.error('Error sending payment release notifications:', err);
-          // Don't fail the request if notifications fail
-        }
-      }
-    } catch (notificationError) {
-      console.error('Error sending payment release notifications:', notificationError);
-      // Don't fail the request if notifications fail
-    }
 
-    res.json({
-      success: true,
-      transactionSignature: signature,
-      message: `Successfully released ${paymentCurrency === 'USDC' ? `$${amountToSend} USDC` : `${amountToSend} SOL`} to freelancer`
-    });
+          // Insert notifications (non-blocking)
+          try {
+            const { error } = await supabaseClient
+              .from('messages')
+              .insert(notifications);
+            if (error) {
+              console.error('Error sending payment release notifications:', error);
+            }
+          } catch (err) {
+            console.error('Error sending payment release notifications:', err);
+            // Don't fail the request if notifications fail
+          }
+        }
+      } catch (notificationError) {
+        console.error('Error sending payment release notifications:', notificationError);
+        // Don't fail the request if notifications fail
+      }
+
+      res.json({
+        success: true,
+        transactionSignature: signature,
+        message: `Successfully released ${paymentCurrency === 'USDC' ? `$${amountToSend} USDC` : `${amountToSend} SOL`} to freelancer`
+      });
+    } catch (releaseError: any) {
+      console.error(`[RELEASE HANDLER] Error in releasePaymentFromPlatform:`, {
+        errorName: releaseError.name,
+        errorMessage: releaseError.message,
+        errorStack: releaseError.stack,
+        transactionMessage: releaseError.transactionMessage,
+        transactionLogs: releaseError.transactionLogs
+      });
+      throw releaseError;
+    }
 
   } catch (error) {
     console.error('Error in releasePaymentHandler:', error);
