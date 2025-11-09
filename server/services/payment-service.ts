@@ -204,6 +204,15 @@ export async function releasePaymentFromPlatform(
     }
     
     // Transfer tokens from escrow to freelancer
+    // CRITICAL: Log all account addresses before creating instruction
+    console.error(`[RELEASE] Creating transfer instruction with:`, {
+      source: escrowTokenAccount.toString(),
+      destination: freelancerTokenAccount.toString(),
+      authority: escrowAccount.toString(),
+      amount: Math.round(amount * Math.pow(10, decimals)),
+      tokenMint: tokenMint.toString()
+    });
+    
     transaction.add(
       createTransferInstruction(
         escrowTokenAccount,
@@ -214,6 +223,8 @@ export async function releasePaymentFromPlatform(
         TOKEN_PROGRAM_ID
       )
     );
+    
+    console.error(`[RELEASE] Transfer instruction added successfully`);
   }
   
   // Sign with platform keypair
