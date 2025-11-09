@@ -119,10 +119,20 @@ export async function releasePaymentFromPlatform(
     
     const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // Verify source account exists and has balance using getAccount (validates it's a token account)
+    // Verify source account exists, is valid, and owned by platform wallet
     const { getAccount } = await import('@solana/spl-token');
+    let sourceAccount;
     try {
-      const sourceAccount = await getAccount(connection, sourceTokenAccount);
+      sourceAccount = await getAccount(connection, sourceTokenAccount);
+      // CRITICAL: Verify owner matches platform wallet
+      if (sourceAccount.owner.toString() !== escrowAccount.toString()) {
+        throw new Error(`Source token account owner mismatch! Owner: ${sourceAccount.owner.toString()}, Expected: ${escrowAccount.toString()}`);
+      }
+      // Verify mint is USDC
+      if (sourceAccount.mint.toString() !== USDC_MINT.toString()) {
+        throw new Error(`Source token account is not USDC! Mint: ${sourceAccount.mint.toString()}, Expected: ${USDC_MINT.toString()}`);
+      }
+      // Check balance
       const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
       if (balanceUSDC < amount) {
         throw new Error(`Insufficient balance: ${balanceUSDC} USDC available, ${amount} USDC required`);
