@@ -113,66 +113,33 @@ export async function releasePaymentFromPlatform(
     const tokenMint = USDC_MINT;
     const decimals = 6;
     
-    // Get token accounts
-    const sourceTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
-    const destTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
+    // Get token accounts - EXACT copy of working releaseEscrowPayment
+    const escrowTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
+    const freelancerTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
     
     const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // Verify source account exists and is valid
-    const { getAccount } = await import('@solana/spl-token');
+    // Create freelancer token account if it doesn't exist - EXACT copy
     try {
-      const sourceAccount = await getAccount(connection, sourceTokenAccount);
-      // Verify it's owned by platform wallet
-      if (sourceAccount.owner.toString() !== escrowAccount.toString()) {
-        throw new Error(`Source account owner mismatch: ${sourceAccount.owner.toString()} != ${escrowAccount.toString()}`);
-      }
-      // Verify mint
-      if (sourceAccount.mint.toString() !== USDC_MINT.toString()) {
-        throw new Error(`Source account mint mismatch: ${sourceAccount.mint.toString()} != ${USDC_MINT.toString()}`);
-      }
-      // Check balance
-      const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
-      if (balanceUSDC < amount) {
-        throw new Error(`Insufficient balance: ${balanceUSDC} < ${amount}`);
-      }
-    } catch (error: any) {
-      if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
-        throw new Error(`Source USDC account missing: ${sourceTokenAccount.toString()}`);
-      }
-      throw error;
-    }
-    
-    // Check if destination exists
-    let destAccountExists = false;
-    try {
-      const accountInfo = await connection.getAccountInfo(destTokenAccount);
-      destAccountExists = accountInfo !== null;
+      await connection.getAccountInfo(freelancerTokenAccount);
     } catch {
-      destAccountExists = false;
-    }
-    
-    // Create destination account if needed
-    if (!destAccountExists) {
       transaction.add(
         createAssociatedTokenAccountInstruction(
-          escrowAccount,
-          destTokenAccount,
+          escrowAccount, // Use platform wallet (escrow account) as payer
+          freelancerTokenAccount,
           freelancerWallet,
           tokenMint
         )
       );
     }
     
-    // Transfer - EXACT same as working releaseEscrowPayment
-    const transferAmount = Math.round(amount * Math.pow(10, decimals));
-    
+    // Transfer tokens from escrow to freelancer - EXACT copy
     transaction.add(
       createTransferInstruction(
-        sourceTokenAccount,
-        destTokenAccount,
-        escrowAccount, // Authority - must be owner of sourceTokenAccount
-        transferAmount,
+        escrowTokenAccount,
+        freelancerTokenAccount,
+        escrowAccount, // Escrow account as authority
+        Math.round(amount * Math.pow(10, decimals)),
         [],
         TOKEN_PROGRAM_ID
       )
