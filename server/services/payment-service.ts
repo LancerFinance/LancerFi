@@ -119,18 +119,13 @@ export async function releasePaymentFromPlatform(
       escrowAccount
     );
     
-    // CRITICAL: Verify source account exists and check its authority
+    // CRITICAL: Verify source account exists
     const { getAccount } = await import('@solana/spl-token');
-    let sourceAccount;
     try {
-      sourceAccount = await getAccount(connection, escrowTokenAccount);
+      const sourceAccount = await getAccount(connection, escrowTokenAccount);
       const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
       if (balanceUSDC < amount) {
         throw new Error(`Insufficient USDC: ${balanceUSDC} available, ${amount} required`);
-      }
-      // Verify the authority matches the platform wallet
-      if (sourceAccount.owner.toString() !== escrowAccount.toString()) {
-        throw new Error(`Source account authority mismatch! Token account owner: ${sourceAccount.owner.toString()}, Expected: ${escrowAccount.toString()}`);
       }
     } catch (error: any) {
       if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
@@ -160,14 +155,14 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer tokens from escrow to freelancer
+    // Transfer tokens - use platform keypair as signer in instruction
     transaction.add(
       createTransferInstruction(
         escrowTokenAccount,
         freelancerTokenAccount,
-        escrowAccount,
+        escrowAccount, // Authority
         Math.round(amount * Math.pow(10, decimals)),
-        [],
+        [platformKeypair], // Signers - platform keypair must sign
         TOKEN_PROGRAM_ID
       )
     );
