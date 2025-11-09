@@ -119,31 +119,16 @@ export async function releasePaymentFromPlatform(
     
     const { getAccount, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // CRITICAL: Verify source account exists - if not, throw immediately
-    try {
-      const sourceAccount = await getAccount(connection, sourceTokenAccount);
-      // Verify balance
-      const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
-      if (balanceUSDC < amount) {
-        throw new Error(`Insufficient balance: ${balanceUSDC} USDC available, ${amount} USDC required`);
-      }
-    } catch (error: any) {
-      if (error.message?.includes('TokenAccountNotFoundError') || error.message?.includes('not found')) {
-        throw new Error(`Source USDC account does not exist: ${sourceTokenAccount.toString()}. Payment may not have been received.`);
-      }
-      throw error;
-    }
-    
-    // Check if destination exists
+    // Check if destination exists using getAccountInfo (same as x402)
     let destAccountExists = false;
     try {
-      await getAccount(connection, destTokenAccount);
-      destAccountExists = true;
+      const accountInfo = await connection.getAccountInfo(destTokenAccount);
+      destAccountExists = accountInfo !== null;
     } catch {
       destAccountExists = false;
     }
     
-    // Create destination account if needed
+    // Create destination account if needed (same as x402)
     if (!destAccountExists) {
       transaction.add(
         createAssociatedTokenAccountInstruction(
@@ -155,14 +140,14 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer
+    // Transfer - EXACT same as x402
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
     
     transaction.add(
       createTransferInstruction(
         sourceTokenAccount,
         destTokenAccount,
-        escrowAccount, // Authority must match the owner of sourceTokenAccount
+        escrowAccount, // Authority
         transferAmount,
         [],
         TOKEN_PROGRAM_ID
