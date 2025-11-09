@@ -1,5 +1,5 @@
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Keypair } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, getAssociatedTokenAddressSync, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
 
 // Solana configuration - PRODUCTION ONLY: MAINNET-BETA
 // NO DEVNET, NO CONDITIONALS
@@ -113,23 +113,22 @@ export async function releasePaymentFromPlatform(
     const tokenMint = USDC_MINT;
     const decimals = 6;
     
-    // Get token accounts
-    const sourceTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
-    const destTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
+    // Get token accounts - use sync version to ensure we get the correct address
+    const sourceTokenAccount = getAssociatedTokenAddressSync(tokenMint, escrowAccount);
+    const destTokenAccount = getAssociatedTokenAddressSync(tokenMint, freelancerWallet);
     
     const { getAccount, createAssociatedTokenAccountInstruction: createATA } = await import('@solana/spl-token');
     
-    // CRITICAL: Verify source account exists and has balance BEFORE creating transaction
-    // If it doesn't exist, we can't transfer - throw error immediately
+    // CRITICAL: Verify source account exists and is valid BEFORE creating transaction
     let sourceAccountData;
     try {
       sourceAccountData = await getAccount(connection, sourceTokenAccount);
       // Verify it's USDC and owned by platform wallet
       if (sourceAccountData.mint.toString() !== USDC_MINT.toString()) {
-        throw new Error(`Source token account is not USDC! Mint: ${sourceAccountData.mint.toString()}`);
+        throw new Error(`Source token account is not USDC! Mint: ${sourceAccountData.mint.toString()}, Expected: ${USDC_MINT.toString()}`);
       }
       if (sourceAccountData.owner.toString() !== escrowAccount.toString()) {
-        throw new Error(`Source token account owner mismatch! Owner: ${sourceAccountData.owner.toString()}`);
+        throw new Error(`Source token account owner mismatch! Owner: ${sourceAccountData.owner.toString()}, Expected: ${escrowAccount.toString()}`);
       }
       // Check balance
       const balanceUSDC = Number(sourceAccountData.amount) / Math.pow(10, 6);
@@ -137,9 +136,11 @@ export async function releasePaymentFromPlatform(
         throw new Error(`Insufficient USDC balance. Available: ${balanceUSDC} USDC, Required: ${amount} USDC`);
       }
     } catch (error: any) {
-      if (error.message?.includes('Invalid param') || error.message?.includes('not found') || error.message?.includes('TokenAccountNotFoundError')) {
+      // If account doesn't exist, throw clear error
+      if (error.message?.includes('Invalid param') || error.message?.includes('not found') || error.message?.includes('TokenAccountNotFoundError') || error.name === 'TokenAccountNotFoundError') {
         throw new Error(`Platform wallet USDC token account does not exist: ${sourceTokenAccount.toString()}. The x402 payment may not have been received. Please verify the payment was successful.`);
       }
+      // Re-throw other errors (mint mismatch, owner mismatch, insufficient balance)
       throw error;
     }
     
