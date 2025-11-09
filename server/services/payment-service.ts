@@ -119,13 +119,18 @@ export async function releasePaymentFromPlatform(
       escrowAccount
     );
     
-    // CRITICAL: Verify source account exists BEFORE building transaction
+    // CRITICAL: Verify source account exists and check its authority
     const { getAccount } = await import('@solana/spl-token');
+    let sourceAccount;
     try {
-      const sourceAccount = await getAccount(connection, escrowTokenAccount);
+      sourceAccount = await getAccount(connection, escrowTokenAccount);
       const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
       if (balanceUSDC < amount) {
         throw new Error(`Insufficient USDC: ${balanceUSDC} available, ${amount} required`);
+      }
+      // Verify the authority matches the platform wallet
+      if (sourceAccount.owner.toString() !== escrowAccount.toString()) {
+        throw new Error(`Source account authority mismatch! Token account owner: ${sourceAccount.owner.toString()}, Expected: ${escrowAccount.toString()}`);
       }
     } catch (error: any) {
       if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
