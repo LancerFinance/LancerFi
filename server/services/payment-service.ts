@@ -56,6 +56,8 @@ export async function releasePaymentFromPlatform(
   amount: number,
   currency: PaymentCurrency = 'SOLANA'
 ): Promise<string> {
+  console.log(`[RELEASE START] Currency: ${currency}, Amount: ${amount}, Freelancer: ${freelancerWallet.toString()}`);
+  
   // Security: Validate amount
   if (amount <= 0) {
     throw new Error('Payment amount must be greater than zero');
@@ -68,7 +70,7 @@ export async function releasePaymentFromPlatform(
   const escrowAccount = platformKeypair.publicKey;
   
   // Verify we're using the correct platform wallet
-  console.log(`[USDC Release] Platform wallet: ${escrowAccount.toString()}`);
+  console.log(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
   if (escrowAccount.toString() !== 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U') {
     throw new Error(`Platform wallet mismatch! Expected AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U, got ${escrowAccount.toString()}`);
   }
@@ -112,23 +114,19 @@ export async function releasePaymentFromPlatform(
     const sourceTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
     const destTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
     
-    console.log(`[USDC Release] Transfer setup:`, {
-      source: sourceTokenAccount.toString(),
-      dest: destTokenAccount.toString(),
-      amount: amount,
-      platformWallet: escrowAccount.toString()
-    });
+    console.log(`[RELEASE] USDC Transfer - Source: ${sourceTokenAccount.toString()}, Dest: ${destTokenAccount.toString()}, Amount: ${amount}`);
     
     // CRITICAL: Verify source account exists and is valid (platform wallet's USDC account)
     // This must exist since x402 payment was received
     try {
       const sourceAccountInfo = await connection.getAccountInfo(sourceTokenAccount);
       if (!sourceAccountInfo) {
+        console.error(`[RELEASE ERROR] Source account does not exist: ${sourceTokenAccount.toString()}`);
         throw new Error(`Platform wallet USDC token account does not exist: ${sourceTokenAccount.toString()}. The x402 payment may not have been received.`);
       }
-      console.log(`[USDC Release] Source account verified: ${sourceTokenAccount.toString()}`);
+      console.log(`[RELEASE] Source account EXISTS: ${sourceTokenAccount.toString()}, Owner: ${sourceAccountInfo.owner.toString()}, Executable: ${sourceAccountInfo.executable}`);
     } catch (error: any) {
-      console.error(`[USDC Release] Source account check failed:`, error);
+      console.error(`[RELEASE ERROR] Source account check failed:`, error);
       throw new Error(`Platform wallet USDC token account is invalid or does not exist: ${sourceTokenAccount.toString()}. Error: ${error.message}`);
     }
     
@@ -138,15 +136,18 @@ export async function releasePaymentFromPlatform(
       const accountInfo = await connection.getAccountInfo(destTokenAccount);
       destAccountExists = accountInfo !== null;
       if (destAccountExists) {
-        console.log(`[USDC Release] Destination account exists: ${destTokenAccount.toString()}`);
+        console.log(`[RELEASE] Destination account EXISTS: ${destTokenAccount.toString()}`);
+      } else {
+        console.log(`[RELEASE] Destination account does NOT exist, will create it`);
       }
-    } catch {
+    } catch (error: any) {
+      console.log(`[RELEASE] Destination account check error (will create):`, error.message);
       destAccountExists = false;
     }
     
     // Create destination account if needed (BEFORE transfer instruction)
     if (!destAccountExists) {
-      console.log(`[USDC Release] Creating freelancer token account`);
+      console.log(`[RELEASE] Adding create account instruction`);
       transaction.add(
         createAssociatedTokenAccountInstruction(
           escrowAccount, // Platform wallet pays
@@ -160,12 +161,7 @@ export async function releasePaymentFromPlatform(
     // Transfer using EXACT same pattern as x402 payment
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
     
-    console.log(`[USDC Release] Adding transfer instruction:`, {
-      from: sourceTokenAccount.toString(),
-      to: destTokenAccount.toString(),
-      authority: escrowAccount.toString(),
-      amount: transferAmount.toString()
-    });
+    console.log(`[RELEASE] Adding transfer instruction - From: ${sourceTokenAccount.toString()}, To: ${destTokenAccount.toString()}, Authority: ${escrowAccount.toString()}, Amount: ${transferAmount.toString()}`);
     
     transaction.add(
       createTransferInstruction(
@@ -178,26 +174,29 @@ export async function releasePaymentFromPlatform(
       )
     );
     
-    console.log(`[USDC Release] Transaction built: ${transaction.instructions.length} instruction(s)`);
+    console.log(`[RELEASE] Transaction built with ${transaction.instructions.length} instruction(s)`);
   }
   
   // Sign with platform keypair
   transaction.sign(platformKeypair);
   
-  console.log(`[USDC Release] Transaction signed, ${transaction.instructions.length} instruction(s)`);
-  console.log(`[USDC Release] Instruction details:`, transaction.instructions.map((ix, i) => ({
-    index: i,
-    programId: ix.programId.toString(),
-    keys: ix.keys.length,
-    dataLength: ix.data.length
-  })));
+  console.log(`[RELEASE] Transaction signed, ${transaction.instructions.length} instruction(s)`);
+  for (let i = 0; i < transaction.instructions.length; i++) {
+    const ix = transaction.instructions[i];
+    console.log(`[RELEASE] Instruction ${i}: Program=${ix.programId.toString()}, Keys=${ix.keys.length}, Data=${ix.data.length} bytes`);
+    if (ix.keys.length > 0) {
+      console.log(`[RELEASE] Instruction ${i} accounts:`, ix.keys.map((k, idx) => `${idx}:${k.pubkey.toString()}`).join(', '));
+    }
+  }
   
   // Send and confirm transaction (let sendRawTransaction do the simulation)
   // The error will be more detailed from sendRawTransaction
+  console.log(`[RELEASE] Sending transaction...`);
   const signature = await connection.sendRawTransaction(
     transaction.serialize(),
     { skipPreflight: false, maxRetries: 3 } // Let it simulate to get better errors
   );
+  console.log(`[RELEASE] Transaction sent: ${signature}`);
   
   // Confirm transaction
   await connection.confirmTransaction({
