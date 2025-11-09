@@ -73,7 +73,6 @@ export async function releasePaymentFromPlatform(
   const escrowAccount = platformKeypair.publicKey;
   
   // Verify we're using the correct platform wallet
-  console.error(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
   if (escrowAccount.toString() !== 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U') {
     throw new Error(`Platform wallet mismatch! Expected AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U, got ${escrowAccount.toString()}`);
   }
@@ -92,10 +91,12 @@ export async function releasePaymentFromPlatform(
   
   const transaction = new Transaction();
   
+  // Set fee payer FIRST (before adding instructions)
+  transaction.feePayer = escrowAccount;
+  
   // Get latest blockhash
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
   transaction.recentBlockhash = blockhash;
-  transaction.feePayer = escrowAccount;
   transaction.lastValidBlockHeight = lastValidBlockHeight;
   
   if (currency === 'SOLANA') {
