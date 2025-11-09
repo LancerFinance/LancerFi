@@ -120,6 +120,10 @@ export async function releasePaymentFromPlatform(
       escrowAccount
     );
     
+    console.error(`[RELEASE] Calculated source token account: ${escrowTokenAccount.toString()}`);
+    console.error(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
+    console.error(`[RELEASE] USDC Mint: ${tokenMint.toString()}`);
+    
     // CRITICAL: Verify source account exists and is valid USDC token account
     const { getAccount } = await import('@solana/spl-token');
     let sourceAccount;
