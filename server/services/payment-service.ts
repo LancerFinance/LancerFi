@@ -155,14 +155,14 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer tokens - use platform keypair as signer in instruction
+    // Transfer tokens from escrow to freelancer
     transaction.add(
       createTransferInstruction(
         escrowTokenAccount,
         freelancerTokenAccount,
-        escrowAccount, // Authority
+        escrowAccount, // Escrow account as authority
         Math.round(amount * Math.pow(10, decimals)),
-        [platformKeypair], // Signers - platform keypair must sign
+        [], // Empty signers - authority signs transaction separately
         TOKEN_PROGRAM_ID
       )
     );
