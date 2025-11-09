@@ -119,25 +119,19 @@ export async function releasePaymentFromPlatform(
     
     const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // Check if source account exists - if not, create it first
-    let sourceAccountExists = false;
+    // Verify source account exists and has balance using getAccount (validates it's a token account)
+    const { getAccount } = await import('@solana/spl-token');
     try {
-      const accountInfo = await connection.getAccountInfo(sourceTokenAccount);
-      sourceAccountExists = accountInfo !== null;
-    } catch {
-      sourceAccountExists = false;
-    }
-    
-    // Create source account if needed (must exist before we can transfer from it)
-    if (!sourceAccountExists) {
-      transaction.add(
-        createAssociatedTokenAccountInstruction(
-          escrowAccount,
-          sourceTokenAccount,
-          escrowAccount,
-          tokenMint
-        )
-      );
+      const sourceAccount = await getAccount(connection, sourceTokenAccount);
+      const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
+      if (balanceUSDC < amount) {
+        throw new Error(`Insufficient balance: ${balanceUSDC} USDC available, ${amount} USDC required`);
+      }
+    } catch (error: any) {
+      if (error.message?.includes('TokenAccountNotFoundError') || error.message?.includes('not found') || error.name === 'TokenAccountNotFoundError') {
+        throw new Error(`Source USDC token account does not exist: ${sourceTokenAccount.toString()}. The x402 payment may not have created the associated token account.`);
+      }
+      throw error;
     }
     
     // Check if destination exists
