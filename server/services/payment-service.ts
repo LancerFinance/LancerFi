@@ -184,40 +184,19 @@ export async function releasePaymentFromPlatform(
   // Sign with platform keypair
   transaction.sign(platformKeypair);
   
-  console.log(`[USDC Release] Transaction signed, instructions: ${transaction.instructions.length}`);
+  console.log(`[USDC Release] Transaction signed, ${transaction.instructions.length} instruction(s)`);
+  console.log(`[USDC Release] Instruction details:`, transaction.instructions.map((ix, i) => ({
+    index: i,
+    programId: ix.programId.toString(),
+    keys: ix.keys.length,
+    dataLength: ix.data.length
+  })));
   
-  // Simulate transaction first to catch errors before sending
-  try {
-    // Get a fresh blockhash for simulation
-    const { blockhash: simBlockhash } = await connection.getLatestBlockhash('confirmed');
-    transaction.recentBlockhash = simBlockhash;
-    
-    const simulation = await connection.simulateTransaction(transaction);
-    
-    console.log(`[USDC Release] Simulation result:`, {
-      err: simulation.value.err,
-      logs: simulation.value.logs?.slice(0, 10), // First 10 logs
-      accountsUsed: simulation.value.accounts?.length
-    });
-    
-    if (simulation.value.err) {
-      const errorDetails = {
-        err: simulation.value.err,
-        logs: simulation.value.logs || []
-      };
-      console.error(`[USDC Release] Simulation failed with details:`, errorDetails);
-      throw new Error(`Transaction simulation failed: ${JSON.stringify(simulation.value.err)}. Logs: ${simulation.value.logs?.join('\n') || 'No logs'}`);
-    }
-  } catch (simError: any) {
-    console.error(`[USDC Release] Simulation error:`, simError);
-    // If simulation fails, we still want to see the detailed error
-    throw simError;
-  }
-  
-  // Send and confirm transaction
+  // Send and confirm transaction (let sendRawTransaction do the simulation)
+  // The error will be more detailed from sendRawTransaction
   const signature = await connection.sendRawTransaction(
     transaction.serialize(),
-    { skipPreflight: true, maxRetries: 3 } // Skip preflight since we already simulated
+    { skipPreflight: false, maxRetries: 3 } // Let it simulate to get better errors
   );
   
   // Confirm transaction
