@@ -165,8 +165,8 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer
-    const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
+    // Transfer - use regular number like working releaseEscrowPayment function
+    const transferAmount = Math.round(amount * Math.pow(10, decimals));
     
     transaction.add(
       createTransferInstruction(
