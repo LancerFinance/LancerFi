@@ -116,18 +116,41 @@ export async function releasePaymentFromPlatform(
     
     console.log(`[RELEASE] USDC Transfer - Source: ${sourceTokenAccount.toString()}, Dest: ${destTokenAccount.toString()}, Amount: ${amount}`);
     
-    // CRITICAL: Verify source account exists and is valid (platform wallet's USDC account)
-    // This must exist since x402 payment was received
+    // CRITICAL: Verify source account exists and is a VALID TOKEN ACCOUNT (not just any account)
+    // Use getAccount from @solana/spl-token to verify it's actually a token account
+    const { getAccount } = await import('@solana/spl-token');
     try {
-      const sourceAccountInfo = await connection.getAccountInfo(sourceTokenAccount);
-      if (!sourceAccountInfo) {
-        console.error(`[RELEASE ERROR] Source account does not exist: ${sourceTokenAccount.toString()}`);
+      const sourceTokenAccountData = await getAccount(connection, sourceTokenAccount);
+      console.log(`[RELEASE] Source token account VERIFIED:`, {
+        address: sourceTokenAccount.toString(),
+        owner: sourceTokenAccountData.owner.toString(),
+        mint: sourceTokenAccountData.mint.toString(),
+        amount: sourceTokenAccountData.amount.toString(),
+        decimals: sourceTokenAccountData.mint.toString() === USDC_MINT.toString() ? 6 : 'unknown'
+      });
+      
+      // Verify it's USDC
+      if (sourceTokenAccountData.mint.toString() !== USDC_MINT.toString()) {
+        throw new Error(`Source token account is not USDC! Mint: ${sourceTokenAccountData.mint.toString()}, Expected: ${USDC_MINT.toString()}`);
+      }
+      
+      // Verify the owner is the platform wallet
+      if (sourceTokenAccountData.owner.toString() !== escrowAccount.toString()) {
+        throw new Error(`Source token account owner mismatch! Owner: ${sourceTokenAccountData.owner.toString()}, Expected: ${escrowAccount.toString()}`);
+      }
+      
+      // Check balance
+      const balanceUSDC = Number(sourceTokenAccountData.amount) / Math.pow(10, 6);
+      console.log(`[RELEASE] Source account balance: ${balanceUSDC} USDC, Required: ${amount} USDC`);
+      if (balanceUSDC < amount) {
+        throw new Error(`Insufficient USDC balance. Available: ${balanceUSDC} USDC, Required: ${amount} USDC`);
+      }
+    } catch (error: any) {
+      console.error(`[RELEASE ERROR] Source token account verification failed:`, error);
+      if (error.message?.includes('Invalid param') || error.message?.includes('not found')) {
         throw new Error(`Platform wallet USDC token account does not exist: ${sourceTokenAccount.toString()}. The x402 payment may not have been received.`);
       }
-      console.log(`[RELEASE] Source account EXISTS: ${sourceTokenAccount.toString()}, Owner: ${sourceAccountInfo.owner.toString()}, Executable: ${sourceAccountInfo.executable}`);
-    } catch (error: any) {
-      console.error(`[RELEASE ERROR] Source account check failed:`, error);
-      throw new Error(`Platform wallet USDC token account is invalid or does not exist: ${sourceTokenAccount.toString()}. Error: ${error.message}`);
+      throw error;
     }
     
     // Check if destination exists (same pattern as x402)
