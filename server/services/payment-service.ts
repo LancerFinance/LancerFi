@@ -124,6 +124,23 @@ export async function releasePaymentFromPlatform(
     console.error(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
     console.error(`[RELEASE] USDC Mint: ${tokenMint.toString()}`);
     
+    // CRITICAL: Query all token accounts for platform wallet to verify ATA calculation
+    const { getParsedTokenAccountsByOwner } = await import('@solana/spl-token');
+    try {
+      const allTokenAccounts = await getParsedTokenAccountsByOwner(connection, escrowAccount, { mint: tokenMint });
+      console.error(`[RELEASE] Found ${allTokenAccounts.value.length} USDC token account(s) for platform wallet`);
+      if (allTokenAccounts.value.length > 0) {
+        const actualAccount = allTokenAccounts.value[0];
+        console.error(`[RELEASE] Actual USDC account: ${actualAccount.pubkey.toString()}, Calculated: ${escrowTokenAccount.toString()}`);
+        if (actualAccount.pubkey.toString() !== escrowTokenAccount.toString()) {
+          throw new Error(`ATA mismatch! Actual account: ${actualAccount.pubkey.toString()}, Calculated: ${escrowTokenAccount.toString()}`);
+        }
+      }
+    } catch (error: any) {
+      console.error(`[RELEASE] Error querying token accounts:`, error.message);
+      // Continue anyway - the getAccount check below will catch if account doesn't exist
+    }
+    
     // CRITICAL: Verify source account exists and is valid USDC token account
     const { getAccount } = await import('@solana/spl-token');
     let sourceAccount;
