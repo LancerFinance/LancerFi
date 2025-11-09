@@ -220,11 +220,40 @@ export async function releasePaymentFromPlatform(
   // Send and confirm transaction (let sendRawTransaction do the simulation)
   // The error will be more detailed from sendRawTransaction
   console.error(`[RELEASE] Sending transaction...`);
-  const signature = await connection.sendRawTransaction(
-    transaction.serialize(),
-    { skipPreflight: false, maxRetries: 3 } // Let it simulate to get better errors
-  );
-  console.error(`[RELEASE] Transaction sent: ${signature}`);
+  console.error(`[RELEASE] Transaction has ${transaction.instructions.length} instruction(s)`);
+  
+  // Log ALL account addresses in the transaction for debugging
+  for (let i = 0; i < transaction.instructions.length; i++) {
+    const ix = transaction.instructions[i];
+    console.error(`[RELEASE] Instruction ${i} details:`, {
+      programId: ix.programId.toString(),
+      accounts: ix.keys.map((k, idx) => ({
+        index: idx,
+        pubkey: k.pubkey.toString(),
+        isSigner: k.isSigner,
+        isWritable: k.isWritable
+      }))
+    });
+  }
+  
+  let signature: string;
+  try {
+    signature = await connection.sendRawTransaction(
+      transaction.serialize(),
+      { skipPreflight: false, maxRetries: 3 } // Let it simulate to get better errors
+    );
+    console.error(`[RELEASE] Transaction sent: ${signature}`);
+  } catch (error: any) {
+    console.error(`[RELEASE ERROR] sendRawTransaction failed:`, {
+      message: error.message,
+      transactionMessage: error.transactionMessage,
+      transactionLogs: error.transactionLogs,
+      signature: error.signature,
+      errorName: error.name
+    });
+    // Re-throw with more context
+    throw error;
+  }
   
   // Confirm transaction
   await connection.confirmTransaction({
