@@ -159,17 +159,16 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // If we created the source account, we need to verify it has balance after creation
-    // For now, add the transfer - if source has no balance, it will fail with a clearer error
+    // Transfer - authority must be the keypair's publicKey, and keypair must be in signers
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
     
     transaction.add(
       createTransferInstruction(
         sourceTokenAccount,
         destTokenAccount,
-        escrowAccount,
+        platformKeypair.publicKey, // Authority: must be the keypair's publicKey
         transferAmount,
-        [],
+        [platformKeypair], // Signers: must include the keypair
         TOKEN_PROGRAM_ID
       )
     );
