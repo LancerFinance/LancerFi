@@ -113,34 +113,19 @@ export async function releasePaymentFromPlatform(
     const tokenMint = USDC_MINT;
     const decimals = 6;
     
-    // Get token accounts
+    // Get token accounts - EXACT same as releaseEscrowPayment
     const escrowTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
     const freelancerTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
     
-    const { getAccount, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
+    const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // Verify source account exists and has balance BEFORE creating transaction
-    // If it doesn't exist, we can't transfer - throw error immediately
-    try {
-      const sourceAccount = await getAccount(connection, escrowTokenAccount);
-      const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
-      if (balanceUSDC < amount) {
-        throw new Error(`Insufficient USDC: ${balanceUSDC} available, ${amount} required`);
-      }
-    } catch (error: any) {
-      if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
-        throw new Error(`Platform wallet USDC account does not exist: ${escrowTokenAccount.toString()}. The x402 payment may not have been received properly.`);
-      }
-      throw error;
-    }
-    
-    // Create freelancer token account if it doesn't exist
+    // Create freelancer token account if it doesn't exist - EXACT same as releaseEscrowPayment
     try {
       await connection.getAccountInfo(freelancerTokenAccount);
     } catch {
       transaction.add(
         createAssociatedTokenAccountInstruction(
-          escrowAccount,
+          escrowAccount, // Use platform wallet (escrow account) as payer
           freelancerTokenAccount,
           freelancerWallet,
           tokenMint
@@ -148,12 +133,12 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer - SAME as regular escrow release
+    // Transfer tokens from escrow to freelancer - EXACT same as releaseEscrowPayment
     transaction.add(
       createTransferInstruction(
         escrowTokenAccount,
         freelancerTokenAccount,
-        escrowAccount,
+        escrowAccount, // Escrow account as authority
         Math.round(amount * Math.pow(10, decimals)),
         [],
         TOKEN_PROGRAM_ID
