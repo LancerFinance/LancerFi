@@ -109,7 +109,7 @@ export async function releasePaymentFromPlatform(
       })
     );
   } else {
-    // USDC token transfer
+    // USDC token transfer - SAME as regular escrow release
     const tokenMint = USDC_MINT;
     const decimals = 6;
     
@@ -117,21 +117,21 @@ export async function releasePaymentFromPlatform(
     const escrowTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
     const freelancerTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
     
-    const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
+    const { getAccount, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // CRITICAL: Create source (escrow) token account if it doesn't exist
-    // x402 payments may have sent USDC but not created the ATA
+    // Verify source account exists and has balance BEFORE creating transaction
+    // If it doesn't exist, we can't transfer - throw error immediately
     try {
-      await connection.getAccountInfo(escrowTokenAccount);
-    } catch {
-      transaction.add(
-        createAssociatedTokenAccountInstruction(
-          escrowAccount,
-          escrowTokenAccount,
-          escrowAccount,
-          tokenMint
-        )
-      );
+      const sourceAccount = await getAccount(connection, escrowTokenAccount);
+      const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
+      if (balanceUSDC < amount) {
+        throw new Error(`Insufficient USDC: ${balanceUSDC} available, ${amount} required`);
+      }
+    } catch (error: any) {
+      if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
+        throw new Error(`Platform wallet USDC account does not exist: ${escrowTokenAccount.toString()}. The x402 payment may not have been received properly.`);
+      }
+      throw error;
     }
     
     // Create freelancer token account if it doesn't exist
@@ -148,7 +148,7 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer tokens from escrow to freelancer
+    // Transfer - SAME as regular escrow release
     transaction.add(
       createTransferInstruction(
         escrowTokenAccount,
