@@ -213,12 +213,15 @@ export async function releasePaymentFromPlatform(
       tokenMint: tokenMint.toString()
     });
     
+    // Convert amount to micro-USDC (6 decimals) - use BigInt like x402 payment
+    const microUSDC = BigInt(Math.round(amount * Math.pow(10, decimals)));
+    
     transaction.add(
       createTransferInstruction(
         escrowTokenAccount,
         freelancerTokenAccount,
         escrowAccount, // Escrow account as authority
-        Math.round(amount * Math.pow(10, decimals)),
+        microUSDC, // BigInt like x402 payment
         [], // Empty signers - authority signs transaction separately
         TOKEN_PROGRAM_ID
       )
