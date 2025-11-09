@@ -56,7 +56,7 @@ export async function releasePaymentFromPlatform(
   amount: number,
   currency: PaymentCurrency = 'SOLANA'
 ): Promise<string> {
-  console.log(`[RELEASE START] Currency: ${currency}, Amount: ${amount}, Freelancer: ${freelancerWallet.toString()}`);
+  console.error(`[RELEASE START] Currency: ${currency}, Amount: ${amount}, Freelancer: ${freelancerWallet.toString()}`);
   
   // Security: Validate amount
   if (amount <= 0) {
@@ -70,7 +70,7 @@ export async function releasePaymentFromPlatform(
   const escrowAccount = platformKeypair.publicKey;
   
   // Verify we're using the correct platform wallet
-  console.log(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
+  console.error(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
   if (escrowAccount.toString() !== 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U') {
     throw new Error(`Platform wallet mismatch! Expected AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U, got ${escrowAccount.toString()}`);
   }
@@ -114,14 +114,14 @@ export async function releasePaymentFromPlatform(
     const sourceTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
     const destTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
     
-    console.log(`[RELEASE] USDC Transfer - Source: ${sourceTokenAccount.toString()}, Dest: ${destTokenAccount.toString()}, Amount: ${amount}`);
+    console.error(`[RELEASE] USDC Transfer - Source: ${sourceTokenAccount.toString()}, Dest: ${destTokenAccount.toString()}, Amount: ${amount}`);
     
     // CRITICAL: Verify source account exists and is a VALID TOKEN ACCOUNT (not just any account)
     // Use getAccount from @solana/spl-token to verify it's actually a token account
     const { getAccount } = await import('@solana/spl-token');
     try {
       const sourceTokenAccountData = await getAccount(connection, sourceTokenAccount);
-      console.log(`[RELEASE] Source token account VERIFIED:`, {
+      console.error(`[RELEASE] Source token account VERIFIED:`, {
         address: sourceTokenAccount.toString(),
         owner: sourceTokenAccountData.owner.toString(),
         mint: sourceTokenAccountData.mint.toString(),
@@ -141,7 +141,7 @@ export async function releasePaymentFromPlatform(
       
       // Check balance
       const balanceUSDC = Number(sourceTokenAccountData.amount) / Math.pow(10, 6);
-      console.log(`[RELEASE] Source account balance: ${balanceUSDC} USDC, Required: ${amount} USDC`);
+      console.error(`[RELEASE] Source account balance: ${balanceUSDC} USDC, Required: ${amount} USDC`);
       if (balanceUSDC < amount) {
         throw new Error(`Insufficient USDC balance. Available: ${balanceUSDC} USDC, Required: ${amount} USDC`);
       }
@@ -158,7 +158,7 @@ export async function releasePaymentFromPlatform(
     try {
       const destAccountData = await getAccount(connection, destTokenAccount);
       destAccountExists = true;
-      console.log(`[RELEASE] Destination account EXISTS and is valid:`, {
+      console.error(`[RELEASE] Destination account EXISTS and is valid:`, {
         address: destTokenAccount.toString(),
         owner: destAccountData.owner.toString(),
         mint: destAccountData.mint.toString()
@@ -166,13 +166,13 @@ export async function releasePaymentFromPlatform(
     } catch (error: any) {
       // Account doesn't exist or isn't valid - we'll create it
       destAccountExists = false;
-      console.log(`[RELEASE] Destination account does NOT exist (or invalid), will create it:`, error.message);
+      console.error(`[RELEASE] Destination account does NOT exist (or invalid), will create it:`, error.message);
     }
     
     // Create destination account if needed (BEFORE transfer instruction)
     // This becomes Instruction 0 if the account doesn't exist
     if (!destAccountExists) {
-      console.log(`[RELEASE] Adding create account instruction (will be Instruction 0)`);
+      console.error(`[RELEASE] Adding create account instruction (will be Instruction 0)`);
       transaction.add(
         createAssociatedTokenAccountInstruction(
           escrowAccount, // Platform wallet pays
@@ -187,7 +187,7 @@ export async function releasePaymentFromPlatform(
     // This becomes Instruction 0 if dest account exists, or Instruction 1 if we created it
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
     
-    console.log(`[RELEASE] Adding transfer instruction (will be Instruction ${transaction.instructions.length}):`, {
+    console.error(`[RELEASE] Adding transfer instruction (will be Instruction ${transaction.instructions.length}):`, {
       from: sourceTokenAccount.toString(),
       to: destTokenAccount.toString(),
       authority: escrowAccount.toString(),
@@ -198,7 +198,7 @@ export async function releasePaymentFromPlatform(
     });
     
     // CRITICAL: Verify addresses one more time right before creating instruction
-    console.log(`[RELEASE] VERIFYING addresses before createTransferInstruction:`, {
+    console.error(`[RELEASE] VERIFYING addresses before createTransferInstruction:`, {
       sourceTokenAccount: sourceTokenAccount.toString(),
       destTokenAccount: destTokenAccount.toString(),
       authority: escrowAccount.toString(),
@@ -216,7 +216,7 @@ export async function releasePaymentFromPlatform(
       TOKEN_PROGRAM_ID
     );
     
-    console.log(`[RELEASE] Transfer instruction created:`, {
+    console.error(`[RELEASE] Transfer instruction created:`, {
       programId: transferIx.programId.toString(),
       keys: transferIx.keys.map((k, i) => ({
         index: i,
@@ -228,13 +228,13 @@ export async function releasePaymentFromPlatform(
     
     transaction.add(transferIx);
     
-    console.log(`[RELEASE] Transaction built with ${transaction.instructions.length} instruction(s)`);
+    console.error(`[RELEASE] Transaction built with ${transaction.instructions.length} instruction(s)`);
     
     // CRITICAL: Double-check the source account one more time right before building
     // Sometimes account state can change or we might have the wrong account
     try {
       const finalCheck = await getAccount(connection, sourceTokenAccount);
-      console.log(`[RELEASE] FINAL CHECK - Source account before transfer:`, {
+      console.error(`[RELEASE] FINAL CHECK - Source account before transfer:`, {
         address: sourceTokenAccount.toString(),
         owner: finalCheck.owner.toString(),
         mint: finalCheck.mint.toString(),
@@ -259,23 +259,23 @@ export async function releasePaymentFromPlatform(
   // Sign with platform keypair
   transaction.sign(platformKeypair);
   
-  console.log(`[RELEASE] Transaction signed, ${transaction.instructions.length} instruction(s)`);
+  console.error(`[RELEASE] Transaction signed, ${transaction.instructions.length} instruction(s)`);
   for (let i = 0; i < transaction.instructions.length; i++) {
     const ix = transaction.instructions[i];
-    console.log(`[RELEASE] Instruction ${i}: Program=${ix.programId.toString()}, Keys=${ix.keys.length}, Data=${ix.data.length} bytes`);
+    console.error(`[RELEASE] Instruction ${i}: Program=${ix.programId.toString()}, Keys=${ix.keys.length}, Data=${ix.data.length} bytes`);
     if (ix.keys.length > 0) {
-      console.log(`[RELEASE] Instruction ${i} accounts:`, ix.keys.map((k, idx) => `${idx}:${k.pubkey.toString()}`).join(', '));
+      console.error(`[RELEASE] Instruction ${i} accounts:`, ix.keys.map((k, idx) => `${idx}:${k.pubkey.toString()}`).join(', '));
     }
   }
   
   // Send and confirm transaction (let sendRawTransaction do the simulation)
   // The error will be more detailed from sendRawTransaction
-  console.log(`[RELEASE] Sending transaction...`);
+  console.error(`[RELEASE] Sending transaction...`);
   const signature = await connection.sendRawTransaction(
     transaction.serialize(),
     { skipPreflight: false, maxRetries: 3 } // Let it simulate to get better errors
   );
-  console.log(`[RELEASE] Transaction sent: ${signature}`);
+  console.error(`[RELEASE] Transaction sent: ${signature}`);
   
   // Confirm transaction
   await connection.confirmTransaction({
