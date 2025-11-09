@@ -117,9 +117,30 @@ export async function releasePaymentFromPlatform(
     const sourceTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
     const destTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
     
-    const { getAccount, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
+    const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // Check if destination exists using getAccountInfo (same as x402)
+    // Check if source account exists - if not, create it first
+    let sourceAccountExists = false;
+    try {
+      const accountInfo = await connection.getAccountInfo(sourceTokenAccount);
+      sourceAccountExists = accountInfo !== null;
+    } catch {
+      sourceAccountExists = false;
+    }
+    
+    // Create source account if needed (must exist before we can transfer from it)
+    if (!sourceAccountExists) {
+      transaction.add(
+        createAssociatedTokenAccountInstruction(
+          escrowAccount,
+          sourceTokenAccount,
+          escrowAccount,
+          tokenMint
+        )
+      );
+    }
+    
+    // Check if destination exists
     let destAccountExists = false;
     try {
       const accountInfo = await connection.getAccountInfo(destTokenAccount);
@@ -128,7 +149,7 @@ export async function releasePaymentFromPlatform(
       destAccountExists = false;
     }
     
-    // Create destination account if needed (same as x402)
+    // Create destination account if needed
     if (!destAccountExists) {
       transaction.add(
         createAssociatedTokenAccountInstruction(
@@ -140,14 +161,14 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer - EXACT same as x402
+    // Transfer
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
     
     transaction.add(
       createTransferInstruction(
         sourceTokenAccount,
         destTokenAccount,
-        escrowAccount, // Authority
+        escrowAccount,
         transferAmount,
         [],
         TOKEN_PROGRAM_ID
