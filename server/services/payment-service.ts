@@ -109,30 +109,45 @@ export async function releasePaymentFromPlatform(
       })
     );
   } else {
-    // USDC token transfer - EXACT copy of working x402 pattern
+    // USDC token transfer
     const tokenMint = USDC_MINT;
     const decimals = 6;
     
-    // Get token accounts (same as x402)
+    // Get token accounts
     const sourceTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
     const destTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
     
-    const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
+    const { getAccount, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // Check if destination exists (same pattern as x402)
+    // CRITICAL: Verify source account exists - if not, throw immediately
+    try {
+      const sourceAccount = await getAccount(connection, sourceTokenAccount);
+      // Verify balance
+      const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
+      if (balanceUSDC < amount) {
+        throw new Error(`Insufficient balance: ${balanceUSDC} USDC available, ${amount} USDC required`);
+      }
+    } catch (error: any) {
+      if (error.message?.includes('TokenAccountNotFoundError') || error.message?.includes('not found')) {
+        throw new Error(`Source USDC account does not exist: ${sourceTokenAccount.toString()}. Payment may not have been received.`);
+      }
+      throw error;
+    }
+    
+    // Check if destination exists
     let destAccountExists = false;
     try {
-      const accountInfo = await connection.getAccountInfo(destTokenAccount);
-      destAccountExists = accountInfo !== null;
+      await getAccount(connection, destTokenAccount);
+      destAccountExists = true;
     } catch {
       destAccountExists = false;
     }
     
-    // Create destination account if needed (same as x402)
+    // Create destination account if needed
     if (!destAccountExists) {
       transaction.add(
         createAssociatedTokenAccountInstruction(
-          escrowAccount, // Payer
+          escrowAccount,
           destTokenAccount,
           freelancerWallet,
           tokenMint
@@ -140,14 +155,14 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer - EXACT same as x402 payment
+    // Transfer
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
     
     transaction.add(
       createTransferInstruction(
         sourceTokenAccount,
         destTokenAccount,
-        platformKeypair.publicKey, // Authority (same as x402 uses clientWallet)
+        escrowAccount, // Authority must match the owner of sourceTokenAccount
         transferAmount,
         [],
         TOKEN_PROGRAM_ID
