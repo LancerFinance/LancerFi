@@ -56,7 +56,10 @@ export async function releasePaymentFromPlatform(
   amount: number,
   currency: PaymentCurrency = 'SOLANA'
 ): Promise<string> {
+  // CRITICAL: Log at the VERY start to confirm function is called
+  console.error(`[RELEASE START] ==========================================`);
   console.error(`[RELEASE START] Currency: ${currency}, Amount: ${amount}, Freelancer: ${freelancerWallet.toString()}`);
+  console.error(`[RELEASE START] ==========================================`);
   
   // Security: Validate amount
   if (amount <= 0) {
@@ -117,20 +120,24 @@ export async function releasePaymentFromPlatform(
     console.error(`[RELEASE] USDC Transfer - Source: ${sourceTokenAccount.toString()}, Dest: ${destTokenAccount.toString()}, Amount: ${amount}`);
     
     // CRITICAL: Verify source account exists FIRST - if it doesn't, we can't transfer
+    console.error(`[RELEASE] About to check source token account: ${sourceTokenAccount.toString()}`);
     const { getAccount } = await import('@solana/spl-token');
     let sourceAccountData;
     try {
+      console.error(`[RELEASE] Calling getAccount for source token account...`);
       sourceAccountData = await getAccount(connection, sourceTokenAccount);
-      console.error(`[RELEASE] Source token account EXISTS:`, {
+      console.error(`[RELEASE] ✅ Source token account EXISTS:`, {
         address: sourceTokenAccount.toString(),
         owner: sourceAccountData.owner.toString(),
         mint: sourceAccountData.mint.toString(),
         amount: sourceAccountData.amount.toString()
       });
     } catch (error: any) {
-      console.error(`[RELEASE ERROR] Source token account does NOT exist!`, {
+      console.error(`[RELEASE ERROR] ❌ Source token account does NOT exist!`, {
         address: sourceTokenAccount.toString(),
-        error: error.message
+        error: error.message,
+        errorName: error.name,
+        errorStack: error.stack
       });
       throw new Error(`Platform wallet USDC token account does not exist: ${sourceTokenAccount.toString()}. The x402 payment may not have been received. Please verify the payment was successful.`);
     }
