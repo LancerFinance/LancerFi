@@ -166,9 +166,9 @@ export async function releasePaymentFromPlatform(
     const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
     // Create freelancer token account if it doesn't exist (use platform wallet as payer)
-    try {
-      await connection.getAccountInfo(freelancerTokenAccount);
-    } catch {
+    const destAccountInfo = await connection.getAccountInfo(freelancerTokenAccount);
+    if (!destAccountInfo) {
+      console.error(`[RELEASE] Destination account does not exist, adding create instruction`);
       transaction.add(
         createAssociatedTokenAccountInstruction(
           escrowAccount, // Use platform wallet (escrow account) as payer
@@ -177,6 +177,12 @@ export async function releasePaymentFromPlatform(
           tokenMint
         )
       );
+    } else {
+      console.error(`[RELEASE] Destination account exists: ${freelancerTokenAccount.toString()}`);
+      // Verify it's a token account
+      if (destAccountInfo.owner.toString() !== TOKEN_PROGRAM_ID.toString()) {
+        throw new Error(`Destination account is not a token account! Owner: ${destAccountInfo.owner.toString()}`);
+      }
     }
     
     // Transfer tokens from escrow to freelancer
