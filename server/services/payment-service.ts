@@ -146,12 +146,13 @@ export async function releasePaymentFromPlatform(
     
     const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // Create freelancer token account if it doesn't exist
-    const destAccountInfo = await connection.getAccountInfo(freelancerTokenAccount);
-    if (!destAccountInfo) {
+    // Create freelancer token account if it doesn't exist (use platform wallet as payer)
+    try {
+      await connection.getAccountInfo(freelancerTokenAccount);
+    } catch {
       transaction.add(
         createAssociatedTokenAccountInstruction(
-          escrowAccount,
+          escrowAccount, // Use platform wallet (escrow account) as payer
           freelancerTokenAccount,
           freelancerWallet,
           tokenMint
