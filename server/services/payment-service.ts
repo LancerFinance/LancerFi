@@ -119,10 +119,14 @@ export async function releasePaymentFromPlatform(
       escrowAccount
     );
     
-    // CRITICAL: Verify source account exists
+    // CRITICAL: Verify source account exists and is valid USDC token account
     const { getAccount } = await import('@solana/spl-token');
     try {
       const sourceAccount = await getAccount(connection, escrowTokenAccount);
+      // Verify mint matches USDC
+      if (sourceAccount.mint.toString() !== tokenMint.toString()) {
+        throw new Error(`Source account mint mismatch! Expected USDC (${tokenMint.toString()}), got ${sourceAccount.mint.toString()}`);
+      }
       const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
       if (balanceUSDC < amount) {
         throw new Error(`Insufficient USDC: ${balanceUSDC} available, ${amount} required`);
