@@ -116,63 +116,54 @@ export async function releasePaymentFromPlatform(
     
     console.error(`[RELEASE] USDC Transfer - Source: ${sourceTokenAccount.toString()}, Dest: ${destTokenAccount.toString()}, Amount: ${amount}`);
     
-    // CRITICAL: Verify source account exists and is a VALID TOKEN ACCOUNT (not just any account)
-    // Use getAccount from @solana/spl-token to verify it's actually a token account
+    // CRITICAL: Verify source account exists FIRST - if it doesn't, we can't transfer
     const { getAccount } = await import('@solana/spl-token');
+    let sourceAccountData;
     try {
-      const sourceTokenAccountData = await getAccount(connection, sourceTokenAccount);
-      console.error(`[RELEASE] Source token account VERIFIED:`, {
+      sourceAccountData = await getAccount(connection, sourceTokenAccount);
+      console.error(`[RELEASE] Source token account EXISTS:`, {
         address: sourceTokenAccount.toString(),
-        owner: sourceTokenAccountData.owner.toString(),
-        mint: sourceTokenAccountData.mint.toString(),
-        amount: sourceTokenAccountData.amount.toString(),
-        decimals: sourceTokenAccountData.mint.toString() === USDC_MINT.toString() ? 6 : 'unknown'
+        owner: sourceAccountData.owner.toString(),
+        mint: sourceAccountData.mint.toString(),
+        amount: sourceAccountData.amount.toString()
       });
-      
-      // Verify it's USDC
-      if (sourceTokenAccountData.mint.toString() !== USDC_MINT.toString()) {
-        throw new Error(`Source token account is not USDC! Mint: ${sourceTokenAccountData.mint.toString()}, Expected: ${USDC_MINT.toString()}`);
-      }
-      
-      // Verify the owner is the platform wallet
-      if (sourceTokenAccountData.owner.toString() !== escrowAccount.toString()) {
-        throw new Error(`Source token account owner mismatch! Owner: ${sourceTokenAccountData.owner.toString()}, Expected: ${escrowAccount.toString()}`);
-      }
-      
-      // Check balance
-      const balanceUSDC = Number(sourceTokenAccountData.amount) / Math.pow(10, 6);
-      console.error(`[RELEASE] Source account balance: ${balanceUSDC} USDC, Required: ${amount} USDC`);
-      if (balanceUSDC < amount) {
-        throw new Error(`Insufficient USDC balance. Available: ${balanceUSDC} USDC, Required: ${amount} USDC`);
-      }
     } catch (error: any) {
-      console.error(`[RELEASE ERROR] Source token account verification failed:`, error);
-      if (error.message?.includes('Invalid param') || error.message?.includes('not found')) {
-        throw new Error(`Platform wallet USDC token account does not exist: ${sourceTokenAccount.toString()}. The x402 payment may not have been received.`);
-      }
-      throw error;
+      console.error(`[RELEASE ERROR] Source token account does NOT exist!`, {
+        address: sourceTokenAccount.toString(),
+        error: error.message
+      });
+      throw new Error(`Platform wallet USDC token account does not exist: ${sourceTokenAccount.toString()}. The x402 payment may not have been received. Please verify the payment was successful.`);
     }
     
-    // Check if destination exists using getAccount (more reliable than getAccountInfo)
+    // Verify it's USDC and owned by platform wallet
+    if (sourceAccountData.mint.toString() !== USDC_MINT.toString()) {
+      throw new Error(`Source token account is not USDC! Mint: ${sourceAccountData.mint.toString()}, Expected: ${USDC_MINT.toString()}`);
+    }
+    
+    if (sourceAccountData.owner.toString() !== escrowAccount.toString()) {
+      throw new Error(`Source token account owner mismatch! Owner: ${sourceAccountData.owner.toString()}, Expected: ${escrowAccount.toString()}`);
+    }
+    
+    // Check balance
+    const balanceUSDC = Number(sourceAccountData.amount) / Math.pow(10, 6);
+    console.error(`[RELEASE] Source account balance: ${balanceUSDC} USDC, Required: ${amount} USDC`);
+    if (balanceUSDC < amount) {
+      throw new Error(`Insufficient USDC balance. Available: ${balanceUSDC} USDC, Required: ${amount} USDC`);
+    }
+    
+    // Check if destination exists (same pattern as x402)
     let destAccountExists = false;
     try {
-      const destAccountData = await getAccount(connection, destTokenAccount);
+      await getAccount(connection, destTokenAccount);
       destAccountExists = true;
-      console.error(`[RELEASE] Destination account EXISTS and is valid:`, {
-        address: destTokenAccount.toString(),
-        owner: destAccountData.owner.toString(),
-        mint: destAccountData.mint.toString()
-      });
-    } catch (error: any) {
-      // Account doesn't exist or isn't valid - we'll create it
+      console.error(`[RELEASE] Destination account EXISTS`);
+    } catch {
       destAccountExists = false;
-      console.error(`[RELEASE] Destination account does NOT exist (or invalid), will create it:`, error.message);
+      console.error(`[RELEASE] Destination account does NOT exist, will create it`);
     }
     
     // Create destination account if needed (BEFORE transfer instruction)
-    // This becomes Instruction 0 if the account doesn't exist
     if (!destAccountExists) {
-      console.error(`[RELEASE] Adding create account instruction (will be Instruction 0)`);
       transaction.add(
         createAssociatedTokenAccountInstruction(
           escrowAccount, // Platform wallet pays
@@ -184,76 +175,27 @@ export async function releasePaymentFromPlatform(
     }
     
     // Transfer using EXACT same pattern as x402 payment
-    // This becomes Instruction 0 if dest account exists, or Instruction 1 if we created it
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
     
-    console.error(`[RELEASE] Adding transfer instruction (will be Instruction ${transaction.instructions.length}):`, {
+    console.error(`[RELEASE] Creating transfer instruction:`, {
       from: sourceTokenAccount.toString(),
       to: destTokenAccount.toString(),
       authority: escrowAccount.toString(),
-      amount: transferAmount.toString(),
-      amountUSDC: amount,
-      tokenMint: tokenMint.toString(),
-      decimals: decimals
+      amount: transferAmount.toString()
     });
     
-    // CRITICAL: Verify addresses one more time right before creating instruction
-    console.error(`[RELEASE] VERIFYING addresses before createTransferInstruction:`, {
-      sourceTokenAccount: sourceTokenAccount.toString(),
-      destTokenAccount: destTokenAccount.toString(),
-      authority: escrowAccount.toString(),
-      platformWallet: escrowAccount.toString(),
-      expectedPlatform: 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U',
-      matches: escrowAccount.toString() === 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U'
-    });
-    
-    const transferIx = createTransferInstruction(
-      sourceTokenAccount, // From: platform wallet USDC account
-      destTokenAccount,    // To: freelancer USDC account
-      escrowAccount,       // Authority: platform wallet (owner of source)
-      transferAmount,      // Amount in micro-USDC (BigInt)
-      [],
-      TOKEN_PROGRAM_ID
+    transaction.add(
+      createTransferInstruction(
+        sourceTokenAccount,
+        destTokenAccount,
+        escrowAccount, // Authority must be owner of source account
+        transferAmount,
+        [],
+        TOKEN_PROGRAM_ID
+      )
     );
     
-    console.error(`[RELEASE] Transfer instruction created:`, {
-      programId: transferIx.programId.toString(),
-      keys: transferIx.keys.map((k, i) => ({
-        index: i,
-        pubkey: k.pubkey.toString(),
-        isSigner: k.isSigner,
-        isWritable: k.isWritable
-      }))
-    });
-    
-    transaction.add(transferIx);
-    
     console.error(`[RELEASE] Transaction built with ${transaction.instructions.length} instruction(s)`);
-    
-    // CRITICAL: Double-check the source account one more time right before building
-    // Sometimes account state can change or we might have the wrong account
-    try {
-      const finalCheck = await getAccount(connection, sourceTokenAccount);
-      console.error(`[RELEASE] FINAL CHECK - Source account before transfer:`, {
-        address: sourceTokenAccount.toString(),
-        owner: finalCheck.owner.toString(),
-        mint: finalCheck.mint.toString(),
-        amount: finalCheck.amount.toString(),
-        expectedAuthority: escrowAccount.toString(),
-        ownerMatchesAuthority: finalCheck.owner.toString() === escrowAccount.toString()
-      });
-      
-      if (finalCheck.owner.toString() !== escrowAccount.toString()) {
-        throw new Error(`CRITICAL: Source token account owner (${finalCheck.owner.toString()}) does NOT match authority (${escrowAccount.toString()})!`);
-      }
-      
-      if (finalCheck.mint.toString() !== USDC_MINT.toString()) {
-        throw new Error(`CRITICAL: Source token account mint (${finalCheck.mint.toString()}) is NOT USDC (${USDC_MINT.toString()})!`);
-      }
-    } catch (error: any) {
-      console.error(`[RELEASE ERROR] Final source account check failed:`, error);
-      throw new Error(`Source token account verification failed before transfer: ${error.message}`);
-    }
   }
   
   // Sign with platform keypair
