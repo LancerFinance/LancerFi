@@ -117,27 +117,40 @@ export async function releasePaymentFromPlatform(
     const escrowTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
     const freelancerTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
     
+    console.error(`[RELEASE] Token accounts:`);
+    console.error(`[RELEASE]   Source (platform): ${escrowTokenAccount.toString()}`);
+    console.error(`[RELEASE]   Destination (freelancer): ${freelancerTokenAccount.toString()}`);
+    console.error(`[RELEASE]   Authority (platform wallet): ${escrowAccount.toString()}`);
+    
     const { getAccount, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // CRITICAL: Verify source account exists BEFORE creating transaction
-    // If it doesn't exist, the x402 payment didn't create it properly
+    // CRITICAL: Verify SOURCE account (platform wallet's USDC token account)
+    console.error(`[RELEASE] Verifying SOURCE account (platform wallet USDC)...`);
+    let sourceAccount;
     try {
-      const sourceAccount = await getAccount(connection, escrowTokenAccount);
+      sourceAccount = await getAccount(connection, escrowTokenAccount);
+      console.error(`[RELEASE] ✓ Source account EXISTS`);
+      console.error(`[RELEASE]   Owner: ${sourceAccount.owner.toString()}`);
+      console.error(`[RELEASE]   Mint: ${sourceAccount.mint.toString()}`);
+      console.error(`[RELEASE]   Amount: ${sourceAccount.amount.toString()}`);
       const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
+      console.error(`[RELEASE]   Balance: ${balanceUSDC} USDC`);
       if (balanceUSDC < amount) {
         throw new Error(`Insufficient USDC in platform wallet: ${balanceUSDC} available, ${amount} required`);
       }
     } catch (error: any) {
+      console.error(`[RELEASE] ✗ Source account ERROR:`, error.message);
       if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found') || error.message?.includes('Invalid param')) {
         throw new Error(`Platform wallet USDC token account does not exist: ${escrowTokenAccount.toString()}. The x402 payment may not have been received. Please verify the payment transaction was successful.`);
       }
       throw error;
     }
     
-    // Create freelancer token account if it doesn't exist
-    try {
-      await connection.getAccountInfo(freelancerTokenAccount);
-    } catch {
+    // Verify DESTINATION account (freelancer's USDC token account)
+    console.error(`[RELEASE] Verifying DESTINATION account (freelancer USDC)...`);
+    const destAccountInfo = await connection.getAccountInfo(freelancerTokenAccount);
+    if (!destAccountInfo) {
+      console.error(`[RELEASE] ✗ Destination account does NOT exist - will create it`);
       transaction.add(
         createAssociatedTokenAccountInstruction(
           escrowAccount,
@@ -146,19 +159,46 @@ export async function releasePaymentFromPlatform(
           tokenMint
         )
       );
+    } else {
+      console.error(`[RELEASE] ✓ Destination account EXISTS`);
+      console.error(`[RELEASE]   Owner: ${destAccountInfo.owner.toString()}`);
+      // Verify it's a token account
+      if (destAccountInfo.owner.toString() !== TOKEN_PROGRAM_ID.toString()) {
+        throw new Error(`Destination account ${freelancerTokenAccount.toString()} is not a token account! Owner: ${destAccountInfo.owner.toString()}`);
+      }
     }
     
-    // Transfer tokens from escrow to freelancer
+    // Verify AUTHORITY (platform wallet)
+    console.error(`[RELEASE] Verifying AUTHORITY (platform wallet)...`);
+    const authorityInfo = await connection.getAccountInfo(escrowAccount);
+    if (!authorityInfo) {
+      throw new Error(`Authority account (platform wallet) ${escrowAccount.toString()} does not exist!`);
+    }
+    console.error(`[RELEASE] ✓ Authority account EXISTS`);
+    console.error(`[RELEASE]   Owner: ${authorityInfo.owner.toString()}`);
+    
+    // Verify source account owner matches authority
+    if (sourceAccount.owner.toString() !== TOKEN_PROGRAM_ID.toString()) {
+      throw new Error(`Source account ${escrowTokenAccount.toString()} is not a token account! Owner: ${sourceAccount.owner.toString()}`);
+    }
+    
+    // All accounts verified - create transfer instruction
+    console.error(`[RELEASE] All accounts verified. Creating transfer instruction...`);
+    const transferAmount = Math.round(amount * Math.pow(10, decimals));
+    console.error(`[RELEASE] Transfer amount: ${transferAmount} micro-USDC (${amount} USDC)`);
+    
     transaction.add(
       createTransferInstruction(
         escrowTokenAccount,
         freelancerTokenAccount,
         escrowAccount,
-        Math.round(amount * Math.pow(10, decimals)),
+        transferAmount,
         [],
         TOKEN_PROGRAM_ID
       )
     );
+    
+    console.error(`[RELEASE] Transfer instruction added successfully`);
   }
   
   // Sign with platform keypair
