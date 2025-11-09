@@ -159,16 +159,17 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer - authority must be the keypair's publicKey, and keypair must be in signers
+    // Transfer - use EXACT same pattern as x402 (which works)
+    // Authority is publicKey, signers is empty array, transaction is signed separately
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
     
     transaction.add(
       createTransferInstruction(
         sourceTokenAccount,
         destTokenAccount,
-        platformKeypair.publicKey, // Authority: must be the keypair's publicKey
+        platformKeypair.publicKey, // Authority: publicKey (same as x402 uses clientWallet)
         transferAmount,
-        [platformKeypair], // Signers: must include the keypair
+        [], // Signers: empty (same as x402) - transaction will be signed with transaction.sign()
         TOKEN_PROGRAM_ID
       )
     );
