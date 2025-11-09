@@ -125,49 +125,33 @@ export async function releasePaymentFromPlatform(
     console.error(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
     console.error(`[RELEASE] USDC Mint: ${tokenMint.toString()}`);
     
-    // CRITICAL: Check if source account exists, create it if it doesn't
-    // This is important because x402 payments might send USDC without explicitly creating the ATA first
-    const { getAccount, createAssociatedTokenAccountInstruction } = await import('@solana/spl-token');
+    // CRITICAL: Verify source account exists and is valid USDC token account
+    // Throw clear error immediately if account doesn't exist
+    const { getAccount } = await import('@solana/spl-token');
     let sourceAccount;
-    const sourceAccountInfo = await connection.getAccountInfo(escrowTokenAccount);
-    if (!sourceAccountInfo) {
-      // Source account doesn't exist - create it
-      // This shouldn't happen if x402 payment worked, but we handle it anyway
-      transaction.add(
-        createAssociatedTokenAccountInstruction(
-          escrowAccount, // Platform wallet as payer
-          escrowTokenAccount,
-          escrowAccount, // Owner
-          tokenMint
-        )
-      );
-      throw new Error(`Platform wallet USDC token account does not exist. The x402 payment may not have been received. Account: ${escrowTokenAccount.toString()}. Cannot create account in same transaction as transfer.`);
-    }
-    
-    // Verify source account is valid USDC token account
     try {
       sourceAccount = await getAccount(connection, escrowTokenAccount);
-      // Verify mint matches USDC
-      if (sourceAccount.mint.toString() !== tokenMint.toString()) {
-        throw new Error(`Source account mint mismatch! Expected USDC (${tokenMint.toString()}), got ${sourceAccount.mint.toString()}`);
-      }
-      // Verify account is not closed
-      if (sourceAccount.amount === BigInt(0) && sourceAccount.closeAuthority !== null) {
-        throw new Error(`Source account appears to be closed or invalid`);
-      }
-      const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
-      if (balanceUSDC < amount) {
-        throw new Error(`Insufficient USDC: ${balanceUSDC} available, ${amount} required`);
-      }
-      // CRITICAL: Verify the source account's owner matches the platform wallet (authority)
-      if (sourceAccount.owner.toString() !== escrowAccount.toString()) {
-        throw new Error(`Source account owner mismatch! Account owner: ${sourceAccount.owner.toString()}, Platform wallet: ${escrowAccount.toString()}. The platform wallet must own the source account to transfer from it.`);
-      }
     } catch (error: any) {
+      // Account doesn't exist - this is the most likely cause of "invalid account data" error
       if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
-        throw new Error(`Platform wallet USDC token account does not exist. The x402 payment may not have been received. Account: ${escrowTokenAccount.toString()}`);
+        throw new Error(`CRITICAL: Platform wallet USDC token account does not exist at ${escrowTokenAccount.toString()}. The x402 payment may not have been received or the account was not created. Please verify the x402 payment transaction was successful.`);
       }
       throw error;
+    }
+    
+    // Verify account is valid USDC token account
+    if (sourceAccount.mint.toString() !== tokenMint.toString()) {
+      throw new Error(`Source account mint mismatch! Expected USDC (${tokenMint.toString()}), got ${sourceAccount.mint.toString()}`);
+    }
+    
+    const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
+    if (balanceUSDC < amount) {
+      throw new Error(`Insufficient USDC: ${balanceUSDC} available, ${amount} required`);
+    }
+    
+    // CRITICAL: Verify the source account's owner matches the platform wallet (authority)
+    if (sourceAccount.owner.toString() !== escrowAccount.toString()) {
+      throw new Error(`Source account owner mismatch! Account owner: ${sourceAccount.owner.toString()}, Platform wallet: ${escrowAccount.toString()}. The platform wallet must own the source account to transfer from it.`);
     }
     
     // Get freelancer's token account
