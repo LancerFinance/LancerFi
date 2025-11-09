@@ -192,21 +192,68 @@ export async function releasePaymentFromPlatform(
       to: destTokenAccount.toString(),
       authority: escrowAccount.toString(),
       amount: transferAmount.toString(),
-      amountUSDC: amount
+      amountUSDC: amount,
+      tokenMint: tokenMint.toString(),
+      decimals: decimals
     });
     
-    transaction.add(
-      createTransferInstruction(
-        sourceTokenAccount, // From: platform wallet USDC account
-        destTokenAccount,    // To: freelancer USDC account
-        escrowAccount,       // Authority: platform wallet (owner of source)
-        transferAmount,      // Amount in micro-USDC (BigInt)
-        [],
-        TOKEN_PROGRAM_ID
-      )
+    // CRITICAL: Verify addresses one more time right before creating instruction
+    console.log(`[RELEASE] VERIFYING addresses before createTransferInstruction:`, {
+      sourceTokenAccount: sourceTokenAccount.toString(),
+      destTokenAccount: destTokenAccount.toString(),
+      authority: escrowAccount.toString(),
+      platformWallet: escrowAccount.toString(),
+      expectedPlatform: 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U',
+      matches: escrowAccount.toString() === 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U'
+    });
+    
+    const transferIx = createTransferInstruction(
+      sourceTokenAccount, // From: platform wallet USDC account
+      destTokenAccount,    // To: freelancer USDC account
+      escrowAccount,       // Authority: platform wallet (owner of source)
+      transferAmount,      // Amount in micro-USDC (BigInt)
+      [],
+      TOKEN_PROGRAM_ID
     );
     
+    console.log(`[RELEASE] Transfer instruction created:`, {
+      programId: transferIx.programId.toString(),
+      keys: transferIx.keys.map((k, i) => ({
+        index: i,
+        pubkey: k.pubkey.toString(),
+        isSigner: k.isSigner,
+        isWritable: k.isWritable
+      }))
+    });
+    
+    transaction.add(transferIx);
+    
     console.log(`[RELEASE] Transaction built with ${transaction.instructions.length} instruction(s)`);
+    
+    // CRITICAL: Double-check the source account one more time right before building
+    // Sometimes account state can change or we might have the wrong account
+    try {
+      const finalCheck = await getAccount(connection, sourceTokenAccount);
+      console.log(`[RELEASE] FINAL CHECK - Source account before transfer:`, {
+        address: sourceTokenAccount.toString(),
+        owner: finalCheck.owner.toString(),
+        mint: finalCheck.mint.toString(),
+        amount: finalCheck.amount.toString(),
+        expectedAuthority: escrowAccount.toString(),
+        ownerMatchesAuthority: finalCheck.owner.toString() === escrowAccount.toString()
+      });
+      
+      if (finalCheck.owner.toString() !== escrowAccount.toString()) {
+        throw new Error(`CRITICAL: Source token account owner (${finalCheck.owner.toString()}) does NOT match authority (${escrowAccount.toString()})!`);
+      }
+      
+      if (finalCheck.mint.toString() !== USDC_MINT.toString()) {
+        throw new Error(`CRITICAL: Source token account mint (${finalCheck.mint.toString()}) is NOT USDC (${USDC_MINT.toString()})!`);
+      }
+    } catch (error: any) {
+      console.error(`[RELEASE ERROR] Final source account check failed:`, error);
+      throw new Error(`Source token account verification failed before transfer: ${error.message}`);
+    }
   }
   
   // Sign with platform keypair
