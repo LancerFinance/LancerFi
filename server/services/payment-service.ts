@@ -119,23 +119,28 @@ export async function releasePaymentFromPlatform(
     
     const { getAccount, createAssociatedTokenAccountInstruction: createATA } = await import('@solana/spl-token');
     
-    // CRITICAL: Ensure source account exists - if not, create it first
+    // CRITICAL: Verify source account exists and has balance BEFORE creating transaction
+    // If it doesn't exist, we can't transfer - throw error immediately
     let sourceAccountData;
     try {
       sourceAccountData = await getAccount(connection, sourceTokenAccount);
-    } catch {
-      // Source account doesn't exist - create it first
-      // This can happen if USDC was sent to the wallet but the ATA wasn't created
-      transaction.add(
-        createATA(
-          escrowAccount, // Payer
-          sourceTokenAccount,
-          escrowAccount, // Owner
-          tokenMint
-        )
-      );
-      // We'll verify it exists after creation
-      sourceAccountData = null;
+      // Verify it's USDC and owned by platform wallet
+      if (sourceAccountData.mint.toString() !== USDC_MINT.toString()) {
+        throw new Error(`Source token account is not USDC! Mint: ${sourceAccountData.mint.toString()}`);
+      }
+      if (sourceAccountData.owner.toString() !== escrowAccount.toString()) {
+        throw new Error(`Source token account owner mismatch! Owner: ${sourceAccountData.owner.toString()}`);
+      }
+      // Check balance
+      const balanceUSDC = Number(sourceAccountData.amount) / Math.pow(10, 6);
+      if (balanceUSDC < amount) {
+        throw new Error(`Insufficient USDC balance. Available: ${balanceUSDC} USDC, Required: ${amount} USDC`);
+      }
+    } catch (error: any) {
+      if (error.message?.includes('Invalid param') || error.message?.includes('not found') || error.message?.includes('TokenAccountNotFoundError')) {
+        throw new Error(`Platform wallet USDC token account does not exist: ${sourceTokenAccount.toString()}. The x402 payment may not have been received. Please verify the payment was successful.`);
+      }
+      throw error;
     }
     
     // Check if destination exists
