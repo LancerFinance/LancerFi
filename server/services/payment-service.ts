@@ -111,6 +111,7 @@ export async function releasePaymentFromPlatform(
     );
   } else {
     // USDC token transfer
+    console.error(`[RELEASE] Starting USDC transfer section`);
     const tokenMint = USDC_MINT;
     const decimals = 6;
     
@@ -125,10 +126,13 @@ export async function releasePaymentFromPlatform(
     console.error(`[RELEASE] USDC Mint: ${tokenMint.toString()}`);
     
     // CRITICAL: Verify source account exists and is valid USDC token account
+    console.error(`[RELEASE] About to call getAccount for source account`);
     const { getAccount } = await import('@solana/spl-token');
     let sourceAccount;
     try {
+      console.error(`[RELEASE] Calling getAccount(${escrowTokenAccount.toString()})`);
       sourceAccount = await getAccount(connection, escrowTokenAccount);
+      console.error(`[RELEASE] getAccount succeeded`);
       // Verify mint matches USDC
       if (sourceAccount.mint.toString() !== tokenMint.toString()) {
         throw new Error(`Source account mint mismatch! Expected USDC (${tokenMint.toString()}), got ${sourceAccount.mint.toString()}`);
@@ -252,6 +256,10 @@ export async function releasePaymentFromPlatform(
   
   let signature: string;
   try {
+    console.error(`[RELEASE] ===== ABOUT TO CALL sendRawTransaction =====`);
+    console.error(`[RELEASE] Transaction has ${transaction.instructions.length} instruction(s)`);
+    console.error(`[RELEASE] Transaction fee payer: ${transaction.feePayer?.toString()}`);
+    console.error(`[RELEASE] Transaction recentBlockhash: ${transaction.recentBlockhash}`);
     signature = await connection.sendRawTransaction(
       transaction.serialize(),
       { skipPreflight: false, maxRetries: 3 } // Let it simulate to get better errors
