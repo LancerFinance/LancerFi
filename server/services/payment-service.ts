@@ -141,7 +141,7 @@ export async function releasePaymentFromPlatform(
       if (balanceUSDC < amount) {
         throw new Error(`Insufficient USDC: ${balanceUSDC} available, ${amount} required`);
       }
-      // Log account details for debugging
+      // Log account details for debugging - CRITICAL for debugging
       console.error(`[RELEASE] Source account verified:`, {
         address: escrowTokenAccount.toString(),
         mint: sourceAccount.mint.toString(),
@@ -150,6 +150,14 @@ export async function releasePaymentFromPlatform(
         balanceUSDC: balanceUSDC,
         closeAuthority: sourceAccount.closeAuthority?.toString() || 'null'
       });
+      
+      // CRITICAL: Verify the account address matches what we calculated
+      // Double-check the ATA calculation
+      const verifyATA = await getAssociatedTokenAddress(tokenMint, escrowAccount);
+      if (verifyATA.toString() !== escrowTokenAccount.toString()) {
+        throw new Error(`ATA calculation mismatch! Calculated: ${escrowTokenAccount.toString()}, Verified: ${verifyATA.toString()}`);
+      }
+      console.error(`[RELEASE] ATA address verified: ${escrowTokenAccount.toString()}`);
     } catch (error: any) {
       if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
         throw new Error(`Platform wallet USDC token account does not exist. The x402 payment may not have been received. Account: ${escrowTokenAccount.toString()}`);
