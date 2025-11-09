@@ -153,24 +153,26 @@ export async function releasePaymentFromPlatform(
       throw error;
     }
     
-    // Check if destination exists (same pattern as x402)
+    // Check if destination exists using getAccount (more reliable than getAccountInfo)
     let destAccountExists = false;
     try {
-      const accountInfo = await connection.getAccountInfo(destTokenAccount);
-      destAccountExists = accountInfo !== null;
-      if (destAccountExists) {
-        console.log(`[RELEASE] Destination account EXISTS: ${destTokenAccount.toString()}`);
-      } else {
-        console.log(`[RELEASE] Destination account does NOT exist, will create it`);
-      }
+      const destAccountData = await getAccount(connection, destTokenAccount);
+      destAccountExists = true;
+      console.log(`[RELEASE] Destination account EXISTS and is valid:`, {
+        address: destTokenAccount.toString(),
+        owner: destAccountData.owner.toString(),
+        mint: destAccountData.mint.toString()
+      });
     } catch (error: any) {
-      console.log(`[RELEASE] Destination account check error (will create):`, error.message);
+      // Account doesn't exist or isn't valid - we'll create it
       destAccountExists = false;
+      console.log(`[RELEASE] Destination account does NOT exist (or invalid), will create it:`, error.message);
     }
     
     // Create destination account if needed (BEFORE transfer instruction)
+    // This becomes Instruction 0 if the account doesn't exist
     if (!destAccountExists) {
-      console.log(`[RELEASE] Adding create account instruction`);
+      console.log(`[RELEASE] Adding create account instruction (will be Instruction 0)`);
       transaction.add(
         createAssociatedTokenAccountInstruction(
           escrowAccount, // Platform wallet pays
@@ -182,9 +184,16 @@ export async function releasePaymentFromPlatform(
     }
     
     // Transfer using EXACT same pattern as x402 payment
+    // This becomes Instruction 0 if dest account exists, or Instruction 1 if we created it
     const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
     
-    console.log(`[RELEASE] Adding transfer instruction - From: ${sourceTokenAccount.toString()}, To: ${destTokenAccount.toString()}, Authority: ${escrowAccount.toString()}, Amount: ${transferAmount.toString()}`);
+    console.log(`[RELEASE] Adding transfer instruction (will be Instruction ${transaction.instructions.length}):`, {
+      from: sourceTokenAccount.toString(),
+      to: destTokenAccount.toString(),
+      authority: escrowAccount.toString(),
+      amount: transferAmount.toString(),
+      amountUSDC: amount
+    });
     
     transaction.add(
       createTransferInstruction(
