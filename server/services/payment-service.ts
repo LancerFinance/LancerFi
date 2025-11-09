@@ -141,34 +141,29 @@ export async function releasePaymentFromPlatform(
       if (balanceUSDC < amount) {
         throw new Error(`Insufficient USDC: ${balanceUSDC} available, ${amount} required`);
       }
+      // CRITICAL: Verify the source account's owner matches the platform wallet (authority)
+      if (sourceAccount.owner.toString() !== escrowAccount.toString()) {
+        throw new Error(`Source account owner mismatch! Account owner: ${sourceAccount.owner.toString()}, Platform wallet: ${escrowAccount.toString()}. The platform wallet must own the source account to transfer from it.`);
+      }
+      
       // Log account details for debugging - CRITICAL for debugging
       console.error(`[RELEASE] Source account verified:`, {
         address: escrowTokenAccount.toString(),
         mint: sourceAccount.mint.toString(),
         owner: sourceAccount.owner.toString(),
+        platformWallet: escrowAccount.toString(),
+        ownerMatches: sourceAccount.owner.toString() === escrowAccount.toString(),
         amount: sourceAccount.amount.toString(),
         balanceUSDC: balanceUSDC,
         closeAuthority: sourceAccount.closeAuthority?.toString() || 'null'
       });
-      
-      // CRITICAL: Verify the account address matches what we calculated
-      // Double-check the ATA calculation
-      const verifyATA = await getAssociatedTokenAddress(tokenMint, escrowAccount);
-      if (verifyATA.toString() !== escrowTokenAccount.toString()) {
-        throw new Error(`ATA calculation mismatch! Calculated: ${escrowTokenAccount.toString()}, Verified: ${verifyATA.toString()}`);
-      }
-      console.error(`[RELEASE] ATA address verified: ${escrowTokenAccount.toString()}`);
-      
-      // CRITICAL: Verify the account actually exists on-chain by querying it directly
-      const onChainAccount = await connection.getAccountInfo(escrowTokenAccount);
-      if (!onChainAccount) {
-        throw new Error(`Source account does not exist on-chain: ${escrowTokenAccount.toString()}`);
-      }
-      if (onChainAccount.owner.toString() !== TOKEN_PROGRAM_ID.toString()) {
-        throw new Error(`Source account is not owned by Token Program! Owner: ${onChainAccount.owner.toString()}`);
-      }
-      console.error(`[RELEASE] On-chain account verified: owner=${onChainAccount.owner.toString()}, data length=${onChainAccount.data.length}`);
     } catch (error: any) {
+      console.error(`[RELEASE ERROR] Source account verification failed:`, {
+        errorName: error.name,
+        errorMessage: error.message,
+        escrowTokenAccount: escrowTokenAccount.toString(),
+        escrowAccount: escrowAccount.toString()
+      });
       if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
         throw new Error(`Platform wallet USDC token account does not exist. The x402 payment may not have been received. Account: ${escrowTokenAccount.toString()}`);
       }
