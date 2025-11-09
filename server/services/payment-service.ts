@@ -113,19 +113,34 @@ export async function releasePaymentFromPlatform(
     const tokenMint = USDC_MINT;
     const decimals = 6;
     
-    // Get token accounts - EXACT copy of working releaseEscrowPayment
+    // Get token accounts
     const escrowTokenAccount = await getAssociatedTokenAddress(tokenMint, escrowAccount);
     const freelancerTokenAccount = await getAssociatedTokenAddress(tokenMint, freelancerWallet);
     
     const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // Create freelancer token account if it doesn't exist - EXACT copy
+    // CRITICAL: Create source (escrow) token account if it doesn't exist
+    // x402 payments may have sent USDC but not created the ATA
+    try {
+      await connection.getAccountInfo(escrowTokenAccount);
+    } catch {
+      transaction.add(
+        createAssociatedTokenAccountInstruction(
+          escrowAccount,
+          escrowTokenAccount,
+          escrowAccount,
+          tokenMint
+        )
+      );
+    }
+    
+    // Create freelancer token account if it doesn't exist
     try {
       await connection.getAccountInfo(freelancerTokenAccount);
     } catch {
       transaction.add(
         createAssociatedTokenAccountInstruction(
-          escrowAccount, // Use platform wallet (escrow account) as payer
+          escrowAccount,
           freelancerTokenAccount,
           freelancerWallet,
           tokenMint
@@ -133,12 +148,12 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer tokens from escrow to freelancer - EXACT copy
+    // Transfer tokens from escrow to freelancer
     transaction.add(
       createTransferInstruction(
         escrowTokenAccount,
         freelancerTokenAccount,
-        escrowAccount, // Escrow account as authority
+        escrowAccount,
         Math.round(amount * Math.pow(10, decimals)),
         [],
         TOKEN_PROGRAM_ID
