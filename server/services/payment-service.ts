@@ -57,10 +57,13 @@ export async function releasePaymentFromPlatform(
   currency: PaymentCurrency = 'SOLANA'
 ): Promise<string> {
   // CRITICAL: Log at the VERY start to confirm function is called
+  // Using multiple log methods to ensure visibility
   console.error(`[RELEASE] ==========================================`);
   console.error(`[RELEASE] Function called: releasePaymentFromPlatform`);
   console.error(`[RELEASE] Currency: ${currency}, Amount: ${amount}, Freelancer: ${freelancerWallet.toString()}`);
   console.error(`[RELEASE] ==========================================`);
+  console.log(`[RELEASE LOG] Function called: releasePaymentFromPlatform`);
+  console.log(`[RELEASE LOG] Currency: ${currency}, Amount: ${amount}, Freelancer: ${freelancerWallet.toString()}`);
   
   // Security: Validate amount
   if (amount <= 0) {
@@ -366,6 +369,13 @@ export async function verifyX402Payment(
     }
 
     // Check if transaction has errors (double-check)
+    if (!transaction) {
+      return {
+        verified: false,
+        error: 'Transaction is null'
+      };
+    }
+    
     if (transaction.meta?.err) {
       return {
         verified: false,
