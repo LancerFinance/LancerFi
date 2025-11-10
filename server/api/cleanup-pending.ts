@@ -4,7 +4,9 @@
  * This endpoint is called by Vercel cron jobs
  */
 
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+// Vercel types - using any to avoid build errors (types are provided at runtime)
+type VercelRequest = any;
+type VercelResponse = any;
 import { supabaseClient } from '../services/supabase.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

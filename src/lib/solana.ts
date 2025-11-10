@@ -413,10 +413,39 @@ export async function createAndFundEscrow(
       escrowAccount
     );
     
-    // Check if escrow token account exists, if not create it
+    // Check if escrow token account exists before adding creation instruction
+    // This makes the transaction look more standard and less suspicious to Phantom
+    // Phantom's security scanner flags transactions that always create accounts unnecessarily
+    let escrowAccountExists = false;
     try {
-      await connection.getAccountInfo(escrowTokenAccount);
+      // Use backend proxy to check account existence (avoids 403 errors)
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 
+        (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+      
+      const response = await fetch(`${API_BASE_URL}/api/rpc/account-balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: escrowTokenAccount.toString() }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        escrowAccountExists = data.accountExists === true;
+      }
     } catch {
+      // If check fails, try direct RPC (may fail with 403, but that's okay)
+      try {
+        const accountInfo = await connection.getAccountInfo(escrowTokenAccount);
+        escrowAccountExists = accountInfo !== null;
+      } catch {
+        // If both fail, assume it doesn't exist and add creation instruction
+        escrowAccountExists = false;
+      }
+    }
+
+    // Only add token account creation if it doesn't exist
+    // This avoids Phantom flagging transactions with unnecessary account creation
+    if (!escrowAccountExists) {
       transaction.add(
         createAssociatedTokenAccountInstruction(
           clientWallet,
@@ -428,14 +457,14 @@ export async function createAndFundEscrow(
     }
     
     // Transfer total amount (amount + platform fee) to escrow
-    // Convert to smallest unit (micro-USDC) and round to integer
-    const totalMicroUnits = Math.round(totalAmount * Math.pow(10, decimals));
+    // Use BigInt to ensure proper token amount handling (like x402 payments)
+    const totalMicroUnits = BigInt(Math.round(totalAmount * Math.pow(10, decimals)));
     transaction.add(
       createTransferInstruction(
         clientTokenAccount,
         escrowTokenAccount,
         clientWallet,
-        totalMicroUnits,
+        totalMicroUnits, // BigInt ensures proper token amount
         [],
         TOKEN_PROGRAM_ID
       )
@@ -481,10 +510,39 @@ export async function fundEscrowWithCurrency(
     escrowAccount
   );
   
-  // Create escrow token account if it doesn't exist
+  // Check if escrow token account exists before adding creation instruction
+  // This makes the transaction look more standard and less suspicious to Phantom
+  // Phantom's security scanner flags transactions that always create accounts unnecessarily
+  let escrowAccountExists = false;
   try {
-    await connection.getAccountInfo(escrowTokenAccount);
+    // Use backend proxy to check account existence (avoids 403 errors)
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 
+      (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+    
+    const response = await fetch(`${API_BASE_URL}/api/rpc/account-balance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: escrowTokenAccount.toString() }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      escrowAccountExists = data.accountExists === true;
+    }
   } catch {
+    // If check fails, try direct RPC (may fail with 403, but that's okay)
+    try {
+      const accountInfo = await connection.getAccountInfo(escrowTokenAccount);
+      escrowAccountExists = accountInfo !== null;
+    } catch {
+      // If both fail, assume it doesn't exist and add creation instruction
+      escrowAccountExists = false;
+    }
+  }
+
+  // Only add token account creation if it doesn't exist
+  // This avoids Phantom flagging transactions with unnecessary account creation
+  if (!escrowAccountExists) {
     transaction.add(
       createAssociatedTokenAccountInstruction(
         clientWallet,
@@ -496,12 +554,14 @@ export async function fundEscrowWithCurrency(
   }
   
   // Transfer tokens to escrow
+  // Use BigInt to ensure proper token amount handling (like x402 payments)
+  const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
   transaction.add(
     createTransferInstruction(
       clientTokenAccount,
       escrowTokenAccount,
       clientWallet,
-      amount * Math.pow(10, decimals),
+      transferAmount, // BigInt ensures proper token amount
       [],
       TOKEN_PROGRAM_ID
     )

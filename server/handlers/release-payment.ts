@@ -93,55 +93,34 @@ export async function releasePaymentHandler(
     // For x402 payments, payment_currency is 'USDC' but we need to use 'USDC' for the release
     let paymentCurrency = escrow.payment_currency || 'SOLANA';
     
-    console.log(`[RELEASE HANDLER] Escrow payment_currency: ${paymentCurrency}, amount_usdc: ${escrow.amount_usdc}`);
-    
     // x402 payments use USDC, so if payment_currency is 'X402' or 'USDC', use 'USDC'
     if (paymentCurrency === 'X402' || paymentCurrency === 'USDC') {
       paymentCurrency = 'USDC';
-      console.log(`[RELEASE HANDLER] Converted to USDC for release`);
     }
     
     const amountToSend = escrow.amount_usdc;
     
-    console.log(`[RELEASE HANDLER] Calling releasePaymentFromPlatform with:`, {
-      freelancerWallet,
-      amount: amountToSend,
-      currency: paymentCurrency
-    });
-    console.error(`[RELEASE HANDLER] About to call releasePaymentFromPlatform - this should appear`);
-    console.log(`[RELEASE HANDLER] About to call releasePaymentFromPlatform - this should also appear`);
-    console.error(`[RELEASE HANDLER] paymentCurrency value: ${paymentCurrency}, checking condition...`);
-
     // CRITICAL: Check if source account exists BEFORE calling releasePaymentFromPlatform
     // The "invalid account data" error means the source account doesn't exist or is invalid
-    console.error(`[RELEASE HANDLER] About to check if paymentCurrency is USDC or X402: ${paymentCurrency === 'USDC' || paymentCurrency === 'X402'}`);
     if (paymentCurrency === 'USDC' || paymentCurrency === 'X402') {
-      console.error(`[RELEASE HANDLER] Condition met! Starting handler check...`);
       try {
         const platformWallet = getPlatformWalletAddress();
         const platformWalletPubkey = new PublicKey(platformWallet);
         const sourceTokenAccount = await getAssociatedTokenAddress(USDC_MINT, platformWalletPubkey);
         
-        console.error(`[HANDLER CHECK] Platform wallet: ${platformWallet}`);
-        console.error(`[HANDLER CHECK] Source token account: ${sourceTokenAccount.toString()}`);
-        
         // Check if account exists - if not, return error immediately
         const accountInfo = await connection.getAccountInfo(sourceTokenAccount);
-        console.error(`[HANDLER CHECK] Account exists: ${accountInfo !== null}`);
         
         if (!accountInfo) {
-          console.error(`[HANDLER CHECK] Account does not exist!`);
           return res.status(500).json({
-            error: `Platform wallet USDC token account does not exist at ${sourceTokenAccount.toString()}. The x402 payment was not received. Please verify the payment transaction was successful.`
+            error: 'Platform wallet USDC token account does not exist. The x402 payment may not have been received.'
           });
         }
         
         // Verify it's a token account
-        console.error(`[HANDLER CHECK] Account owner: ${accountInfo.owner.toString()}, Expected: ${TOKEN_PROGRAM_ID.toString()}`);
         if (accountInfo.owner.toString() !== TOKEN_PROGRAM_ID.toString()) {
-          console.error(`[HANDLER CHECK] Account is not a token account!`);
           return res.status(500).json({
-            error: `Platform wallet account at ${sourceTokenAccount.toString()} is not a valid token account. Owner: ${accountInfo.owner.toString()}`
+            error: 'Platform wallet account is not a valid token account'
           });
         }
         
@@ -150,31 +129,21 @@ export async function releasePaymentHandler(
         const sourceAccount = await getAccount(connection, sourceTokenAccount);
         const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
         
-        console.error(`[HANDLER CHECK] Account balance: ${balanceUSDC} USDC, Required: ${amountToSend}`);
-        console.error(`[HANDLER CHECK] Account mint: ${sourceAccount.mint.toString()}, Expected: ${USDC_MINT.toString()}`);
-        console.error(`[HANDLER CHECK] Account owner: ${sourceAccount.owner.toString()}, Expected: ${platformWallet}`);
-        
         if (balanceUSDC < amountToSend) {
-          console.error(`[HANDLER CHECK] Insufficient balance!`);
           return res.status(500).json({
-            error: `Insufficient USDC in platform wallet. Available: ${balanceUSDC}, Required: ${amountToSend}`
+            error: 'Insufficient USDC in platform wallet'
           });
         }
-        
-        console.error(`[HANDLER CHECK] All checks passed, proceeding to releasePaymentFromPlatform`);
       } catch (checkError: any) {
-        // If check fails, return error immediately - don't continue
-        console.error(`[HANDLER CHECK] Error during check: ${checkError.message}`);
-        console.error(`[HANDLER CHECK] Error stack: ${checkError.stack}`);
+        console.error('Payment release validation failed:', checkError.message);
         return res.status(500).json({
-          error: `Failed to verify platform wallet USDC account: ${checkError.message || 'Unknown error'}`
+          error: 'Failed to verify platform wallet USDC account'
         });
       }
     }
 
     // Release payment from platform wallet
     try {
-      console.error(`[RELEASE HANDLER] Inside try block, calling releasePaymentFromPlatform now`);
       const signature = await releasePaymentFromPlatform(
         new PublicKey(freelancerWallet),
         amountToSend,

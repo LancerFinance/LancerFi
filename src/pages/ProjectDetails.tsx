@@ -64,6 +64,23 @@ const ProjectDetails = () => {
   const [showKickOffDialog, setShowKickOffDialog] = useState(false);
   const { canProceed: canComplete } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'completing a project' });
   const { canProceed: canKickOff } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'kicking off a freelancer' });
+  
+  const copyToClipboard = async (text: string, fieldName: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: "Copied!",
+        description: `${fieldName} copied to clipboard`,
+      });
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy to clipboard",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     if (id) {
@@ -737,7 +754,11 @@ const ProjectDetails = () => {
                     {escrow.escrow_account && (
                       <div>
                         <div className="text-sm text-muted-foreground mb-1">Escrow Account</div>
-                        <div className="font-mono text-sm bg-muted p-2 rounded break-all">
+                        <div 
+                          onClick={() => copyToClipboard(escrow.escrow_account!, 'Escrow Account')}
+                          className="font-mono text-sm bg-muted p-2 rounded break-all cursor-pointer transition-all duration-200 select-all hover:bg-muted/80"
+                          title="Click to copy"
+                        >
                           {escrow.escrow_account}
                         </div>
                       </div>
@@ -745,7 +766,11 @@ const ProjectDetails = () => {
                     {escrow.transaction_signature && (
                       <div>
                         <div className="text-sm text-muted-foreground mb-1">Transaction Signature</div>
-                        <div className="font-mono text-xs bg-muted p-2 rounded break-all">
+                        <div 
+                          onClick={() => copyToClipboard(escrow.transaction_signature!, 'Transaction Signature')}
+                          className="font-mono text-xs bg-muted p-2 rounded break-all cursor-pointer transition-all duration-200 select-all hover:bg-muted/80"
+                          title="Click to copy"
+                        >
                           {escrow.transaction_signature}
                         </div>
                         <a 

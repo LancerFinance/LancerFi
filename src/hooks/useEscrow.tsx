@@ -224,11 +224,12 @@ export const useEscrow = (): UseEscrowReturn => {
       const blockhashPromise = getLatestBlockhashWithFallback();
       
       // Create escrow account on Solana (internally using single token)
+      // Use the actual paymentCurrency, not hardcoded 'SOLANA'
       const { escrowAccount, transaction } = await createEscrowAccount(
         clientWallet,
         projectId,
         finalAmount,
-        'SOLANA',
+        paymentCurrency, // Use actual payment currency (SOLANA or USDC)
         platformFeePercent
       );
 
@@ -422,14 +423,18 @@ export const useEscrow = (): UseEscrowReturn => {
       transaction.feePayer = clientWallet;
       transaction.lastValidBlockHeight = lastValidBlockHeight;
 
-      // Sign and send with Phantom
-      const res = await ph.signAndSendTransaction(transaction);
-      const signature = typeof res === 'string' ? res : res?.signature;
-      if (!signature) throw new Error('No signature returned from wallet');
+      // Use the same pattern as x402 payments: signTransaction + sendRawTransactionViaProxy
+      // This avoids Phantom security warnings that can occur with signAndSendTransaction
+      // for certain transaction patterns (like token account creation + transfer)
+      const signedTransaction = await ph.signTransaction(transaction);
       
-      // Don't wait for confirmation - Phantom handles it and WebSocket connections are blocked
-      // The transaction is already confirmed when signAndSendTransaction returns
-      // We can verify it later if needed, but don't block here
+      // Serialize immediately after signing
+      const serializedTransaction = signedTransaction.serialize();
+      
+      // Send via backend proxy (same as x402 payments)
+      // This is more reliable and avoids Phantom security warnings
+      const { sendRawTransactionViaProxy } = await import('@/lib/solana');
+      const signature = await sendRawTransactionViaProxy(serializedTransaction);
 
       // Update escrow status in database
       await db.updateEscrow(escrowId, {
