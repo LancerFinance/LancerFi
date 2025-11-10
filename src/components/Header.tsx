@@ -139,9 +139,29 @@ const Header = () => {
         </div>
 
         {/* Secondary Navigation Bar */}
-        <div className="hidden lg:flex items-center justify-between py-3 border-t border-border/50">
-          
+        <div className="hidden lg:flex items-center py-3 border-t border-border/50">
           <span className="text-sm text-muted-foreground">SOL, USDC, X402 payments • Near-zero fees</span>
+          <div className="flex items-center space-x-2 ml-40">
+            <a 
+              href="https://x.com/LancerFi" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary transition-colors"
+              aria-label="Follow us on X (Twitter)"
+            >
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </a>
+            <button 
+              className="text-xs sm:text-sm font-medium text-foreground bg-gradient-to-b from-muted to-muted/80 hover:from-muted/90 hover:to-muted/70 border-2 border-border rounded-full px-3 py-1.5 shadow-lg hover:shadow-xl active:shadow-inner active:translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              style={{
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)'
+              }}
+            >
+              CA: XXXXXXpump
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
