@@ -1,7 +1,8 @@
 import { Response } from 'express';
 import { PublicKey } from '@solana/web3.js';
-import { releasePaymentFromPlatform } from '../services/payment-service.js';
+import { releasePaymentFromPlatform, getPlatformWalletAddress, connection, USDC_MINT } from '../services/payment-service.js';
 import { supabaseClient } from '../services/supabase.js';
+import { getAssociatedTokenAddress } from '@solana/spl-token';
 
 interface AuthenticatedRequest {
   walletAddress?: string;
@@ -109,6 +110,29 @@ export async function releasePaymentHandler(
     });
     console.error(`[RELEASE HANDLER] About to call releasePaymentFromPlatform - this should appear`);
     console.log(`[RELEASE HANDLER] About to call releasePaymentFromPlatform - this should also appear`);
+
+    // CRITICAL: Check if source account exists BEFORE calling releasePaymentFromPlatform
+    // This will help us debug the "invalid account data" error
+    if (paymentCurrency === 'USDC' || paymentCurrency === 'X402') {
+      try {
+        const platformWallet = getPlatformWalletAddress();
+        const platformWalletPubkey = new PublicKey(platformWallet);
+        const sourceTokenAccount = await getAssociatedTokenAddress(USDC_MINT, platformWalletPubkey);
+        
+        console.error(`[RELEASE HANDLER] Checking source account: ${sourceTokenAccount.toString()}`);
+        const { getAccount } = await import('@solana/spl-token');
+        const sourceAccount = await getAccount(connection, sourceTokenAccount);
+        console.error(`[RELEASE HANDLER] Source account EXISTS! Balance: ${Number(sourceAccount.amount) / Math.pow(10, 6)} USDC`);
+      } catch (error: any) {
+        console.error(`[RELEASE HANDLER] Source account check FAILED: ${error.name} - ${error.message}`);
+        if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
+          return res.status(500).json({
+            error: `Platform wallet USDC token account does not exist. The x402 payment may not have been received. Please verify the x402 payment transaction was successful.`
+          });
+        }
+        // Continue anyway - let releasePaymentFromPlatform handle it
+      }
+    }
 
     // Release payment from platform wallet
     try {
