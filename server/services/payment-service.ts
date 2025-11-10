@@ -57,12 +57,10 @@ export async function releasePaymentFromPlatform(
   currency: PaymentCurrency = 'SOLANA'
 ): Promise<string> {
   // CRITICAL: Log at the VERY start to confirm function is called
-  console.log(`[RELEASE START] ==========================================`);
-  console.log(`[RELEASE START] Currency: ${currency}, Amount: ${amount}, Freelancer: ${freelancerWallet.toString()}`);
-  console.log(`[RELEASE START] ==========================================`);
-  console.error(`[RELEASE START ERROR] ==========================================`);
-  console.error(`[RELEASE START ERROR] Currency: ${currency}, Amount: ${amount}, Freelancer: ${freelancerWallet.toString()}`);
-  console.error(`[RELEASE START ERROR] ==========================================`);
+  console.error(`[RELEASE] ==========================================`);
+  console.error(`[RELEASE] Function called: releasePaymentFromPlatform`);
+  console.error(`[RELEASE] Currency: ${currency}, Amount: ${amount}, Freelancer: ${freelancerWallet.toString()}`);
+  console.error(`[RELEASE] ==========================================`);
   
   // Security: Validate amount
   if (amount <= 0) {
@@ -123,32 +121,8 @@ export async function releasePaymentFromPlatform(
       escrowAccount
     );
     
-    // CRITICAL: Verify source account exists BEFORE building transaction
-    // This is the most likely cause of "invalid account data" error
-    const { getAccount } = await import('@solana/spl-token');
-    let sourceAccount;
-    try {
-      sourceAccount = await getAccount(connection, escrowTokenAccount);
-    } catch (error: any) {
-      if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
-        throw new Error(`Platform wallet USDC token account does not exist at ${escrowTokenAccount.toString()}. The x402 payment may not have been received.`);
-      }
-      throw error;
-    }
-    
-    // Verify account is valid
-    if (sourceAccount.mint.toString() !== tokenMint.toString()) {
-      throw new Error(`Source account mint mismatch! Expected USDC, got ${sourceAccount.mint.toString()}`);
-    }
-    
-    const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
-    if (balanceUSDC < amount) {
-      throw new Error(`Insufficient USDC: ${balanceUSDC} available, ${amount} required`);
-    }
-    
-    if (sourceAccount.owner.toString() !== escrowAccount.toString()) {
-      throw new Error(`Source account owner mismatch! Owner: ${sourceAccount.owner.toString()}, Expected: ${escrowAccount.toString()}`);
-    }
+    console.error(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
+    console.error(`[RELEASE] Calculated source token account: ${escrowTokenAccount.toString()}`);
     
     // Get freelancer's token account
     const freelancerTokenAccount = await getAssociatedTokenAddress(
@@ -156,39 +130,94 @@ export async function releasePaymentFromPlatform(
       freelancerWallet
     );
     
-    const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
+    const { createAssociatedTokenAccountInstruction, createTransferInstruction, getAccount } = await import('@solana/spl-token');
     
-    // Create freelancer token account if it doesn't exist - EXACT match to working code
-    try {
-      await connection.getAccountInfo(freelancerTokenAccount);
-    } catch {
+    // CRITICAL: Verify source token account exists and has balance BEFORE attempting transfer
+    console.error(`[RELEASE] Verifying source token account exists: ${escrowTokenAccount.toString()}`);
+    const sourceAccountInfo = await connection.getAccountInfo(escrowTokenAccount);
+    if (!sourceAccountInfo) {
+      throw new Error(`Source token account does not exist at ${escrowTokenAccount.toString()}. The x402 payment may not have been received. Please verify the payment transaction was successful.`);
+    }
+    
+    // Verify it's a valid token account
+    if (sourceAccountInfo.owner.toString() !== TOKEN_PROGRAM_ID.toString()) {
+      throw new Error(`Source account at ${escrowTokenAccount.toString()} is not a valid token account. Owner: ${sourceAccountInfo.owner.toString()}`);
+    }
+    
+    // Get token account details to verify balance and ownership
+    const sourceTokenAccountData = await getAccount(connection, escrowTokenAccount);
+    const sourceBalanceUSDC = Number(sourceTokenAccountData.amount) / Math.pow(10, decimals);
+    console.error(`[RELEASE] Source token account balance: ${sourceBalanceUSDC} USDC, Required: ${amount} USDC`);
+    console.error(`[RELEASE] Source token account owner: ${sourceTokenAccountData.owner.toString()}, Expected: ${escrowAccount.toString()}`);
+    console.error(`[RELEASE] Source token account mint: ${sourceTokenAccountData.mint.toString()}, Expected: ${tokenMint.toString()}`);
+    
+    // Verify the token account is owned by the platform wallet
+    if (sourceTokenAccountData.owner.toString() !== escrowAccount.toString()) {
+      throw new Error(`Token account owner mismatch! Token account owner: ${sourceTokenAccountData.owner.toString()}, Platform wallet: ${escrowAccount.toString()}`);
+    }
+    
+    // Verify the token account is for the correct mint (USDC)
+    if (sourceTokenAccountData.mint.toString() !== tokenMint.toString()) {
+      throw new Error(`Token account mint mismatch! Token account mint: ${sourceTokenAccountData.mint.toString()}, Expected: ${tokenMint.toString()}`);
+    }
+    
+    if (sourceBalanceUSDC < amount) {
+      throw new Error(`Insufficient USDC in source token account. Available: ${sourceBalanceUSDC}, Required: ${amount}`);
+    }
+    
+    // Check if freelancer token account exists - use null check, not try-catch
+    const freelancerAccountInfo = await connection.getAccountInfo(freelancerTokenAccount);
+    if (!freelancerAccountInfo) {
+      // Freelancer token account doesn't exist - create it
+      console.error(`[RELEASE] Freelancer token account does not exist, creating: ${freelancerTokenAccount.toString()}`);
       transaction.add(
         createAssociatedTokenAccountInstruction(
-          escrowAccount,
+          escrowAccount, // Use platform wallet (escrow account) as payer
           freelancerTokenAccount,
           freelancerWallet,
           tokenMint
         )
       );
+    } else {
+      console.error(`[RELEASE] Freelancer token account exists: ${freelancerTokenAccount.toString()}`);
     }
     
     // Transfer tokens - EXACT match to working releaseEscrowPayment
+    const transferAmount = Math.round(amount * Math.pow(10, decimals));
+    console.error(`[RELEASE] Creating transfer instruction:`);
+    console.error(`[RELEASE]   Source: ${escrowTokenAccount.toString()}`);
+    console.error(`[RELEASE]   Destination: ${freelancerTokenAccount.toString()}`);
+    console.error(`[RELEASE]   Authority: ${escrowAccount.toString()}`);
+    console.error(`[RELEASE]   Amount: ${transferAmount} micro-USDC (${amount} USDC)`);
+    console.error(`[RELEASE]   Token Program: ${TOKEN_PROGRAM_ID.toString()}`);
+    
     transaction.add(
       createTransferInstruction(
         escrowTokenAccount,
         freelancerTokenAccount,
-        escrowAccount,
-        Math.round(amount * Math.pow(10, decimals)),
+        escrowAccount, // Escrow account as authority
+        transferAmount,
         [],
         TOKEN_PROGRAM_ID
       )
     );
+    
+    console.error(`[RELEASE] Transfer instruction added to transaction`);
   }
+  
+  // Verify transaction is valid before signing
+  if (transaction.instructions.length === 0) {
+    throw new Error('Transaction has no instructions - cannot send empty transaction');
+  }
+  
+  console.error(`[RELEASE] Transaction has ${transaction.instructions.length} instruction(s) before signing`);
+  console.error(`[RELEASE] Transaction fee payer: ${transaction.feePayer?.toString()}`);
+  console.error(`[RELEASE] Transaction recentBlockhash: ${transaction.recentBlockhash ? 'set' : 'NOT SET'}`);
   
   // Sign with platform keypair
   transaction.sign(platformKeypair);
   
-  console.error(`[RELEASE] Transaction signed, ${transaction.instructions.length} instruction(s)`);
+  console.error(`[RELEASE] Transaction signed successfully, ${transaction.instructions.length} instruction(s)`);
   for (let i = 0; i < transaction.instructions.length; i++) {
     const ix = transaction.instructions[i];
     console.error(`[RELEASE] Instruction ${i}: Program=${ix.programId.toString()}, Keys=${ix.keys.length}, Data=${ix.data.length} bytes`);
