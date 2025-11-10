@@ -136,36 +136,72 @@ export async function releasePaymentFromPlatform(
     const { createAssociatedTokenAccountInstruction, createTransferInstruction, getAccount } = await import('@solana/spl-token');
     
     // CRITICAL: Verify source token account exists and has balance BEFORE attempting transfer
-    console.error(`[RELEASE] Verifying source token account exists: ${escrowTokenAccount.toString()}`);
-    const sourceAccountInfo = await connection.getAccountInfo(escrowTokenAccount);
-    if (!sourceAccountInfo) {
-      throw new Error(`Source token account does not exist at ${escrowTokenAccount.toString()}. The x402 payment may not have been received. Please verify the payment transaction was successful.`);
-    }
+    console.error(`[RELEASE] ===== STARTING SOURCE TOKEN ACCOUNT VALIDATION =====`);
+    console.error(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
+    console.error(`[RELEASE] USDC Mint: ${tokenMint.toString()}`);
+    console.error(`[RELEASE] Calculating source token account (ATA) for platform wallet...`);
     
-    // Verify it's a valid token account
-    if (sourceAccountInfo.owner.toString() !== TOKEN_PROGRAM_ID.toString()) {
-      throw new Error(`Source account at ${escrowTokenAccount.toString()} is not a valid token account. Owner: ${sourceAccountInfo.owner.toString()}`);
-    }
-    
-    // Get token account details to verify balance and ownership
-    const sourceTokenAccountData = await getAccount(connection, escrowTokenAccount);
-    const sourceBalanceUSDC = Number(sourceTokenAccountData.amount) / Math.pow(10, decimals);
-    console.error(`[RELEASE] Source token account balance: ${sourceBalanceUSDC} USDC, Required: ${amount} USDC`);
-    console.error(`[RELEASE] Source token account owner: ${sourceTokenAccountData.owner.toString()}, Expected: ${escrowAccount.toString()}`);
-    console.error(`[RELEASE] Source token account mint: ${sourceTokenAccountData.mint.toString()}, Expected: ${tokenMint.toString()}`);
-    
-    // Verify the token account is owned by the platform wallet
-    if (sourceTokenAccountData.owner.toString() !== escrowAccount.toString()) {
-      throw new Error(`Token account owner mismatch! Token account owner: ${sourceTokenAccountData.owner.toString()}, Platform wallet: ${escrowAccount.toString()}`);
-    }
-    
-    // Verify the token account is for the correct mint (USDC)
-    if (sourceTokenAccountData.mint.toString() !== tokenMint.toString()) {
-      throw new Error(`Token account mint mismatch! Token account mint: ${sourceTokenAccountData.mint.toString()}, Expected: ${tokenMint.toString()}`);
-    }
-    
-    if (sourceBalanceUSDC < amount) {
-      throw new Error(`Insufficient USDC in source token account. Available: ${sourceBalanceUSDC}, Required: ${amount}`);
+    try {
+      console.error(`[RELEASE] Checking if source token account exists: ${escrowTokenAccount.toString()}`);
+      const sourceAccountInfo = await connection.getAccountInfo(escrowTokenAccount);
+      
+      if (!sourceAccountInfo) {
+        console.error(`[RELEASE] ❌ SOURCE TOKEN ACCOUNT DOES NOT EXIST!`);
+        console.error(`[RELEASE] Token account address: ${escrowTokenAccount.toString()}`);
+        console.error(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
+        console.error(`[RELEASE] This means the x402 payment was not received or the token account was never created.`);
+        throw new Error(`Source token account does not exist at ${escrowTokenAccount.toString()}. The x402 payment may not have been received. Please verify the payment transaction was successful. Platform wallet: ${escrowAccount.toString()}`);
+      }
+      
+      console.error(`[RELEASE] ✅ Source token account exists`);
+      console.error(`[RELEASE] Account owner (program): ${sourceAccountInfo.owner.toString()}`);
+      console.error(`[RELEASE] Expected owner (TOKEN_PROGRAM_ID): ${TOKEN_PROGRAM_ID.toString()}`);
+      
+      // Verify it's a valid token account
+      if (sourceAccountInfo.owner.toString() !== TOKEN_PROGRAM_ID.toString()) {
+        console.error(`[RELEASE] ❌ Account is not a token account!`);
+        throw new Error(`Source account at ${escrowTokenAccount.toString()} is not a valid token account. Owner: ${sourceAccountInfo.owner.toString()}, Expected: ${TOKEN_PROGRAM_ID.toString()}`);
+      }
+      
+      console.error(`[RELEASE] ✅ Account is a valid token account`);
+      
+      // Get token account details to verify balance and ownership
+      console.error(`[RELEASE] Fetching token account details...`);
+      const sourceTokenAccountData = await getAccount(connection, escrowTokenAccount);
+      const sourceBalanceUSDC = Number(sourceTokenAccountData.amount) / Math.pow(10, decimals);
+      
+      console.error(`[RELEASE] Token account details:`);
+      console.error(`[RELEASE]   Balance: ${sourceBalanceUSDC} USDC`);
+      console.error(`[RELEASE]   Required: ${amount} USDC`);
+      console.error(`[RELEASE]   Owner: ${sourceTokenAccountData.owner.toString()}`);
+      console.error(`[RELEASE]   Expected Owner: ${escrowAccount.toString()}`);
+      console.error(`[RELEASE]   Mint: ${sourceTokenAccountData.mint.toString()}`);
+      console.error(`[RELEASE]   Expected Mint: ${tokenMint.toString()}`);
+      
+      // Verify the token account is owned by the platform wallet
+      if (sourceTokenAccountData.owner.toString() !== escrowAccount.toString()) {
+        console.error(`[RELEASE] ❌ Token account owner mismatch!`);
+        throw new Error(`Token account owner mismatch! Token account owner: ${sourceTokenAccountData.owner.toString()}, Platform wallet: ${escrowAccount.toString()}`);
+      }
+      
+      // Verify the token account is for the correct mint (USDC)
+      if (sourceTokenAccountData.mint.toString() !== tokenMint.toString()) {
+        console.error(`[RELEASE] ❌ Token account mint mismatch!`);
+        throw new Error(`Token account mint mismatch! Token account mint: ${sourceTokenAccountData.mint.toString()}, Expected: ${tokenMint.toString()}`);
+      }
+      
+      if (sourceBalanceUSDC < amount) {
+        console.error(`[RELEASE] ❌ Insufficient balance!`);
+        throw new Error(`Insufficient USDC in source token account. Available: ${sourceBalanceUSDC}, Required: ${amount}`);
+      }
+      
+      console.error(`[RELEASE] ✅ All source token account validations passed!`);
+      console.error(`[RELEASE] ===== SOURCE TOKEN ACCOUNT VALIDATION COMPLETE =====`);
+    } catch (validationError: any) {
+      console.error(`[RELEASE] ❌ VALIDATION ERROR:`, validationError);
+      console.error(`[RELEASE] Error message:`, validationError.message);
+      console.error(`[RELEASE] Error stack:`, validationError.stack);
+      throw validationError;
     }
     
     // Check if freelancer token account exists - use null check, not try-catch
