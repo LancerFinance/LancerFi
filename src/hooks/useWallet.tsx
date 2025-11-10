@@ -32,11 +32,31 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   // Optional auto-connect behind a user-controlled flag (disabled by default)
   useEffect(() => {
     const shouldAutoConnect = localStorage.getItem('wallet_auto_connect') === 'true';
-    if (!shouldAutoConnect) return;
-
+    const wasExplicitlyDisconnected = localStorage.getItem('wallet_explicitly_disconnected') === 'true';
+    
     const init = async () => {
       const w: any = window as any;
       
+      // If user explicitly disconnected, disconnect Phantom if it's still connected
+      if (wasExplicitlyDisconnected) {
+        try {
+          if (w.solana && w.solana.isPhantom && w.solana.isConnected) {
+            // Phantom is still connected but user explicitly disconnected
+            // Disconnect it to respect user's choice
+            if (w.solana.disconnect) {
+              await w.solana.disconnect();
+            }
+          }
+        } catch {}
+        // Don't auto-connect if user explicitly disconnected
+        return;
+      }
+      
+      // Don't auto-connect if flag is not set
+      if (!shouldAutoConnect) {
+        return;
+      }
+
       // Try Phantom if already connected
       try {
         if (w.solana && w.solana.isPhantom && w.solana.isConnected) {
@@ -57,11 +77,29 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
     if (w.solana && w.solana.on) {
       w.solana.on('disconnect', () => {
+        // Set explicit disconnect flag when Phantom disconnects
+        localStorage.setItem('wallet_explicitly_disconnected', 'true');
+        localStorage.removeItem('wallet_auto_connect');
         setWallet({ address: null, isConnected: false, isConnecting: false, provider: null });
       });
       w.solana.on('connect', (pubkey: any) => {
+        // Only reconnect if user didn't explicitly disconnect
+        const wasExplicitlyDisconnected = localStorage.getItem('wallet_explicitly_disconnected') === 'true';
+        if (wasExplicitlyDisconnected) {
+          // User explicitly disconnected, don't auto-reconnect
+          // Disconnect again to respect user's choice
+          try {
+            if (w.solana?.disconnect) {
+              w.solana.disconnect();
+            }
+          } catch {}
+          return;
+        }
+        
         const address = pubkey?.toString?.() || w.solana?.publicKey?.toString?.();
-        if (address) setWallet(prev => ({ ...prev, address, isConnected: true, provider: w.solana }));
+        if (address) {
+          setWallet(prev => ({ ...prev, address, isConnected: true, provider: w.solana }));
+        }
       });
     }
 
@@ -74,6 +112,10 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const connectWallet = async () => {
+    // Clear explicit disconnect flag FIRST before connecting
+    // This prevents the connect event listener from disconnecting immediately
+    localStorage.removeItem('wallet_explicitly_disconnected');
+    
     setWallet(prev => ({ ...prev, isConnecting: true }));
 
     try {
@@ -84,6 +126,9 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         const resp = await w.solana.connect();
         const address = resp?.publicKey?.toString?.() || w.solana?.publicKey?.toString?.();
         if (!address) throw new Error('Unable to get Solana wallet address');
+
+        // Set auto-connect flag for future sessions
+        localStorage.setItem('wallet_auto_connect', 'true');
 
         setWallet({ address, isConnected: true, isConnecting: false, provider: w.solana });
         return;
@@ -101,11 +146,19 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     try {
       const w: any = window as any;
       if (w.solana?.disconnect) {
-        w.solana.disconnect();
+        // Disconnect from Phantom
+        w.solana.disconnect().catch(() => {
+          // Ignore errors, but ensure state is cleared
+        });
       }
     } catch {}
 
+    // Remove auto-connect flag
     localStorage.removeItem('wallet_auto_connect');
+    // Set explicit disconnect flag to prevent auto-reconnect on refresh
+    localStorage.setItem('wallet_explicitly_disconnected', 'true');
+    
+    // Clear wallet state
     setWallet({ address: null, isConnected: false, isConnecting: false, provider: null });
     
     // Clear timeout on disconnect

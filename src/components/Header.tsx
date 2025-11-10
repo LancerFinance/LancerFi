@@ -141,7 +141,7 @@ const Header = () => {
         {/* Secondary Navigation Bar */}
         <div className="hidden lg:flex items-center py-3 border-t border-border/50">
           <span className="text-sm text-muted-foreground">SOL, USDC, X402 payments • Near-zero fees</span>
-          <div className="flex items-center space-x-2 ml-40">
+          <div className={`flex items-center space-x-2 ${connectedAddress ? 'ml-40' : 'ml-[110px]'}`}>
             <a 
               href="https://x.com/LancerFi" 
               target="_blank" 
