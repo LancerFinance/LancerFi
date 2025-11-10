@@ -57,9 +57,12 @@ export async function releasePaymentFromPlatform(
   currency: PaymentCurrency = 'SOLANA'
 ): Promise<string> {
   // CRITICAL: Log at the VERY start to confirm function is called
-  console.error(`[RELEASE START] ==========================================`);
-  console.error(`[RELEASE START] Currency: ${currency}, Amount: ${amount}, Freelancer: ${freelancerWallet.toString()}`);
-  console.error(`[RELEASE START] ==========================================`);
+  console.log(`[RELEASE START] ==========================================`);
+  console.log(`[RELEASE START] Currency: ${currency}, Amount: ${amount}, Freelancer: ${freelancerWallet.toString()}`);
+  console.log(`[RELEASE START] ==========================================`);
+  console.error(`[RELEASE START ERROR] ==========================================`);
+  console.error(`[RELEASE START ERROR] Currency: ${currency}, Amount: ${amount}, Freelancer: ${freelancerWallet.toString()}`);
+  console.error(`[RELEASE START ERROR] ==========================================`);
   
   // Security: Validate amount
   if (amount <= 0) {
@@ -121,20 +124,34 @@ export async function releasePaymentFromPlatform(
       escrowAccount
     );
     
-    console.error(`[RELEASE] Calculated source token account: ${escrowTokenAccount.toString()}`);
-    console.error(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
-    console.error(`[RELEASE] USDC Mint: ${tokenMint.toString()}`);
+    console.log(`[RELEASE] Calculated source token account: ${escrowTokenAccount.toString()}`);
+    console.log(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
+    console.log(`[RELEASE] USDC Mint: ${tokenMint.toString()}`);
+    console.error(`[RELEASE ERROR] Calculated source token account: ${escrowTokenAccount.toString()}`);
+    console.error(`[RELEASE ERROR] Platform wallet: ${escrowAccount.toString()}`);
+    console.error(`[RELEASE ERROR] USDC Mint: ${tokenMint.toString()}`);
     
     // CRITICAL: Verify source account exists and is valid USDC token account
     // Throw clear error immediately if account doesn't exist
+    console.log(`[RELEASE] About to check if source account exists`);
+    console.error(`[RELEASE ERROR] About to check if source account exists`);
     const { getAccount } = await import('@solana/spl-token');
     let sourceAccount;
     try {
+      console.log(`[RELEASE] Calling getAccount for ${escrowTokenAccount.toString()}`);
+      console.error(`[RELEASE ERROR] Calling getAccount for ${escrowTokenAccount.toString()}`);
       sourceAccount = await getAccount(connection, escrowTokenAccount);
+      console.log(`[RELEASE] getAccount succeeded - account exists!`);
+      console.error(`[RELEASE ERROR] getAccount succeeded - account exists!`);
     } catch (error: any) {
+      console.log(`[RELEASE] getAccount failed: ${error.name} - ${error.message}`);
+      console.error(`[RELEASE ERROR] getAccount failed: ${error.name} - ${error.message}`);
       // Account doesn't exist - this is the most likely cause of "invalid account data" error
       if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
-        throw new Error(`CRITICAL: Platform wallet USDC token account does not exist at ${escrowTokenAccount.toString()}. The x402 payment may not have been received or the account was not created. Please verify the x402 payment transaction was successful.`);
+        const errorMsg = `CRITICAL: Platform wallet USDC token account does not exist at ${escrowTokenAccount.toString()}. The x402 payment may not have been received or the account was not created. Please verify the x402 payment transaction was successful.`;
+        console.log(`[RELEASE] THROWING ERROR: ${errorMsg}`);
+        console.error(`[RELEASE ERROR] THROWING ERROR: ${errorMsg}`);
+        throw new Error(errorMsg);
       }
       throw error;
     }
