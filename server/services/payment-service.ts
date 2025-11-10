@@ -113,8 +113,7 @@ export async function releasePaymentFromPlatform(
       })
     );
   } else {
-    // USDC token transfer
-    console.error(`[RELEASE] Starting USDC transfer section`);
+    // USDC token transfer - EXACT match to working releaseEscrowPayment
     const tokenMint = USDC_MINT;
     const decimals = 6;
     
@@ -124,41 +123,22 @@ export async function releasePaymentFromPlatform(
       escrowAccount
     );
     
-    console.log(`[RELEASE] Calculated source token account: ${escrowTokenAccount.toString()}`);
-    console.log(`[RELEASE] Platform wallet: ${escrowAccount.toString()}`);
-    console.log(`[RELEASE] USDC Mint: ${tokenMint.toString()}`);
-    console.error(`[RELEASE ERROR] Calculated source token account: ${escrowTokenAccount.toString()}`);
-    console.error(`[RELEASE ERROR] Platform wallet: ${escrowAccount.toString()}`);
-    console.error(`[RELEASE ERROR] USDC Mint: ${tokenMint.toString()}`);
-    
-    // CRITICAL: Verify source account exists and is valid USDC token account
-    // Throw clear error immediately if account doesn't exist
-    console.log(`[RELEASE] About to check if source account exists`);
-    console.error(`[RELEASE ERROR] About to check if source account exists`);
+    // CRITICAL: Verify source account exists BEFORE building transaction
+    // This is the most likely cause of "invalid account data" error
     const { getAccount } = await import('@solana/spl-token');
     let sourceAccount;
     try {
-      console.log(`[RELEASE] Calling getAccount for ${escrowTokenAccount.toString()}`);
-      console.error(`[RELEASE ERROR] Calling getAccount for ${escrowTokenAccount.toString()}`);
       sourceAccount = await getAccount(connection, escrowTokenAccount);
-      console.log(`[RELEASE] getAccount succeeded - account exists!`);
-      console.error(`[RELEASE ERROR] getAccount succeeded - account exists!`);
     } catch (error: any) {
-      console.log(`[RELEASE] getAccount failed: ${error.name} - ${error.message}`);
-      console.error(`[RELEASE ERROR] getAccount failed: ${error.name} - ${error.message}`);
-      // Account doesn't exist - this is the most likely cause of "invalid account data" error
       if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('not found')) {
-        const errorMsg = `CRITICAL: Platform wallet USDC token account does not exist at ${escrowTokenAccount.toString()}. The x402 payment may not have been received or the account was not created. Please verify the x402 payment transaction was successful.`;
-        console.log(`[RELEASE] THROWING ERROR: ${errorMsg}`);
-        console.error(`[RELEASE ERROR] THROWING ERROR: ${errorMsg}`);
-        throw new Error(errorMsg);
+        throw new Error(`Platform wallet USDC token account does not exist at ${escrowTokenAccount.toString()}. The x402 payment may not have been received.`);
       }
       throw error;
     }
     
-    // Verify account is valid USDC token account
+    // Verify account is valid
     if (sourceAccount.mint.toString() !== tokenMint.toString()) {
-      throw new Error(`Source account mint mismatch! Expected USDC (${tokenMint.toString()}), got ${sourceAccount.mint.toString()}`);
+      throw new Error(`Source account mint mismatch! Expected USDC, got ${sourceAccount.mint.toString()}`);
     }
     
     const balanceUSDC = Number(sourceAccount.amount) / Math.pow(10, 6);
@@ -166,9 +146,8 @@ export async function releasePaymentFromPlatform(
       throw new Error(`Insufficient USDC: ${balanceUSDC} available, ${amount} required`);
     }
     
-    // CRITICAL: Verify the source account's owner matches the platform wallet (authority)
     if (sourceAccount.owner.toString() !== escrowAccount.toString()) {
-      throw new Error(`Source account owner mismatch! Account owner: ${sourceAccount.owner.toString()}, Platform wallet: ${escrowAccount.toString()}. The platform wallet must own the source account to transfer from it.`);
+      throw new Error(`Source account owner mismatch! Owner: ${sourceAccount.owner.toString()}, Expected: ${escrowAccount.toString()}`);
     }
     
     // Get freelancer's token account
@@ -177,16 +156,15 @@ export async function releasePaymentFromPlatform(
       freelancerWallet
     );
     
-    const { createTransferInstruction } = await import('@solana/spl-token');
+    const { createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     
-    // Create freelancer token account if it doesn't exist (use platform wallet as payer)
-    // EXACT match to working releaseEscrowPayment
+    // Create freelancer token account if it doesn't exist - EXACT match to working code
     try {
       await connection.getAccountInfo(freelancerTokenAccount);
     } catch {
       transaction.add(
         createAssociatedTokenAccountInstruction(
-          escrowAccount, // Use platform wallet (escrow account) as payer
+          escrowAccount,
           freelancerTokenAccount,
           freelancerWallet,
           tokenMint
@@ -194,30 +172,17 @@ export async function releasePaymentFromPlatform(
       );
     }
     
-    // Transfer tokens from escrow to freelancer
-    // CRITICAL: Log all account addresses before creating instruction
-    console.error(`[RELEASE] Creating transfer instruction with:`, {
-      source: escrowTokenAccount.toString(),
-      destination: freelancerTokenAccount.toString(),
-      authority: escrowAccount.toString(),
-      amount: Math.round(amount * Math.pow(10, decimals)),
-      tokenMint: tokenMint.toString()
-    });
-    
-    // Transfer tokens from escrow to freelancer
-    // EXACT match to working releaseEscrowPayment
+    // Transfer tokens - EXACT match to working releaseEscrowPayment
     transaction.add(
       createTransferInstruction(
         escrowTokenAccount,
         freelancerTokenAccount,
-        escrowAccount, // Escrow account as authority
-        Math.round(amount * Math.pow(10, decimals)), // Regular number like working code
-        [], // Empty signers - authority signs transaction separately
+        escrowAccount,
+        Math.round(amount * Math.pow(10, decimals)),
+        [],
         TOKEN_PROGRAM_ID
       )
     );
-    
-    console.error(`[RELEASE] Transfer instruction added successfully`);
   }
   
   // Sign with platform keypair
