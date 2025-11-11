@@ -8,12 +8,14 @@ import { Link, useNavigate } from "react-router-dom";
 import WalletButton from "./WalletButton";
 import { useWallet } from "@/hooks/useWallet";
 import { db } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
   const [dashboardNotificationCount, setDashboardNotificationCount] = useState(0);
+  const { toast } = useToast();
   const {
     isConnected,
     address: connectedAddress
@@ -60,6 +62,24 @@ const Header = () => {
       setDashboardNotificationCount(proposalsCount + submissionsCount);
     } catch (error) {
       console.error('Error checking dashboard notifications:', error);
+    }
+  };
+
+  const copyContractAddress = async () => {
+    const contractAddress = "XXXXXXpump";
+    try {
+      await navigator.clipboard.writeText(contractAddress);
+      toast({
+        title: "Copied!",
+        description: "Contract address copied to clipboard",
+      });
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy to clipboard",
+        variant: "destructive",
+      });
     }
   };
   return <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -154,7 +174,8 @@ const Header = () => {
               </svg>
             </a>
             <button 
-              className="text-xs sm:text-sm font-medium text-foreground bg-gradient-to-b from-muted to-muted/80 hover:from-muted/90 hover:to-muted/70 border-2 border-border rounded-full px-3 py-1.5 shadow-lg hover:shadow-xl active:shadow-inner active:translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              onClick={copyContractAddress}
+              className="text-xs sm:text-sm font-medium text-foreground bg-gradient-to-b from-muted to-muted/80 hover:from-muted/90 hover:to-muted/70 border-2 border-border rounded-full px-3 py-1.5 shadow-lg hover:shadow-xl active:shadow-inner active:translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
               style={{
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)'
               }}

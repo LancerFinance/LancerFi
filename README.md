@@ -83,6 +83,28 @@ cd server
 npm run dev
 ```
 
+## Troubleshooting
+
+### Missing Module Errors
+
+If you encounter errors like:
+- `Failed to resolve import "dompurify" from "src/lib/input-sanitizer.ts"`
+- `Failed to resolve import "bad-words" from "src/lib/profanity-filter.ts"`
+
+**Solution**: Make sure you've installed all dependencies:
+
+```sh
+# In the root directory
+npm install
+
+# Also install backend dependencies
+cd server
+npm install
+cd ..
+```
+
+These errors occur when `node_modules` is missing or incomplete. The `node_modules` folder is not included in the repository (it's gitignored), so you must run `npm install` after cloning the repository.
+
 ## Solana Network Configuration
 
 - **Development**: Uses Solana Devnet (for testing)

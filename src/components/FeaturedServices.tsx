@@ -36,12 +36,35 @@ const FeaturedServices = () => {
     try {
       const projects = await db.getProjects();
       
-      // Get featured services (top 6 with freelancers assigned)
-      const featuredServices = projects
-        .filter(project => project.freelancer_id && project.status !== 'completed')
-        .slice(0, 6);
+      // Featured service IDs to always show
+      const featuredServiceIds = [
+        'fbd2f08c-a7b9-46bd-ba97-12e95b293b36', // NFT Platform LandingPage
+        '49c35814-853a-481d-8161-71050fc005bb'  // Defi Trading Platform
+      ];
+      
+      // Get the featured services by ID first
+      const featuredById = projects.filter(project => 
+        featuredServiceIds.includes(project.id)
+      );
+      
+      // Sort featured services to match the order in featuredServiceIds
+      const sortedFeatured = featuredServiceIds
+        .map(id => featuredById.find(p => p.id === id))
+        .filter(Boolean) as Service[];
+      
+      // Get additional services (top services with freelancers assigned, excluding already featured ones)
+      const additionalServices = projects
+        .filter(project => 
+          project.freelancer_id && 
+          project.status !== 'completed' &&
+          !featuredServiceIds.includes(project.id)
+        )
+        .slice(0, 4); // Get up to 4 more to fill out to 6 total
+      
+      // Combine featured services with additional services
+      const allFeaturedServices = [...sortedFeatured, ...additionalServices].slice(0, 6);
 
-      setServices(featuredServices as Service[]);
+      setServices(allFeaturedServices as Service[]);
     } catch (error) {
       console.error('Error loading featured services:', error);
     } finally {
