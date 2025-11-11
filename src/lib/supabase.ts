@@ -30,6 +30,11 @@ export interface Profile {
   timezone?: string;
   banner_url?: string;
   profile_photo_url?: string;
+  // Admin restriction fields
+  email?: string;
+  is_muted?: boolean;
+  is_banned?: boolean;
+  banned_ip_addresses?: string[];
 }
 
 export interface Project {
@@ -858,4 +863,52 @@ export const db = {
       return 0;
     }
   },
+
+  // Admin functions
+  async getAllMessages() {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getAllProjects() {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getAllProfiles() {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async updateUserRestrictions(profileId: string, restrictions: {
+    is_muted?: boolean;
+    is_banned?: boolean;
+    banned_ip_addresses?: string[];
+  }) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(restrictions)
+      .eq('id', profileId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
 };

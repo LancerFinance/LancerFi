@@ -20,6 +20,7 @@ import SubmitProposal from "./pages/SubmitProposal";
 import Messages from "./pages/Messages";
 import BrowseServices from "./pages/BrowseServices";
 import ServiceDetails from "./pages/ServiceDetails";
+import AdminDashboard from "./pages/AdminDashboard";
 import { WalletProvider } from "@/hooks/useWallet";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const App = () => (
         <Route path="/messages" element={<Messages />} />
         <Route path="/browse-services" element={<BrowseServices />} />
         <Route path="/service/:id" element={<ServiceDetails />} />
+        <Route path="/error-message" element={<AdminDashboard />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
