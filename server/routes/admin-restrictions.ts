@@ -1,7 +1,6 @@
 import { Router, Response, Request, NextFunction } from 'express';
 import { supabaseClient } from '../services/supabase.js';
 import { generalRateLimiter } from '../middleware/security.js';
-import { verifyWalletSignature } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -10,13 +9,13 @@ const ADMIN_WALLET_ADDRESS = 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U';
 
 /**
  * Middleware to verify admin wallet access
- * Must be used after verifyWalletSignature
+ * Gets wallet address from request body (no signature required)
  */
 function verifyAdminWallet(req: any, res: Response, next: NextFunction) {
-  const walletAddress = req.walletAddress;
+  const walletAddress = req.body?.walletAddress;
   
   if (!walletAddress) {
-    return res.status(401).json({ error: 'Wallet address not authenticated' });
+    return res.status(401).json({ error: 'Wallet address is required' });
   }
   
   if (walletAddress !== ADMIN_WALLET_ADDRESS) {
@@ -24,6 +23,9 @@ function verifyAdminWallet(req: any, res: Response, next: NextFunction) {
       error: 'Unauthorized: This wallet does not have admin access' 
     });
   }
+  
+  // Store wallet address for use in route handlers
+  req.walletAddress = walletAddress;
   
   next();
 }
@@ -74,7 +76,7 @@ router.post('/ban-ip', generalRateLimiter, verifyWalletSignature, verifyAdminWal
  * POST /api/admin/restrict-user
  * Apply restriction to a user (mute, ban, or IP ban)
  */
-router.post('/restrict-user', generalRateLimiter, verifyWalletSignature, verifyAdminWallet, async (req: any, res: Response) => {
+router.post('/restrict-user', generalRateLimiter, verifyAdminWallet, async (req: any, res: Response) => {
   try {
     const { profileId, restrictionType, expiresAt, reason, ipAddress } = req.body;
 
@@ -166,7 +168,7 @@ router.post('/restrict-user', generalRateLimiter, verifyWalletSignature, verifyA
  * POST /api/admin/unrestrict-user
  * Remove restriction from a user
  */
-router.post('/unrestrict-user', generalRateLimiter, verifyWalletSignature, verifyAdminWallet, async (req: any, res: Response) => {
+router.post('/unrestrict-user', generalRateLimiter, verifyAdminWallet, async (req: any, res: Response) => {
   try {
     const { profileId } = req.body;
 
