@@ -187,18 +187,19 @@ const AdminUsers = () => {
         ? new Date(Date.now() + durationNum * 24 * 60 * 60 * 1000).toISOString()
         : null; // 0 or negative = permanent
       
-      if (restrictionType === 'mute') {
-        // Check mute limit (3 mutes per week)
-        const muteCount = muteHistory[selectedUser.id] || 0;
-        if (muteCount >= 3) {
-          toast({
-            title: "Mute Limit Reached",
-            description: "This user has been muted 3 times in the past 7 days. Cannot mute again.",
-            variant: "destructive"
-          });
-          return;
-        }
-      }
+      // TEMPORARILY DISABLED FOR TESTING
+      // if (restrictionType === 'mute') {
+      //   // Check mute limit (3 mutes per week)
+      //   const muteCount = muteHistory[selectedUser.id] || 0;
+      //   if (muteCount >= 3) {
+      //     toast({
+      //       title: "Mute Limit Reached",
+      //       description: "This user has been muted 3 times in the past 7 days. Cannot mute again.",
+      //       variant: "destructive"
+      //     });
+      //     return;
+      //   }
+      // }
 
       // Map frontend restriction types to backend types
       const backendRestrictionType = restrictionType === 'mute' ? 'mute' : 
@@ -398,11 +399,12 @@ const AdminUsers = () => {
                           IP Banned ({user.banned_ip_addresses.length})
                         </Badge>
                       )}
-                      {muteHistory[user.id] !== undefined && muteHistory[user.id] >= 3 && (
+                      {/* TEMPORARILY DISABLED FOR TESTING */}
+                      {/* {muteHistory[user.id] !== undefined && muteHistory[user.id] >= 3 && (
                         <Badge variant="outline" className="bg-orange-500/10 text-orange-700 dark:text-orange-400">
                           Muted 3 times in past 7 days
                         </Badge>
-                      )}
+                      )} */}
                     </div>
                     <div className="space-y-1 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
