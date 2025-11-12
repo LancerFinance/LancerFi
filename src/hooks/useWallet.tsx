@@ -151,6 +151,22 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         // Set auto-connect flag for future sessions
         localStorage.setItem('wallet_auto_connect', 'true');
 
+        // Track IP address when wallet connects
+        try {
+          const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
+          await fetch(`${API_BASE_URL}/api/track-ip`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ walletAddress: address })
+          }).catch(err => {
+            // Silently fail - IP tracking is not critical
+            console.error('Failed to track IP on wallet connect:', err);
+          });
+        } catch (ipError) {
+          // Silently fail - IP tracking is not critical
+          console.error('Exception tracking IP on wallet connect:', ipError);
+        }
+
         setWallet({ address, isConnected: true, isConnecting: false, provider: w.solana });
         return;
       }

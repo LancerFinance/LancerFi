@@ -15,7 +15,9 @@ import {
   sanitizeRequestBody,
   generalRateLimiter,
   paymentRateLimiter,
-  rpcRateLimiter
+  rpcRateLimiter,
+  checkIPBan,
+  trackUserIP
 } from './middleware/security.js';
 
 // Load environment variables
@@ -94,8 +96,10 @@ app.use(validateRequestSize);
 app.use(sanitizeRequestBody);
 
 // Check IP bans before any other processing (blocks all requests from banned IPs)
-import { checkIPBan } from './middleware/security.js';
 app.use(checkIPBan);
+
+// Track user IP addresses from API requests (after IP ban check)
+app.use(trackUserIP);
 
 // Apply general rate limiting to all routes
 app.use(generalRateLimiter);

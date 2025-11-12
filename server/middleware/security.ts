@@ -184,6 +184,48 @@ export function getClientIP(req: Request): string {
 }
 
 /**
+ * Track user IP address from API requests (if wallet address is available)
+ * This runs after IP ban check but before other middleware
+ */
+export async function trackUserIP(req: Request, res: Response, next: NextFunction) {
+  try {
+    const clientIP = getClientIP(req);
+    
+    // Skip if IP is unknown or localhost
+    if (!clientIP || clientIP === 'unknown' || clientIP === '::1' || clientIP.startsWith('127.') || clientIP.startsWith('::ffff:127.')) {
+      return next();
+    }
+    
+    // Try to get wallet address from request body or query
+    const walletAddress = (req.body as any)?.walletAddress || 
+                          (req.body as any)?.address || 
+                          (req.query as any)?.walletAddress ||
+                          (req.query as any)?.address;
+    
+    // If wallet address is available, track IP (async, don't block request)
+    if (walletAddress && typeof walletAddress === 'string') {
+      (async () => {
+        try {
+          await supabaseClient
+            .from('profiles')
+            .update({ last_ip_address: clientIP })
+            .eq('wallet_address', walletAddress);
+        } catch (err: any) {
+          // Silently fail - IP tracking is not critical
+          console.error('Error tracking user IP:', err);
+        }
+      })();
+    }
+    
+    next();
+  } catch (error: any) {
+    // Silently fail - IP tracking is not critical
+    console.error('Exception in IP tracking:', error);
+    next();
+  }
+}
+
+/**
  * Middleware to check if IP address is banned and block all requests
  * This should be applied early in the middleware chain
  */
