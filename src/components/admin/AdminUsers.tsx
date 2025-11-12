@@ -161,7 +161,15 @@ const AdminUsers = () => {
       return;
     }
 
-    // IP address is optional for IP ban - will use user's last known IP if not provided
+    // Validate IP address for IP ban
+    if (restrictionType === 'ip_ban' && !ipAddress.trim()) {
+      toast({
+        title: "IP Address Required",
+        description: "Please enter an IP address to ban, or the system will attempt to find the user's last known IP address.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     // Validate duration (0 = permanent, otherwise must be >= 0.1)
     const durationNum = parseFloat(duration);
@@ -221,7 +229,24 @@ const AdminUsers = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `Server error: ${response.status}`);
+        const errorMessage = errorData.error || `Server error: ${response.status}`;
+        
+        // Show more helpful error for IP ban issues
+        if (restrictionType === 'ip_ban' && errorMessage.includes('IP address')) {
+          toast({
+            title: "IP Address Required",
+            description: errorMessage + (errorData.suggestion ? ` ${errorData.suggestion}` : ''),
+            variant: "destructive",
+            duration: 8000
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: errorMessage,
+            variant: "destructive"
+          });
+        }
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -535,15 +560,16 @@ const AdminUsers = () => {
             </div>
             {restrictionType === 'ip_ban' && (
               <div>
-                <Label htmlFor="ip-address">IP Address (Optional)</Label>
+                <Label htmlFor="ip-address">IP Address <span className="text-destructive">*</span></Label>
                 <Input
                   id="ip-address"
                   value={ipAddress}
                   onChange={(e) => setIpAddress(e.target.value)}
-                  placeholder="Leave empty to use user's last known IP"
+                  placeholder="Enter IP address (e.g., 192.168.1.1)"
+                  required
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  If left empty, the system will automatically use the user's last known IP address. IP ban also applies wallet ban.
+                  Enter the IP address to ban. If left empty, the system will attempt to find the user's last known IP from their profile or recent projects. IP ban also applies wallet ban.
                 </p>
               </div>
             )}

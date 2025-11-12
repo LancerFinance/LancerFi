@@ -269,8 +269,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       if (!ipToBan) {
         console.error('Cannot ban IP: No IP address found for user');
+        // If no IP can be found, still apply wallet ban but return error about IP
         return res.status(400).json({ 
-          error: 'Cannot ban IP: User has no recorded IP address. Please ensure the user has created a project or interacted with the platform recently. You can also manually enter an IP address.' 
+          error: 'Cannot ban IP: No IP address found for user. The user has no recorded IP address in their profile or recent projects. Please manually enter an IP address to proceed with the IP ban.',
+          suggestion: 'You can manually enter the IP address in the IP Address field, or the system will attempt to find it from the user\'s profile or recent projects.'
         });
       }
       
