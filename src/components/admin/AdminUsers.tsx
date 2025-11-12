@@ -29,6 +29,7 @@ const AdminUsers = () => {
   const [warnReason, setWarnReason] = useState('');
   const [muteHistory, setMuteHistory] = useState<Record<string, number>>({}); // profile_id -> mute count in last 7 days
   const [copiedWallet, setCopiedWallet] = useState<string | null>(null); // Track which wallet was copied
+  const [filter, setFilter] = useState<'all' | 'restricted'>('all');
 
   useEffect(() => {
     loadUsers();
@@ -220,6 +221,25 @@ const AdminUsers = () => {
 
       const result = await response.json();
       
+      // Send system message to user about the restriction
+      try {
+        const restrictionName = restrictionType === 'mute' ? 'muted' : restrictionType === 'ban' ? 'banned' : 'IP banned';
+        const expiresText = expiresAt 
+          ? ` until ${format(new Date(expiresAt), 'PPp')}`
+          : ' permanently';
+        const reasonText = banReason.trim() ? ` Reason: ${banReason.trim()}` : '';
+        
+        await db.createMessage({
+          sender_id: 'system@lancerfi.app',
+          recipient_id: selectedUser.wallet_address || selectedUser.id,
+          subject: `You have been ${restrictionName}`,
+          content: `You have been ${restrictionName}${expiresText}.${reasonText}`
+        });
+      } catch (msgError) {
+        console.error('Error sending restriction message:', msgError);
+        // Don't fail the restriction if message fails
+      }
+      
       toast({
         title: "Success",
         description: `User ${restrictionType === 'mute' ? 'muted' : restrictionType === 'ban' ? 'banned' : 'IP banned'} successfully${expiresAt ? ` for ${duration} days` : ' permanently'}`
@@ -297,11 +317,16 @@ const AdminUsers = () => {
 
   const filteredUsers = users.filter(user => {
     const searchLower = searchTerm.toLowerCase();
-    return searchTerm === '' || 
+    const matchesSearch = searchTerm === '' || 
       user.wallet_address?.toLowerCase().includes(searchLower) ||
       user.username?.toLowerCase().includes(searchLower) ||
       user.full_name?.toLowerCase().includes(searchLower) ||
       user.email?.toLowerCase().includes(searchLower);
+    
+    const matchesFilter = filter === 'all' || 
+      (filter === 'restricted' && (user.is_muted || user.is_banned));
+    
+    return matchesSearch && matchesFilter;
   });
 
   if (loading) {
@@ -322,14 +347,25 @@ const AdminUsers = () => {
         <p className="text-sm text-muted-foreground mt-1">Total: {users.length} users</p>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-        <Input
-          placeholder="Search users by wallet, username, name, or email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Search users by wallet, username, name, or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="Filter" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Users</SelectItem>
+            <SelectItem value="restricted">Restricted</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-2 max-h-[600px] overflow-y-auto">
@@ -418,25 +454,25 @@ const AdminUsers = () => {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleWarn(user)}
+                      disabled={user.is_muted || user.is_banned}
+                      className={user.is_muted || user.is_banned ? "opacity-50 cursor-not-allowed" : ""}
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      Warn
+                    </Button>
                     {(!user.is_muted && !user.is_banned) && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleWarn(user)}
-                        >
-                          <Shield className="w-4 h-4 mr-2" />
-                          Warn
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRestrict(user)}
-                        >
-                          <Shield className="w-4 h-4 mr-2" />
-                          Restrict
-                        </Button>
-                      </>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRestrict(user)}
+                      >
+                        <Shield className="w-4 h-4 mr-2" />
+                        Restrict
+                      </Button>
                     )}
                     {(user.is_muted || user.is_banned) && (
                       <>

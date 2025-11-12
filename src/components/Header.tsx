@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, VolumeX, Ban } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Menu, X, User, MessageSquare, Plus, Shield, Zap, Users } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ import WalletButton from "./WalletButton";
 import { useWallet } from "@/hooks/useWallet";
 import { db } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 // Admin wallet address
 const ADMIN_WALLET_ADDRESS = 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U';
@@ -19,6 +20,12 @@ const Header = () => {
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
   const [dashboardNotificationCount, setDashboardNotificationCount] = useState(0);
+  const [restrictionStatus, setRestrictionStatus] = useState<{
+    isRestricted: boolean;
+    restrictionType: 'mute' | 'ban_wallet' | 'ban_ip' | null;
+    expiresAt: string | null;
+    reason: string | null;
+  } | null>(null);
   const { toast } = useToast();
   const {
     isConnected,
@@ -31,10 +38,12 @@ const Header = () => {
     if (isConnected && connectedAddress) {
       checkUnreadMessages();
       checkDashboardNotifications();
+      checkRestrictionStatus();
       // Check for new messages and notifications every 10 seconds
       const interval = setInterval(() => {
         checkUnreadMessages();
         checkDashboardNotifications();
+        checkRestrictionStatus();
       }, 10000);
 
       // Listen for message read events to update count immediately
@@ -47,8 +56,19 @@ const Header = () => {
     } else {
       setUnreadCount(0);
       setDashboardNotificationCount(0);
+      setRestrictionStatus(null);
     }
   }, [isConnected, connectedAddress]);
+  
+  const checkRestrictionStatus = async () => {
+    if (!connectedAddress) return;
+    try {
+      const restriction = await db.checkUserRestriction(connectedAddress);
+      setRestrictionStatus(restriction);
+    } catch (error) {
+      console.error('Error checking restriction status:', error);
+    }
+  };
   const checkUnreadMessages = async () => {
     if (!connectedAddress) return;
     try {
@@ -89,8 +109,10 @@ const Header = () => {
       });
     }
   };
-  return <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
+  return (
+    <>
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
         {/* Top bar with announcement */}
         
 
@@ -269,7 +291,29 @@ const Header = () => {
               </div>
             </nav>
           </div>}
-      </div>
-    </header>;
+        </div>
+      </header>
+      
+      {/* Muted/Banned Banner */}
+      {restrictionStatus?.isRestricted && (restrictionStatus.restrictionType === 'mute' || restrictionStatus.restrictionType === 'ban_wallet') && (
+        <div className="w-full bg-yellow-500/10 border-b border-yellow-500/20 py-2 px-4">
+          <div className="container mx-auto flex items-center justify-center gap-2 text-sm font-medium text-yellow-700 dark:text-yellow-400">
+            {restrictionStatus.restrictionType === 'mute' ? (
+              <VolumeX className="w-4 h-4" />
+            ) : (
+              <Ban className="w-4 h-4" />
+            )}
+            <span>
+              {restrictionStatus.restrictionType === 'mute' ? 'MUTED' : 'BANNED'}
+              {restrictionStatus.expiresAt && (
+                <> UNTIL {format(new Date(restrictionStatus.expiresAt), 'MMM d, yyyy HH:mm')}</>
+              )}
+              {!restrictionStatus.expiresAt && ' PERMANENTLY'}
+            </span>
+          </div>
+        </div>
+      )}
+    </>
+  );
 };
 export default Header;
