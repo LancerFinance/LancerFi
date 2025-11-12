@@ -35,6 +35,17 @@ const AdminUsers = () => {
     loadUsers();
   }, []);
 
+  // Refresh mute history periodically to update the "3 mutes in 7 days" badge
+  useEffect(() => {
+    if (users.length === 0) return;
+    
+    const interval = setInterval(() => {
+      loadMuteHistory(users);
+    }, 60000); // Every minute
+    
+    return () => clearInterval(interval);
+  }, [users]);
+
   const loadUsers = async () => {
     try {
       setLoading(true);
@@ -229,14 +240,22 @@ const AdminUsers = () => {
           : ' permanently';
         const reasonText = banReason.trim() ? ` Reason: ${banReason.trim()}` : '';
         
-        await db.createMessage({
-          sender_id: 'system@lancerfi.app',
-          recipient_id: selectedUser.wallet_address || selectedUser.id,
-          subject: `You have been ${restrictionName}`,
-          content: `You have been ${restrictionName}${expiresText}.${reasonText}`
-        });
-      } catch (msgError) {
+        // Use wallet_address as recipient_id (messages are keyed by wallet address)
+        const recipientWallet = selectedUser.wallet_address;
+        if (recipientWallet) {
+          await db.createMessage({
+            sender_id: 'system@lancerfi.app',
+            recipient_id: recipientWallet,
+            subject: `You have been ${restrictionName}`,
+            content: `You have been ${restrictionName}${expiresText}.${reasonText}`
+          });
+          console.log('Restriction message sent to:', recipientWallet);
+        } else {
+          console.warn('Cannot send restriction message: user has no wallet_address');
+        }
+      } catch (msgError: any) {
         console.error('Error sending restriction message:', msgError);
+        console.error('Error details:', msgError.message, msgError);
         // Don't fail the restriction if message fails
       }
       

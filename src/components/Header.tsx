@@ -61,12 +61,17 @@ const Header = () => {
   }, [isConnected, connectedAddress]);
   
   const checkRestrictionStatus = async () => {
-    if (!connectedAddress) return;
+    if (!connectedAddress) {
+      setRestrictionStatus(null);
+      return;
+    }
     try {
       const restriction = await db.checkUserRestriction(connectedAddress);
+      console.log('Restriction status checked:', restriction);
       setRestrictionStatus(restriction);
     } catch (error) {
       console.error('Error checking restriction status:', error);
+      setRestrictionStatus(null);
     }
   };
   const checkUnreadMessages = async () => {
