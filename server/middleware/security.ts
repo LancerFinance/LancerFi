@@ -226,12 +226,16 @@ export async function checkIPBan(req: Request, res: Response, next: NextFunction
         });
       } else {
         // Ban expired, clean it up (async, don't block request)
-        supabaseClient
-          .from('banned_ip_addresses')
-          .delete()
-          .eq('ip_address', clientIP)
-          .then(() => {})
-          .catch((err: any) => console.error('Error cleaning up expired IP ban:', err));
+        (async () => {
+          try {
+            await supabaseClient
+              .from('banned_ip_addresses')
+              .delete()
+              .eq('ip_address', clientIP);
+          } catch (err: any) {
+            console.error('Error cleaning up expired IP ban:', err);
+          }
+        })();
       }
     }
     
