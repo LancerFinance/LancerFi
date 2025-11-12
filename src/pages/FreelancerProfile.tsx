@@ -18,32 +18,9 @@ import {
   GraduationCap,
   Image as ImageIcon
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, Profile } from "@/lib/supabase";
 import MessageDialog from "@/components/MessageDialog";
-
-interface Profile {
-  id: string;
-  wallet_address?: string;
-  username?: string;
-  full_name?: string;
-  bio?: string;
-  skills?: string[];
-  hourly_rate?: number;
-  total_earned?: number;
-  rating?: number;
-  completed_projects?: number;
-  portfolio_url?: string;
-  experience_years?: number;
-  availability_status?: string;
-  languages?: string[];
-  education?: string;
-  certifications?: string[];
-  response_time?: string;
-  location?: string;
-  timezone?: string;
-  banner_url?: string;
-  profile_photo_url?: string;
-}
+import { getSolanaPrice } from "@/lib/solana-price";
 
 // Past Works Component
 const PastWorksSection = ({ freelancerId }: { freelancerId: string }) => {
@@ -137,6 +114,7 @@ const FreelancerProfile = () => {
   const { id } = useParams<{ id: string }>();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [usdEarned, setUsdEarned] = useState<number>(0);
 
   useEffect(() => {
     if (id) {
@@ -154,8 +132,8 @@ const FreelancerProfile = () => {
 
       if (error) throw error;
       
-      // Calculate total earned
-      let totalEarned: number | null = null;
+      // Calculate total earned in USD
+      let totalEarnedUSD: number = 0;
       if (data?.id) {
         const { data: projects } = await supabase
           .from('projects')
@@ -165,21 +143,61 @@ const FreelancerProfile = () => {
         const projectIds = (projects || []).map((p: any) => p.id);
 
         if (projectIds.length > 0) {
+          // Fetch payment_currency to know if amount_usdc is in SOL or USD
           const { data: escrows } = await supabase
             .from('escrows')
-            .select('amount_usdc')
+            .select('amount_usdc, payment_currency')
             .in('project_id', projectIds)
             .eq('status', 'released');
             
           if (escrows && escrows.length > 0) {
-            totalEarned = escrows.reduce((sum: number, e: any) => sum + Number(e.amount_usdc || 0), 0);
+            // Separate SOL and USD earnings
+            let solEarnings = 0;
+            let usdEarnings = 0;
+            
+            escrows.forEach((e: any) => {
+              const amount = Number(e.amount_usdc || 0);
+              const currency = e.payment_currency || 'SOLANA';
+              
+              if (currency === 'SOLANA') {
+                solEarnings += amount;
+              } else {
+                usdEarnings += amount;
+              }
+            });
+            
+            // Convert SOL to USD
+            if (solEarnings > 0) {
+              try {
+                const priceData = await getSolanaPrice();
+                const solPrice = priceData.price_usd;
+                usdEarnings += solEarnings * solPrice;
+              } catch (error) {
+                console.error('Error fetching SOL price:', error);
+                // Use fallback price of $100
+                usdEarnings += solEarnings * 100;
+              }
+            }
+            
+            totalEarnedUSD = usdEarnings;
           }
         }
       }
       
-      if (totalEarned !== null) {
-        data.total_earned = totalEarned;
+      // If no escrows found, convert database total_earned (SOL) to USD
+      if (totalEarnedUSD === 0 && data?.total_earned && data.total_earned > 0) {
+        try {
+          const priceData = await getSolanaPrice();
+          const solPrice = priceData.price_usd;
+          totalEarnedUSD = data.total_earned * solPrice;
+        } catch (error) {
+          console.error('Error fetching SOL price:', error);
+          // Use fallback price of $100
+          totalEarnedUSD = data.total_earned * 100;
+        }
       }
+      
+      setUsdEarned(totalEarnedUSD);
       setProfile(data);
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -396,7 +414,7 @@ const FreelancerProfile = () => {
                       <span className="text-xs text-muted-foreground">Rate</span>
                     </div>
                     <div>
-                      <div className="font-bold">${profile.total_earned?.toLocaleString() || 0}</div>
+                      <div className="font-bold">${usdEarned.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       <span className="text-xs text-muted-foreground">Earned</span>
                     </div>
                   </div>

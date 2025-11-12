@@ -8,11 +8,13 @@ import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase, Profile } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { getSolanaPrice } from "@/lib/solana-price";
 
 const HireTalent = () => {
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [freelancers, setFreelancers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [usdEarnings, setUsdEarnings] = useState<Record<string, number>>({});
   const { toast } = useToast();
   
   const categories = ["All Categories", "Developers", "Designers", "Marketers", "Auditors"];
@@ -52,29 +54,97 @@ const HireTalent = () => {
 
         if (projectIds.length > 0) {
           // Sum released escrows for those projects
+          // Fetch payment_currency to know if amount_usdc is in SOL or USD
           const { data: escrows, error: escErr } = await supabase
             .from('escrows')
-            .select('project_id, amount_usdc, status')
+            .select('project_id, amount_usdc, payment_currency, status')
             .in('project_id', projectIds)
             .eq('status', 'released');
           if (escErr) throw escErr;
 
-          earningsByFreelancer = (escrows || []).reduce((acc: Record<string, number>, e: any) => {
+          // Separate SOL and USD earnings
+          const solEarningsByFreelancer: Record<string, number> = {};
+          const usdEarningsByFreelancer: Record<string, number> = {};
+
+          (escrows || []).forEach((e: any) => {
             const fid = projectToFreelancer[e.project_id as string];
             if (fid) {
-              acc[fid] = (acc[fid] || 0) + Number(e.amount_usdc || 0);
+              const amount = Number(e.amount_usdc || 0);
+              const currency = e.payment_currency || 'SOLANA';
+              
+              // If currency is SOLANA, amount_usdc is in SOL - add to SOL earnings
+              // If currency is X402 or USDC, amount_usdc is already in USD - add to USD earnings
+              if (currency === 'SOLANA') {
+                solEarningsByFreelancer[fid] = (solEarningsByFreelancer[fid] || 0) + amount;
+              } else {
+                usdEarningsByFreelancer[fid] = (usdEarningsByFreelancer[fid] || 0) + amount;
+              }
             }
-            return acc;
-          }, {});
+          });
+
+          // Convert SOL earnings to USD and combine with USD earnings
+          const priceData = await getSolanaPrice();
+          const solPrice = priceData.price_usd;
+          
+          earningsByFreelancer = {};
+          const allFreelancerIds = new Set([
+            ...Object.keys(solEarningsByFreelancer),
+            ...Object.keys(usdEarningsByFreelancer)
+          ]);
+
+          for (const fid of allFreelancerIds) {
+            const solAmount = solEarningsByFreelancer[fid] || 0;
+            const usdAmount = usdEarningsByFreelancer[fid] || 0;
+            
+            // Convert SOL to USD
+            const solInUsd = solAmount * solPrice;
+            
+            // Total USD earnings = USD from USDC/X402 payments + USD from SOL payments
+            earningsByFreelancer[fid] = usdAmount + solInUsd;
+          }
         }
       }
 
-      const withEarnings = freelancerList.map((f) => ({
-        ...f,
-        total_earned: earningsByFreelancer[f.id] ?? (f.total_earned ?? 0),
-      }));
+      // Get SOL price for converting SOL amounts to USD
+      let solPrice = 100; // Fallback price
+      try {
+        const priceData = await getSolanaPrice();
+        solPrice = priceData.price_usd || 100; // Ensure we have a valid price
+        if (!solPrice || solPrice <= 0) {
+          solPrice = 100; // Use fallback if price is invalid
+        }
+      } catch (error) {
+        console.error('Error fetching SOL price:', error);
+        solPrice = 100; // Use fallback price
+      }
 
-      setFreelancers(withEarnings);
+      // Calculate USD earnings for each freelancer
+      // earningsByFreelancer contains USD amounts from escrows (already converted)
+      // For freelancers without escrows, convert their database total_earned (SOL) to USD
+      const earningsMap: Record<string, number> = {};
+      for (const freelancer of freelancerList) {
+        let usdEarned = 0;
+        
+        // If we calculated earnings from escrows, use those (already in USD)
+        if (earningsByFreelancer[freelancer.id] !== undefined && earningsByFreelancer[freelancer.id] > 0) {
+          usdEarned = earningsByFreelancer[freelancer.id];
+        } 
+        // Otherwise, convert database total_earned (which is in SOL) to USD
+        else if (freelancer.total_earned && Number(freelancer.total_earned) > 0) {
+          // The database total_earned is stored in SOL, so convert to USD
+          const solAmount = Number(freelancer.total_earned);
+          usdEarned = solAmount * solPrice;
+          console.log(`Converting ${solAmount} SOL to USD for freelancer ${freelancer.id}: ${solAmount} * ${solPrice} = ${usdEarned}`);
+        }
+        
+        earningsMap[freelancer.id] = usdEarned;
+      }
+      
+      console.log('Final earningsMap:', earningsMap);
+      console.log('SOL Price used:', solPrice);
+
+      setUsdEarnings(earningsMap);
+      setFreelancers(freelancerList);
     } catch (error) {
       console.error('Error loading freelancers:', error);
       toast({
@@ -219,7 +289,7 @@ const HireTalent = () => {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Total Earned:</span>
                   <span className="font-medium text-web3-primary">
-                    ${freelancer.total_earned?.toLocaleString() || 0}
+                    ${(usdEarnings[freelancer.id] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
 
