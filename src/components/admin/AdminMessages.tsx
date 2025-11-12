@@ -12,12 +12,15 @@ import { db, Message } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
+// Admin wallet address
+const ADMIN_WALLET_ADDRESS = 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U';
+
 const AdminMessages = () => {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'read' | 'admin'>('all');
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
   const [newMessageDialogOpen, setNewMessageDialogOpen] = useState(false);
@@ -137,7 +140,8 @@ const AdminMessages = () => {
     
     const matchesFilter = filter === 'all' || 
       (filter === 'unread' && !message.is_read) ||
-      (filter === 'read' && message.is_read);
+      (filter === 'read' && message.is_read) ||
+      (filter === 'admin' && message.sender_id === ADMIN_WALLET_ADDRESS);
     
     return matchesSearch && matchesFilter;
   });
@@ -226,6 +230,7 @@ const AdminMessages = () => {
             <SelectItem value="all">All Messages</SelectItem>
             <SelectItem value="unread">Unread</SelectItem>
             <SelectItem value="read">Read</SelectItem>
+            <SelectItem value="admin">Admin Messages</SelectItem>
           </SelectContent>
         </Select>
       </div>
