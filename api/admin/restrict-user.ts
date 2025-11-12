@@ -112,6 +112,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('Updating profile:', profileId, 'with restrictions:', restrictions);
 
+    // Get user profile first to get wallet_address for message
+    const { data: userProfile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('wallet_address')
+      .eq('id', profileId)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching user profile:', profileError);
+      return res.status(500).json({ 
+        error: 'Failed to fetch user profile', 
+        details: profileError.message,
+        code: profileError.code
+      });
+    }
+
     // Update user restrictions
     const { data: updatedProfile, error: updateError } = await supabaseClient
       .from('profiles')
@@ -127,6 +143,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         details: updateError.message,
         code: updateError.code
       });
+    }
+
+    // Send system message to user about the restriction (using service key to bypass RLS)
+    if (userProfile?.wallet_address && (restrictionType === 'mute' || restrictionType === 'ban_wallet')) {
+      try {
+        const restrictionName = restrictionType === 'mute' ? 'muted' : 'banned';
+        const expiresText = expiresAt 
+          ? ` until ${new Date(expiresAt).toLocaleString()}`
+          : ' permanently';
+        const reasonText = reason ? ` Reason: ${reason}` : '';
+        
+        const { error: messageError } = await supabaseClient
+          .from('messages')
+          .insert({
+            sender_id: 'system@lancerfi.app',
+            recipient_id: userProfile.wallet_address,
+            subject: `You have been ${restrictionName}`,
+            content: `You have been ${restrictionName}${expiresText}.${reasonText}`,
+            is_read: false
+          });
+        
+        if (messageError) {
+          console.error('Error sending restriction message:', messageError);
+          // Don't fail the request if message fails
+        } else {
+          console.log('Restriction message sent to:', userProfile.wallet_address);
+        }
+      } catch (msgError: any) {
+        console.error('Exception sending restriction message:', msgError);
+        // Don't fail the request if message fails
+      }
     }
 
     // Record mute in history if it's a mute

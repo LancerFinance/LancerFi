@@ -232,32 +232,7 @@ const AdminUsers = () => {
 
       const result = await response.json();
       
-      // Send system message to user about the restriction
-      try {
-        const restrictionName = restrictionType === 'mute' ? 'muted' : restrictionType === 'ban' ? 'banned' : 'IP banned';
-        const expiresText = expiresAt 
-          ? ` until ${format(new Date(expiresAt), 'PPp')}`
-          : ' permanently';
-        const reasonText = banReason.trim() ? ` Reason: ${banReason.trim()}` : '';
-        
-        // Use wallet_address as recipient_id (messages are keyed by wallet address)
-        const recipientWallet = selectedUser.wallet_address;
-        if (recipientWallet) {
-          await db.createMessage({
-            sender_id: 'system@lancerfi.app',
-            recipient_id: recipientWallet,
-            subject: `You have been ${restrictionName}`,
-            content: `You have been ${restrictionName}${expiresText}.${reasonText}`
-          });
-          console.log('Restriction message sent to:', recipientWallet);
-        } else {
-          console.warn('Cannot send restriction message: user has no wallet_address');
-        }
-      } catch (msgError: any) {
-        console.error('Error sending restriction message:', msgError);
-        console.error('Error details:', msgError.message, msgError);
-        // Don't fail the restriction if message fails
-      }
+      // System message is now sent from the backend to bypass RLS
       
       toast({
         title: "Success",

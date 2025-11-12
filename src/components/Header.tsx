@@ -300,7 +300,7 @@ const Header = () => {
       </header>
       
       {/* Muted/Banned Banner */}
-      {restrictionStatus?.isRestricted && (restrictionStatus.restrictionType === 'mute' || restrictionStatus.restrictionType === 'ban_wallet') && (
+      {restrictionStatus?.isRestricted && (
         <div className="w-full bg-yellow-500/10 border-b border-yellow-500/20 py-2 px-4">
           <div className="container mx-auto flex items-center justify-center gap-2 text-sm font-medium text-yellow-700 dark:text-yellow-400">
             {restrictionStatus.restrictionType === 'mute' ? (
