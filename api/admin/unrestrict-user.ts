@@ -61,12 +61,19 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Vercel serverless function handler
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Convert Vercel request/response to Express-compatible format
+  // Modify the request URL to match what the router expects
+  const expressReq = req as any;
+  const expressRes = res as any;
+  
+  // The router expects /unrestrict-user, but Vercel routes /api/admin/unrestrict-user here
+  // So we need to modify the path
+  const originalUrl = expressReq.url;
+  expressReq.url = '/unrestrict-user';
+  expressReq.path = '/unrestrict-user';
+  expressReq.originalUrl = '/unrestrict-user';
+  
+  // Handle the request through Express
   return new Promise((resolve) => {
-    const expressReq = req as any;
-    const expressRes = res as any;
-    
-    // Handle the request through Express
     app(expressReq, expressRes, () => {
       resolve(undefined);
     });

@@ -47,7 +47,7 @@ app.use(validateRequestSize);
 app.use(sanitizeRequestBody);
 app.use(generalRateLimiter);
 
-// Mount the admin restrictions router
+// Mount the admin restrictions router at root since Vercel already routes /api/admin/restrict-user here
 app.use('/', adminRestrictionsRouter);
 
 // Error handling
@@ -61,12 +61,19 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Vercel serverless function handler
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Convert Vercel request/response to Express-compatible format
+  // Modify the request URL to match what the router expects
+  const expressReq = req as any;
+  const expressRes = res as any;
+  
+  // The router expects /restrict-user, but Vercel routes /api/admin/restrict-user here
+  // So we need to modify the path
+  const originalUrl = expressReq.url;
+  expressReq.url = '/restrict-user';
+  expressReq.path = '/restrict-user';
+  expressReq.originalUrl = '/restrict-user';
+  
+  // Handle the request through Express
   return new Promise((resolve) => {
-    const expressReq = req as any;
-    const expressRes = res as any;
-    
-    // Handle the request through Express
     app(expressReq, expressRes, () => {
       resolve(undefined);
     });
