@@ -83,6 +83,10 @@ app.use(cors({
   credentials: true
 }));
 
+// Trust proxy for Vercel (fixes rate limiting warnings)
+// Set to 1 to trust only the first proxy (Vercel's edge)
+app.set('trust proxy', 1);
+
 // Request size limits and validation
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
