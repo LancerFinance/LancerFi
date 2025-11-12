@@ -230,7 +230,8 @@ export async function checkIPBan(req: Request, res: Response, next: NextFunction
           .from('banned_ip_addresses')
           .delete()
           .eq('ip_address', clientIP)
-          .catch(err => console.error('Error cleaning up expired IP ban:', err));
+          .then(() => {})
+          .catch((err: any) => console.error('Error cleaning up expired IP ban:', err));
       }
     }
     
