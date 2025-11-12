@@ -35,6 +35,10 @@ export interface Profile {
   is_muted?: boolean;
   is_banned?: boolean;
   banned_ip_addresses?: string[];
+  restriction_type?: 'mute' | 'ban_wallet' | 'ban_ip' | null;
+  restriction_expires_at?: string | null;
+  restriction_reason?: string | null;
+  last_ip_address?: string | null;
 }
 
 export interface Project {
@@ -153,7 +157,15 @@ export const db = {
   async getProjects(filters?: { status?: string; category?: string }) {
     let query = supabase
       .from('projects')
-      .select('*')
+      .select(`
+        *,
+        profiles!projects_client_id_fkey(
+          is_muted,
+          is_banned,
+          restriction_type,
+          restriction_expires_at
+        )
+      `)
       .order('created_at', { ascending: false });
 
     if (filters?.status) {
@@ -165,6 +177,25 @@ export const db = {
 
     const { data, error } = await query;
     if (error) throw error;
+    
+    // Filter out projects from muted/banned users
+    if (data) {
+      const now = new Date();
+      return data.filter((project: any) => {
+        const profile = project.profiles;
+        if (!profile) return true; // No profile = allow
+        
+        // Check if restriction has expired
+        const expiresAt = profile.restriction_expires_at ? new Date(profile.restriction_expires_at) : null;
+        const isExpired = expiresAt && expiresAt < now;
+        
+        if (isExpired) return true; // Restriction expired = allow
+        
+        // Filter out if muted or banned
+        return !(profile.is_muted || profile.is_banned);
+      });
+    }
+    
     return data;
   },
 
@@ -895,10 +926,40 @@ export const db = {
     return data;
   },
 
+  // Get profiles for public display (excludes muted/banned users)
+  async getPublicProfiles() {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Filter out muted/banned users
+    if (data) {
+      const now = new Date();
+      return data.filter((profile: Profile) => {
+        // Check if restriction has expired
+        const expiresAt = profile.restriction_expires_at ? new Date(profile.restriction_expires_at) : null;
+        const isExpired = expiresAt && expiresAt < now;
+        
+        if (isExpired) return true; // Restriction expired = allow
+        
+        // Filter out if muted or banned
+        return !(profile.is_muted || profile.is_banned);
+      });
+    }
+
+    return data;
+  },
+
   async updateUserRestrictions(profileId: string, restrictions: {
     is_muted?: boolean;
     is_banned?: boolean;
     banned_ip_addresses?: string[];
+    restriction_type?: 'mute' | 'ban_wallet' | 'ban_ip' | null;
+    restriction_expires_at?: string | null;
+    restriction_reason?: string | null;
   }) {
     const { data, error } = await supabase
       .from('profiles')
@@ -909,6 +970,53 @@ export const db = {
     
     if (error) throw error;
     return data;
+  },
+
+  // Check if user is restricted (muted or banned)
+  async checkUserRestriction(walletAddress: string): Promise<{
+    isRestricted: boolean;
+    restrictionType: 'mute' | 'ban_wallet' | 'ban_ip' | null;
+    expiresAt: string | null;
+    reason: string | null;
+  }> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('restriction_type, restriction_expires_at, restriction_reason, is_muted, is_banned')
+      .eq('wallet_address', walletAddress)
+      .maybeSingle();
+    
+    if (error || !data) {
+      return { isRestricted: false, restrictionType: null, expiresAt: null, reason: null };
+    }
+
+    // Check if restriction has expired
+    const now = new Date();
+    const expiresAt = data.restriction_expires_at ? new Date(data.restriction_expires_at) : null;
+    const isExpired = expiresAt && expiresAt < now;
+
+    if (isExpired) {
+      // Restriction expired, clear it
+      await supabase
+        .from('profiles')
+        .update({
+          is_muted: false,
+          is_banned: false,
+          restriction_type: null,
+          restriction_expires_at: null
+        })
+        .eq('wallet_address', walletAddress);
+      
+      return { isRestricted: false, restrictionType: null, expiresAt: null, reason: null };
+    }
+
+    const isRestricted = (data.is_muted || data.is_banned) && !isExpired;
+    
+    return {
+      isRestricted,
+      restrictionType: data.restriction_type as 'mute' | 'ban_wallet' | 'ban_ip' | null,
+      expiresAt: data.restriction_expires_at,
+      reason: data.restriction_reason
+    };
   },
 
 };

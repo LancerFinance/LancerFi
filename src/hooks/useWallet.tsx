@@ -127,6 +127,27 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         const address = resp?.publicKey?.toString?.() || w.solana?.publicKey?.toString?.();
         if (!address) throw new Error('Unable to get Solana wallet address');
 
+        // Check if wallet is banned
+        try {
+          const { db } = await import('@/lib/supabase');
+          const restriction = await db.checkUserRestriction(address);
+          if (restriction.isRestricted && restriction.restrictionType === 'ban_wallet') {
+            // Disconnect wallet immediately
+            if (w.solana?.disconnect) {
+              await w.solana.disconnect();
+            }
+            setWallet({ address: null, isConnected: false, isConnecting: false, provider: null });
+            const expiresAt = restriction.expiresAt 
+              ? new Date(restriction.expiresAt).toLocaleString()
+              : 'permanently';
+            alert(`Your wallet is banned ${expiresAt !== 'permanently' ? `until ${expiresAt}` : 'permanently'}.${restriction.reason ? ` Reason: ${restriction.reason}` : ''}`);
+            return;
+          }
+        } catch (restrictionError) {
+          console.error('Error checking restriction:', restrictionError);
+          // Continue with connection if check fails
+        }
+
         // Set auto-connect flag for future sessions
         localStorage.setItem('wallet_auto_connect', 'true');
 

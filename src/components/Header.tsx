@@ -9,6 +9,10 @@ import WalletButton from "./WalletButton";
 import { useWallet } from "@/hooks/useWallet";
 import { db } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+
+// Admin wallet address
+const ADMIN_WALLET_ADDRESS = 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U';
+
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,6 +24,9 @@ const Header = () => {
     isConnected,
     address: connectedAddress
   } = useWallet();
+  
+  // Check if connected wallet is admin wallet
+  const isAdminWallet = connectedAddress === ADMIN_WALLET_ADDRESS;
   useEffect(() => {
     if (isConnected && connectedAddress) {
       checkUnreadMessages();
@@ -182,6 +189,17 @@ const Header = () => {
             >
               CA: XXXXXXpump
             </button>
+            {isAdminWallet && (
+              <Link
+                to="/error-message"
+                className="text-xs sm:text-sm font-medium text-foreground bg-gradient-to-b from-muted to-muted/80 hover:from-muted/90 hover:to-muted/70 border-2 border-border rounded-full px-3 py-1.5 shadow-lg hover:shadow-xl active:shadow-inner active:translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
+                style={{
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)'
+                }}
+              >
+                Dashboard
+              </Link>
+            )}
           </div>
         </div>
 

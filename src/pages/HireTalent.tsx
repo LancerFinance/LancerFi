@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Star, MapPin, Wallet, Clock, User, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { supabase, Profile } from "@/lib/supabase";
+import { supabase, Profile, db } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { getSolanaPrice } from "@/lib/solana-price";
 
@@ -25,15 +25,12 @@ const HireTalent = () => {
 
   const loadFreelancers = async () => {
     try {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .not('skills', 'is', null)
-        .order('rating', { ascending: false });
-      
-      if (error) throw error;
+      // Use getPublicProfiles to exclude muted/banned users
+      const profiles = await db.getPublicProfiles();
+      const filteredProfiles = (profiles || []).filter(p => p.skills && p.skills.length > 0)
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
-      const freelancerList = profiles || [];
+      const freelancerList = filteredProfiles;
       const freelancerIds = freelancerList.map((f) => f.id).filter(Boolean);
 
       let earningsByFreelancer: Record<string, number> = {};

@@ -22,6 +22,7 @@ const AdminUsers = () => {
   const [restrictionType, setRestrictionType] = useState<'mute' | 'ban' | 'ip_ban'>('mute');
   const [ipAddress, setIpAddress] = useState('');
   const [banReason, setBanReason] = useState('');
+  const [duration, setDuration] = useState<string>('7'); // Default 7 days
 
   useEffect(() => {
     loadUsers();
@@ -61,24 +62,63 @@ const AdminUsers = () => {
       return;
     }
 
+    // Validate duration (0 = permanent, otherwise must be >= 0.1)
+    const durationNum = parseFloat(duration);
+    if (isNaN(durationNum) || (durationNum !== 0 && durationNum < 0.1)) {
+      toast({
+        title: "Error",
+        description: "Duration must be 0 (permanent) or at least 0.1 days",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const restrictions: any = {};
       
+      // Calculate expiration date (duration in days)
+      const expiresAt = durationNum > 0 
+        ? new Date(Date.now() + durationNum * 24 * 60 * 60 * 1000).toISOString()
+        : null; // 0 or negative = permanent
+      
       if (restrictionType === 'mute') {
         restrictions.is_muted = true;
+        restrictions.restriction_type = 'mute';
+        restrictions.restriction_expires_at = expiresAt;
+        restrictions.restriction_reason = banReason.trim() || null;
       } else if (restrictionType === 'ban') {
         restrictions.is_banned = true;
+        restrictions.restriction_type = 'ban_wallet';
+        restrictions.restriction_expires_at = expiresAt;
+        restrictions.restriction_reason = banReason.trim() || null;
       } else if (restrictionType === 'ip_ban') {
-        // Get existing banned IPs or initialize empty array
-        const existingBans = selectedUser.banned_ip_addresses || [];
-        restrictions.banned_ip_addresses = [...existingBans, ipAddress.trim()];
+        restrictions.restriction_type = 'ban_ip';
+        restrictions.restriction_expires_at = expiresAt;
+        restrictions.restriction_reason = banReason.trim() || null;
+        // Also add to banned IP addresses table via API
+        const API_BASE_URL = import.meta.env.VITE_API_URL ||
+          (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+        
+        try {
+          await fetch(`${API_BASE_URL}/api/admin/ban-ip`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ipAddress: ipAddress.trim(),
+              expiresAt,
+              reason: banReason.trim() || null
+            })
+          });
+        } catch (ipBanError) {
+          console.error('Error banning IP:', ipBanError);
+        }
       }
 
       await db.updateUserRestrictions(selectedUser.id, restrictions);
       
       toast({
         title: "Success",
-        description: `User ${restrictionType === 'mute' ? 'muted' : restrictionType === 'ban' ? 'banned' : 'IP banned'} successfully`
+        description: `User ${restrictionType === 'mute' ? 'muted' : restrictionType === 'ban' ? 'banned' : 'IP banned'} successfully${expiresAt ? ` for ${duration} days` : ' permanently'}`
       });
       
       setRestrictDialogOpen(false);
@@ -86,6 +126,7 @@ const AdminUsers = () => {
       setRestrictionType('mute');
       setIpAddress('');
       setBanReason('');
+      setDuration('7');
       loadUsers();
     } catch (error) {
       console.error('Error applying restriction:', error);
@@ -271,6 +312,21 @@ const AdminUsers = () => {
                   <SelectItem value="ip_ban">Ban IP Address</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label htmlFor="duration">Duration (days)</Label>
+              <Input
+                id="duration"
+                type="number"
+                min="0.1"
+                step="0.1"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder="Enter duration in days (0.1 minimum)"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Enter 0 for permanent restriction
+              </p>
             </div>
             {restrictionType === 'ip_ban' && (
               <div>

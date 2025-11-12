@@ -15,6 +15,9 @@ import { formatUSDC } from "@/lib/solana";
 import { useToast } from "@/hooks/use-toast";
 import { validateProject } from "@/lib/validation";
 
+// Admin wallet address - can edit any project
+const ADMIN_WALLET_ADDRESS = 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U';
+
 const EditProject = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -62,8 +65,11 @@ const EditProject = () => {
         return;
       }
 
-      // Check if user is the project owner
-      if (!address || projectData.client_id !== address) {
+      // Check if user is the project owner or admin wallet
+      const isAdmin = address === ADMIN_WALLET_ADDRESS;
+      const isOwner = address && projectData.client_id === address;
+      
+      if (!address || (!isOwner && !isAdmin)) {
         toast({
           title: "Access Denied",
           description: "You can only edit your own projects",
@@ -73,8 +79,8 @@ const EditProject = () => {
         return;
       }
 
-      // Check if project can be edited (only active projects)
-      if (projectData.status !== 'active') {
+      // Check if project can be edited (only active projects, unless admin)
+      if (projectData.status !== 'active' && !isAdmin) {
         toast({
           title: "Cannot Edit Project",
           description: "Only active projects can be edited",

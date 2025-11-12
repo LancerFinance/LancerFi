@@ -7,6 +7,9 @@ import rpcProxyRouter from './routes/rpc-proxy.js';
 import x402PaymentRouter from './routes/x402-payment.js';
 import projectRateLimitRouter from './routes/project-rate-limit.js';
 import projectCleanupRouter from './routes/project-cleanup.js';
+import adminAuthRouter from './routes/admin-auth.js';
+import adminRestrictionsRouter from './routes/admin-restrictions.js';
+import systemStatusRouter from './routes/system-status.js';
 import { 
   validateRequestSize, 
   sanitizeRequestBody,
@@ -104,6 +107,9 @@ app.use('/api/rpc', rpcRateLimiter, rpcProxyRouter);
 app.use('/api/x402', paymentRateLimiter, x402PaymentRouter);
 app.use('/api/project', projectRateLimitRouter);
 app.use('/api/project', projectCleanupRouter);
+app.use('/api/admin', adminAuthRouter);
+app.use('/api/admin', adminRestrictionsRouter);
+app.use('/api/system-status', systemStatusRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

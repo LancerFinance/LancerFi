@@ -48,6 +48,28 @@ const MessageDialog = ({
       return;
     }
 
+    // Check if user is muted or banned
+    try {
+      const restriction = await db.checkUserRestriction(address);
+      if (restriction.isRestricted) {
+        const restrictionType = restriction.restrictionType;
+        if (restrictionType === 'mute' || restrictionType === 'ban_wallet') {
+          const restrictionName = restrictionType === 'mute' ? 'muted' : 'banned';
+          const expiresAt = restriction.expiresAt 
+            ? new Date(restriction.expiresAt).toLocaleString()
+            : 'permanently';
+          toast({
+            title: "Cannot Send Message",
+            description: `You are ${restrictionName} ${expiresAt !== 'permanently' ? `until ${expiresAt}` : 'permanently'}. You cannot send messages.${restriction.reason ? ` Reason: ${restriction.reason}` : ''}`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Error checking restriction:', error);
+    }
+
     // Validate form
     const validationErrors = validateMessage(formData.content, formData.subject);
     if (validationErrors.length > 0) {

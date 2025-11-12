@@ -42,6 +42,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+// Admin wallet address - can edit any project
+const ADMIN_WALLET_ADDRESS = 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U';
+
 const ProjectDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -282,7 +285,8 @@ const ProjectDetails = () => {
     }
   };
 
-  const isProjectOwner = address && project && project.client_id === address;
+  const isAdmin = address === ADMIN_WALLET_ADDRESS;
+  const isProjectOwner = address && project && (project.client_id === address || isAdmin);
   const isAssignedFreelancer = address && project && project.freelancer_id && freelancer?.wallet_address === address;
 
   const handleCompleteProject = async () => {
