@@ -161,16 +161,7 @@ const AdminUsers = () => {
       return;
     }
 
-    // Validate IP address for IP ban
-    if (restrictionType === 'ip_ban' && !ipAddress.trim()) {
-      toast({
-        title: "IP Address Required",
-        description: "Please enter an IP address to ban, or the system will attempt to find the user's last known IP address.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+    // IP address is optional - backend will attempt to auto-detect if not provided
     // Validate duration (0 = permanent, otherwise must be >= 0.1)
     const durationNum = parseFloat(duration);
     if (isNaN(durationNum) || (durationNum !== 0 && durationNum < 0.1)) {
@@ -560,16 +551,15 @@ const AdminUsers = () => {
             </div>
             {restrictionType === 'ip_ban' && (
               <div>
-                <Label htmlFor="ip-address">IP Address <span className="text-destructive">*</span></Label>
+                <Label htmlFor="ip-address">IP Address (Optional)</Label>
                 <Input
                   id="ip-address"
                   value={ipAddress}
                   onChange={(e) => setIpAddress(e.target.value)}
-                  placeholder="Enter IP address (e.g., 192.168.1.1)"
-                  required
+                  placeholder="Leave empty to auto-detect from user's profile/projects"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Enter the IP address to ban. If left empty, the system will attempt to find the user's last known IP from their profile or recent projects. IP ban also applies wallet ban.
+                  Enter the IP address to ban, or leave empty to auto-detect from the user's profile or recent projects. If auto-detection fails, you'll be prompted to enter it manually. IP ban also applies wallet ban.
                 </p>
               </div>
             )}
