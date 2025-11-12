@@ -56,10 +56,11 @@ router.post('/check-wallet-limit', async (req: Request, res: Response) => {
     // This ensures failed escrow creations don't count toward the limit
     let count = 0;
     let error = null;
+    let fundedEscrows: any[] = [];
     
     try {
       // First, get all escrows for this wallet that are funded
-      const { data: fundedEscrows, error: escrowError } = await supabase
+      const { data: escrows, error: escrowError } = await supabase
         .from('escrows')
         .select('project_id, created_at')
         .eq('client_wallet', walletAddress)
@@ -68,9 +69,10 @@ router.post('/check-wallet-limit', async (req: Request, res: Response) => {
       
       if (escrowError) {
         error = escrowError;
-      } else if (fundedEscrows && fundedEscrows.length > 0) {
+      } else if (escrows && escrows.length > 0) {
+        fundedEscrows = escrows;
         // Get project IDs from funded escrows
-        const projectIds = fundedEscrows.map(e => e.project_id);
+        const projectIds = escrows.map(e => e.project_id);
         
         // Get projects created in the last 24 hours
         const { data: recentProjects, error: projectError } = await supabase
