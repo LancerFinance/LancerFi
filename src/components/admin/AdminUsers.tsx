@@ -110,7 +110,7 @@ const AdminUsers = () => {
           sender_id: 'system@lancerfi.app',
           recipient_id: selectedUser.wallet_address || selectedUser.id,
           subject: 'Warning from Admin',
-          content: `You have been warned by an administrator.${warnReason.trim() ? ` Reason: ${warnReason.trim()}` : ''} Please review our terms of service and community guidelines.`
+          content: `You have been warned by an administrator.${warnReason.trim() ? ` Reason: ${warnReason.trim()}` : ''}`
         });
       } catch (msgError) {
         console.error('Error sending warning message:', msgError);
