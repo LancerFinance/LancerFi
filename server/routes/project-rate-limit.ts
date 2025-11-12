@@ -30,6 +30,118 @@ function getClientIP(req: Request): string {
 }
 
 /**
+ * Check if wallet can create a project (2 projects per 24 hours)
+ */
+router.post('/check-wallet-limit', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress } = req.body;
+    
+    if (!walletAddress) {
+      return res.status(400).json({ 
+        allowed: false, 
+        error: 'walletAddress is required',
+        count: 0,
+        limit: 2
+      });
+    }
+    
+    const supabase = supabaseClient;
+    
+    // Get current timestamp and 24 hours ago
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    // Count projects created by this wallet in the last 24 hours
+    // Only count projects that have successfully created escrow (status = 'funded')
+    // This ensures failed escrow creations don't count toward the limit
+    let count = 0;
+    let error = null;
+    
+    try {
+      // First, get all escrows for this wallet that are funded
+      const { data: fundedEscrows, error: escrowError } = await supabase
+        .from('escrows')
+        .select('project_id, created_at')
+        .eq('client_wallet', walletAddress)
+        .eq('status', 'funded')
+        .order('created_at', { ascending: false });
+      
+      if (escrowError) {
+        error = escrowError;
+      } else if (fundedEscrows && fundedEscrows.length > 0) {
+        // Get project IDs from funded escrows
+        const projectIds = fundedEscrows.map(e => e.project_id);
+        
+        // Get projects created in the last 24 hours
+        const { data: recentProjects, error: projectError } = await supabase
+          .from('projects')
+          .select('id, created_at')
+          .in('id', projectIds)
+          .eq('client_id', walletAddress)
+          .gte('created_at', twentyFourHoursAgo.toISOString());
+        
+        if (projectError) {
+          error = projectError;
+        } else {
+          count = recentProjects?.length || 0;
+        }
+      }
+    } catch (e: any) {
+      error = e;
+    }
+    
+    if (error) {
+      console.error('Error checking wallet limit:', error);
+      // Fail open - allow if we can't check
+      return res.json({ 
+        allowed: true, 
+        reason: 'Unable to verify wallet limit',
+        count: 0,
+        limit: 2
+      });
+    }
+    
+    const projectCount = count || 0;
+    const allowed = projectCount < 2;
+    
+    if (!allowed) {
+      // Find the oldest project in the last 24 hours to calculate remaining time
+      let remainingHours = 24;
+      if (fundedEscrows && fundedEscrows.length > 0) {
+        const oldestEscrow = fundedEscrows[fundedEscrows.length - 1];
+        const oldestProjectTime = new Date(oldestEscrow.created_at);
+        const hoursSinceOldest = (now.getTime() - oldestProjectTime.getTime()) / (1000 * 60 * 60);
+        remainingHours = Math.ceil(24 - hoursSinceOldest);
+      }
+      
+      return res.json({
+        allowed: false,
+        count: projectCount,
+        limit: 2,
+        reason: `Wallet has reached the limit of 2 projects in 24 hours. Please wait ${remainingHours} more hour${remainingHours > 1 ? 's' : ''} before creating another project.`,
+        remainingHours
+      });
+    }
+    
+    return res.json({
+      allowed: true,
+      count: projectCount,
+      limit: 2,
+      reason: `Wallet has created ${projectCount}/2 projects in the last 24 hours`
+    });
+  } catch (error: any) {
+    console.error('Error in wallet limit check:', error);
+    // Fail open - allow if there's an error
+    return res.json({ 
+      allowed: true, 
+      reason: 'Error checking wallet limit',
+      count: 0,
+      limit: 2
+    });
+  }
+});
+
+/**
  * Check if IP can create a project (3 projects per 6 hours)
  */
 router.post('/check-ip-limit', async (req: Request, res: Response) => {
@@ -259,4 +371,3 @@ router.post('/reset-rate-limit', async (req: Request, res: Response) => {
 });
 
 export default router;
-

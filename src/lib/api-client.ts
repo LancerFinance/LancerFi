@@ -114,6 +114,49 @@ export async function checkBackendHealth(): Promise<boolean> {
 }
 
 /**
+ * Check if wallet can create a project (2 projects per 24 hours)
+ */
+export async function checkWalletProjectLimit(walletAddress: string): Promise<{
+  allowed: boolean;
+  count: number;
+  limit: number;
+  reason: string;
+  remainingHours?: number;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/project/check-wallet-limit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ walletAddress }),
+    });
+
+    if (!response.ok) {
+      // Fail open - allow if we can't check
+      return {
+        allowed: true,
+        count: 0,
+        limit: 2,
+        reason: 'Unable to verify wallet limit',
+      };
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error checking wallet limit:', error);
+    // Fail open - allow if there's an error
+    return {
+      allowed: true,
+      count: 0,
+      limit: 2,
+      reason: 'Error checking wallet limit',
+    };
+  }
+}
+
+/**
  * Check if IP can create a project (3 projects per 6 hours)
  */
 export async function checkIPProjectLimit(): Promise<{

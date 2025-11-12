@@ -303,47 +303,18 @@ const PostProject = () => {
     // Show loading state immediately
     setIsCheckingBalance(true);
     
-    // TEMPORARILY DISABLED: Rate limiting checks (for testing)
-    // TODO: Re-enable rate limiting after testing
-    /*
-    // Check wallet-based rate limit (24 hours between projects)
-    // Only count projects that have successfully created escrow (status = 'funded')
-    // This ensures failed escrow creations don't count toward the limit
+    // Check wallet-based rate limit (2 projects per 24 hours)
     try {
-      // First, get all escrows for this wallet that are funded
-      const { data: fundedEscrows, error: escrowError } = await supabase
-        .from('escrows')
-        .select('project_id, created_at')
-        .eq('client_wallet', address)
-        .eq('status', 'funded')
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (!escrowError && fundedEscrows && fundedEscrows.length > 0) {
-        // Get the project creation time for the most recent funded escrow
-        const { data: project, error: projectError } = await supabase
-          .from('projects')
-          .select('created_at')
-          .eq('id', fundedEscrows[0].project_id)
-          .eq('client_id', address)
-          .single();
-        
-        if (!projectError && project) {
-          const lastProjectTime = new Date(project.created_at);
-          const now = new Date();
-          const hoursSinceLastProject = (now.getTime() - lastProjectTime.getTime()) / (1000 * 60 * 60);
-          
-          if (hoursSinceLastProject < 24) {
-            const remainingHours = Math.ceil(24 - hoursSinceLastProject);
-            setIsCheckingBalance(false);
-            toast({
-              title: "Rate Limit Exceeded",
-              description: `You can only create one project every 24 hours. Please wait ${remainingHours} more hour${remainingHours > 1 ? 's' : ''} before creating another project.`,
-              variant: "destructive",
-            });
-            return;
-          }
-        }
+      const { checkWalletProjectLimit } = await import('@/lib/api-client');
+      const walletLimitCheck = await checkWalletProjectLimit(address);
+      if (!walletLimitCheck.allowed) {
+        setIsCheckingBalance(false);
+        toast({
+          title: "Rate Limit Exceeded",
+          description: walletLimitCheck.reason || `You can only create 2 projects every 24 hours. Please wait ${walletLimitCheck.remainingHours || 24} more hour${(walletLimitCheck.remainingHours || 24) > 1 ? 's' : ''} before creating another project.`,
+          variant: "destructive",
+        });
+        return;
       }
     } catch (walletLimitError: any) {
       console.error('Error checking wallet rate limit:', walletLimitError);
@@ -352,6 +323,7 @@ const PostProject = () => {
     
     // Check IP-based rate limit (3 projects per 6 hours)
     try {
+      const { checkIPProjectLimit } = await import('@/lib/api-client');
       const ipLimitCheck = await checkIPProjectLimit();
       if (!ipLimitCheck.allowed) {
         setIsCheckingBalance(false);
@@ -366,7 +338,6 @@ const PostProject = () => {
       console.error('Error checking IP rate limit:', ipLimitError);
       // Continue if check fails (fail open)
     }
-    */
     
     // Check wallet balances before proceeding
     // For SOL payments, check SOL balance (payment amount + platform fee + transaction fees)
