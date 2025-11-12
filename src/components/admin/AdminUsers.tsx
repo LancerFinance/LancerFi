@@ -194,8 +194,9 @@ const AdminUsers = () => {
                                      'ban_ip';
 
       // Authenticate with backend
+      // Use relative URL in production (same domain), or env variable, or fallback
       const API_BASE_URL = import.meta.env.VITE_API_URL ||
-        (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+        (import.meta.env.PROD ? '' : 'http://localhost:3001');
 
       // Generate challenge and sign it
       const timestamp = Date.now();
@@ -276,8 +277,9 @@ const AdminUsers = () => {
     }
 
     try {
+      // Use relative URL in production (same domain), or env variable, or fallback
       const API_BASE_URL = import.meta.env.VITE_API_URL ||
-        (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+        (import.meta.env.PROD ? '' : 'http://localhost:3001');
 
       // Generate challenge and sign it
       const timestamp = Date.now();
