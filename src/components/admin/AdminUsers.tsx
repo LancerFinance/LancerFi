@@ -213,13 +213,16 @@ const AdminUsers = () => {
         throw signError;
       }
 
+      // Convert signature to base64 (browser-compatible)
+      const signatureBase64 = btoa(String.fromCharCode(...Array.from(signature)));
+
       // Call backend API
       const response = await fetch(`${API_BASE_URL}/api/admin/restrict-user`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletAddress: address,
-          signature: Buffer.from(signature).toString('base64'),
+          signature: signatureBase64,
           message: challenge,
           profileId: selectedUser.id,
           restrictionType: backendRestrictionType,
@@ -292,13 +295,16 @@ const AdminUsers = () => {
         throw signError;
       }
 
+      // Convert signature to base64 (browser-compatible)
+      const signatureBase64 = btoa(String.fromCharCode(...Array.from(signature)));
+
       // Call backend API
       const response = await fetch(`${API_BASE_URL}/api/admin/unrestrict-user`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletAddress: address,
-          signature: Buffer.from(signature).toString('base64'),
+          signature: signatureBase64,
           message: challenge,
           profileId: user.id
         })
