@@ -160,76 +160,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Update user restrictions
-    const { data: updatedProfile, error: updateError } = await supabaseClient
-      .from('profiles')
-      .update(restrictions)
-      .eq('id', profileId)
-      .select()
-      .single();
-
-    if (updateError) {
-      console.error('Error updating user restrictions:', updateError);
-      return res.status(500).json({ 
-        error: 'Failed to update user restrictions', 
-        details: updateError.message,
-        code: updateError.code
-      });
-    }
-
-    // Send system message to user about the restriction (using service key to bypass RLS)
-    if (userProfile?.wallet_address && (restrictionType === 'mute' || restrictionType === 'ban_wallet' || restrictionType === 'ban_ip')) {
-      try {
-        const restrictionName = restrictionType === 'mute' ? 'muted' : restrictionType === 'ban_ip' ? 'IP banned' : 'banned';
-        const expiresText = expiresAt 
-          ? ` until ${new Date(expiresAt).toLocaleString()}`
-          : ' permanently';
-        const reasonText = reason ? ` Reason: ${reason}` : '';
-        
-        const { error: messageError } = await supabaseClient
-          .from('messages')
-          .insert({
-            sender_id: 'system@lancerfi.app',
-            recipient_id: userProfile.wallet_address,
-            subject: `You have been ${restrictionType === 'ban_ip' ? 'IP banned' : restrictionName}`,
-            content: `You have been ${restrictionName}${expiresText}.${reasonText}`,
-            is_read: false
-          });
-        
-        if (messageError) {
-          console.error('Error sending restriction message:', messageError);
-          // Don't fail the request if message fails
-        } else {
-          console.log('Restriction message sent to:', userProfile.wallet_address);
-        }
-      } catch (msgError: any) {
-        console.error('Exception sending restriction message:', msgError);
-        // Don't fail the request if message fails
-      }
-    }
-
-    // Record mute in history if it's a mute
-    if (restrictionType === 'mute') {
-      try {
-        const { error: historyError } = await supabaseClient
-          .from('mute_history')
-          .insert({
-            profile_id: profileId,
-            muted_by_wallet: walletAddress,
-            reason: reason || null
-          });
-        
-        if (historyError) {
-          console.error('Error recording mute history:', historyError);
-          // Don't fail the request if history recording fails
-        }
-      } catch (historyError: any) {
-        console.error('Exception recording mute history:', historyError);
-        // Don't fail the request if history recording fails
-      }
-    }
-
-    // Handle IP ban separately
+    // Handle IP ban FIRST (before updating profile) to validate IP exists
+    // This ensures we don't apply wallet ban or send message if IP ban fails
     if (restrictionType === 'ban_ip') {
       // Get IP address: use provided IP, or user's last known IP from profile, or from recent projects
       let ipToBan = ipAddress?.trim();
@@ -267,20 +199,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       
+      // If no IP found, return error BEFORE applying any restrictions
       if (!ipToBan) {
         console.error('Cannot ban IP: No IP address found for user');
-        // If no IP can be found, still apply wallet ban but return error about IP
         return res.status(400).json({ 
           error: 'Cannot ban IP: No IP address found for user. The user has no recorded IP address in their profile or recent projects. Please manually enter an IP address to proceed with the IP ban.',
           suggestion: 'You can manually enter the IP address in the IP Address field, or the system will attempt to find it from the user\'s profile or recent projects.'
         });
       }
       
+      // Ban the IP address
       try {
         const { error: ipBanError } = await supabaseClient
           .from('banned_ip_addresses')
           .upsert({
-            ip_address: ipToBan,
+            ip_address: ipToBan.trim(),
             expires_at: expiresAt || null,
             reason: reason || null,
             banned_by_wallet: walletAddress
@@ -292,7 +225,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           console.error('Error banning IP:', ipBanError);
           return res.status(500).json({ 
             error: 'Failed to ban IP address', 
-            details: ipBanError.message 
+            details: ipBanError.message,
+            code: ipBanError.code
           });
         }
         
@@ -301,8 +235,77 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error('Exception banning IP:', ipBanError);
         return res.status(500).json({ 
           error: 'Failed to ban IP address', 
-          details: ipBanError.message 
+          details: ipBanError.message || 'Unknown error'
         });
+      }
+    }
+
+    // Now update user restrictions (wallet ban is applied here for IP bans)
+    const { data: updatedProfile, error: updateError } = await supabaseClient
+      .from('profiles')
+      .update(restrictions)
+      .eq('id', profileId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error updating user restrictions:', updateError);
+      return res.status(500).json({ 
+        error: 'Failed to update user restrictions', 
+        details: updateError.message,
+        code: updateError.code
+      });
+    }
+
+    // Record mute in history if it's a mute
+    if (restrictionType === 'mute') {
+      try {
+        const { error: historyError } = await supabaseClient
+          .from('mute_history')
+          .insert({
+            profile_id: profileId,
+            muted_by_wallet: walletAddress,
+            reason: reason || null
+          });
+        
+        if (historyError) {
+          console.error('Error recording mute history:', historyError);
+          // Don't fail the request if history recording fails
+        }
+      } catch (historyError: any) {
+        console.error('Exception recording mute history:', historyError);
+        // Don't fail the request if history recording fails
+      }
+    }
+
+    // Send system message to user about the restriction (AFTER all restrictions are successfully applied)
+    if (userProfile?.wallet_address && (restrictionType === 'mute' || restrictionType === 'ban_wallet' || restrictionType === 'ban_ip')) {
+      try {
+        const restrictionName = restrictionType === 'mute' ? 'muted' : restrictionType === 'ban_ip' ? 'IP banned' : 'banned';
+        const expiresText = expiresAt 
+          ? ` until ${new Date(expiresAt).toLocaleString()}`
+          : ' permanently';
+        const reasonText = reason ? ` Reason: ${reason}` : '';
+        
+        const { error: messageError } = await supabaseClient
+          .from('messages')
+          .insert({
+            sender_id: 'system@lancerfi.app',
+            recipient_id: userProfile.wallet_address,
+            subject: `You have been ${restrictionType === 'ban_ip' ? 'IP banned' : restrictionName}`,
+            content: `You have been ${restrictionName}${expiresText}.${reasonText}`,
+            is_read: false
+          });
+        
+        if (messageError) {
+          console.error('Error sending restriction message:', messageError);
+          // Don't fail the request if message fails
+        } else {
+          console.log('Restriction message sent to:', userProfile.wallet_address);
+        }
+      } catch (msgError: any) {
+        console.error('Exception sending restriction message:', msgError);
+        // Don't fail the request if message fails
       }
     }
 
