@@ -8,6 +8,7 @@ type VercelRequest = any;
 type VercelResponse = any;
 
 import { supabaseClient } from '../../server/services/supabase.js';
+import { checkIPBanForVercel } from '../../server/middleware/ip-ban-check.js';
 
 // Admin wallet address - only this wallet can access admin endpoints
 const ADMIN_WALLET_ADDRESS = 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U';
@@ -54,6 +55,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+  
+  // Check IP ban first - block all requests from banned IPs
+  const isBlocked = await checkIPBanForVercel(req, res);
+  if (isBlocked) {
+    return; // Request already blocked
   }
   
   // Only allow POST requests

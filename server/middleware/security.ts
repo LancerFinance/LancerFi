@@ -4,6 +4,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
+import { supabaseClient } from '../services/supabase.js';
 
 // Request size limits
 const MAX_JSON_SIZE = '10mb';
@@ -154,5 +155,91 @@ export function validateStringLength(str: string, min: number, max: number): boo
   
   const length = str.length;
   return length >= min && length <= max;
+}
+
+/**
+ * Get client IP address from request
+ */
+export function getClientIP(req: Request): string {
+  // Check various headers for IP (handles proxies/load balancers)
+  const forwarded = req.headers['x-forwarded-for'];
+  const realIP = req.headers['x-real-ip'];
+  const cfConnectingIP = req.headers['cf-connecting-ip']; // Cloudflare
+  
+  if (typeof forwarded === 'string') {
+    // x-forwarded-for can contain multiple IPs, take the first one
+    return forwarded.split(',')[0].trim();
+  }
+  
+  if (typeof realIP === 'string') {
+    return realIP;
+  }
+  
+  if (typeof cfConnectingIP === 'string') {
+    return cfConnectingIP;
+  }
+  
+  // Fallback to connection remote address
+  return req.socket?.remoteAddress || req.ip || 'unknown';
+}
+
+/**
+ * Middleware to check if IP address is banned and block all requests
+ * This should be applied early in the middleware chain
+ */
+export async function checkIPBan(req: Request, res: Response, next: NextFunction) {
+  try {
+    const clientIP = getClientIP(req);
+    
+    // Skip check if IP is unknown or localhost (for development)
+    if (!clientIP || clientIP === 'unknown' || clientIP === '::1' || clientIP.startsWith('127.') || clientIP.startsWith('::ffff:127.')) {
+      return next();
+    }
+    
+    // Check if IP is banned
+    const { data: ipBan, error } = await supabaseClient
+      .from('banned_ip_addresses')
+      .select('*')
+      .eq('ip_address', clientIP)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error checking IP ban:', error);
+      // On error, allow request (fail open for availability)
+      return next();
+    }
+    
+    if (ipBan) {
+      // Check if ban has expired
+      const now = new Date();
+      const expires = ipBan.expires_at ? new Date(ipBan.expires_at) : null;
+      const isExpired = expires && expires < now;
+      
+      if (!isExpired) {
+        // IP is banned and not expired - block the request
+        console.log(`Blocked request from banned IP: ${clientIP}`);
+        return res.status(403).json({
+          error: 'Access denied',
+          message: 'Your IP address has been banned from accessing this service.',
+          expiresAt: ipBan.expires_at || null,
+          reason: ipBan.reason || null
+        });
+      } else {
+        // Ban expired, clean it up (async, don't block request)
+        supabaseClient
+          .from('banned_ip_addresses')
+          .delete()
+          .eq('ip_address', clientIP)
+          .catch(err => console.error('Error cleaning up expired IP ban:', err));
+      }
+    }
+    
+    // IP is not banned or ban expired - allow request
+    next();
+  } catch (error: any) {
+    console.error('Exception in IP ban check:', error);
+    // On exception, allow request (fail open for availability)
+    next();
+  }
 }
 

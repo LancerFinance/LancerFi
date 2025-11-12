@@ -210,13 +210,29 @@ router.post('/unrestrict-user', generalRateLimiter, verifyAdminWallet, async (re
 /**
  * GET /api/admin/check-restriction
  * Check if a wallet or IP is restricted
+ * If no parameters provided, checks the request IP address
  */
 router.get('/check-restriction', generalRateLimiter, async (req: Request, res: Response) => {
   try {
     const { walletAddress, ipAddress } = req.query;
-
+    
+    // If no parameters, get IP from request
+    let ipToCheck = ipAddress as string | undefined;
     if (!walletAddress && !ipAddress) {
-      return res.status(400).json({ error: 'walletAddress or ipAddress is required' });
+      // Get client IP from request
+      const forwarded = req.headers['x-forwarded-for'];
+      const realIP = req.headers['x-real-ip'];
+      const cfConnectingIP = req.headers['cf-connecting-ip'];
+      
+      if (typeof forwarded === 'string') {
+        ipToCheck = forwarded.split(',')[0].trim();
+      } else if (typeof realIP === 'string') {
+        ipToCheck = realIP;
+      } else if (typeof cfConnectingIP === 'string') {
+        ipToCheck = cfConnectingIP;
+      } else {
+        ipToCheck = req.socket?.remoteAddress || req.ip || undefined;
+      }
     }
 
     let isRestricted = false;
@@ -247,11 +263,11 @@ router.get('/check-restriction', generalRateLimiter, async (req: Request, res: R
     }
 
     // Check IP ban
-    if (ipAddress && !isRestricted) {
+    if (ipToCheck && !isRestricted) {
       const { data: ipBan, error: ipError } = await supabaseClient
         .from('banned_ip_addresses')
         .select('*')
-        .eq('ip_address', ipAddress as string)
+        .eq('ip_address', ipToCheck)
         .maybeSingle();
 
       if (!ipError && ipBan) {
@@ -264,6 +280,16 @@ router.get('/check-restriction', generalRateLimiter, async (req: Request, res: R
           restrictionType = 'ban_ip';
           expiresAt = ipBan.expires_at;
           reason = ipBan.reason;
+          
+          // If IP is banned, return 403 instead of 200
+          return res.status(403).json({
+            error: 'Access denied',
+            message: 'Your IP address has been banned from accessing this service.',
+            isRestricted: true,
+            restrictionType: 'ban_ip',
+            expiresAt: ipBan.expires_at,
+            reason: ipBan.reason
+          });
         }
       }
     }

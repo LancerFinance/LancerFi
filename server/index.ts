@@ -93,6 +93,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(validateRequestSize);
 app.use(sanitizeRequestBody);
 
+// Check IP bans before any other processing (blocks all requests from banned IPs)
+import { checkIPBan } from './middleware/security.js';
+app.use(checkIPBan);
+
 // Apply general rate limiting to all routes
 app.use(generalRateLimiter);
 

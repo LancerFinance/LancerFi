@@ -22,15 +22,17 @@ import BrowseServices from "./pages/BrowseServices";
 import ServiceDetails from "./pages/ServiceDetails";
 import AdminDashboard from "./pages/AdminDashboard";
 import { WalletProvider } from "@/hooks/useWallet";
+import { IPBanGuard } from "@/components/IPBanGuard";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <WalletProvider>
-      <Toaster />
-      <Sonner />
-    <BrowserRouter>
+      <IPBanGuard>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/how-it-works" element={<HowItWorksPage />} />
@@ -54,6 +56,7 @@ const App = () => (
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
+      </IPBanGuard>
     </WalletProvider>
   </QueryClientProvider>
 );

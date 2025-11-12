@@ -15,7 +15,8 @@ import {
   sanitizeRequestBody,
   generalRateLimiter,
   paymentRateLimiter,
-  rpcRateLimiter
+  rpcRateLimiter,
+  checkIPBan
 } from '../server/middleware/security.js';
 
 // Load environment variables
@@ -92,6 +93,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(validateRequestSize);
 app.use(sanitizeRequestBody);
+
+// Check IP bans before any other processing (blocks all requests from banned IPs)
+app.use(checkIPBan);
 
 // Apply general rate limiting to all routes
 app.use(generalRateLimiter);
