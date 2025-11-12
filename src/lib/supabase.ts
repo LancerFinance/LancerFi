@@ -39,6 +39,9 @@ export interface Profile {
   restriction_expires_at?: string | null;
   restriction_reason?: string | null;
   last_ip_address?: string | null;
+  warning_count?: number;
+  last_warning_at?: string | null;
+  last_warning_reason?: string | null;
 }
 
 export interface Project {

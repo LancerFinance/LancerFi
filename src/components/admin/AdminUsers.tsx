@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, User, Ban, Volume2, VolumeX, Shield } from "lucide-react";
-import { db, Profile } from "@/lib/supabase";
+import { db, Profile, supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -23,6 +23,9 @@ const AdminUsers = () => {
   const [ipAddress, setIpAddress] = useState('');
   const [banReason, setBanReason] = useState('');
   const [duration, setDuration] = useState<string>('7'); // Default 7 days
+  const [warnDialogOpen, setWarnDialogOpen] = useState(false);
+  const [warnReason, setWarnReason] = useState('');
+  const [muteHistory, setMuteHistory] = useState<Record<string, number>>({}); // profile_id -> mute count in last 7 days
 
   useEffect(() => {
     loadUsers();
@@ -33,6 +36,9 @@ const AdminUsers = () => {
       setLoading(true);
       const data = await db.getAllProfiles();
       setUsers(data || []);
+      
+      // Load mute history for all users
+      await loadMuteHistory(data || []);
     } catch (error) {
       console.error('Error loading users:', error);
       toast({
@@ -45,9 +51,87 @@ const AdminUsers = () => {
     }
   };
 
+  const loadMuteHistory = async (profiles: Profile[]) => {
+    try {
+      const profileIds = profiles.map(p => p.id);
+      if (profileIds.length === 0) return;
+
+      const { data, error } = await supabase
+        .from('mute_history')
+        .select('profile_id, muted_at')
+        .in('profile_id', profileIds)
+        .gte('muted_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()); // Last 7 days
+
+      if (error) throw error;
+
+      // Count mutes per profile in last 7 days
+      const muteCounts: Record<string, number> = {};
+      (data || []).forEach((record: any) => {
+        muteCounts[record.profile_id] = (muteCounts[record.profile_id] || 0) + 1;
+      });
+
+      setMuteHistory(muteCounts);
+    } catch (error) {
+      console.error('Error loading mute history:', error);
+    }
+  };
+
   const handleRestrict = (user: Profile) => {
     setSelectedUser(user);
     setRestrictDialogOpen(true);
+  };
+
+  const handleWarn = (user: Profile) => {
+    setSelectedUser(user);
+    setWarnDialogOpen(true);
+  };
+
+  const applyWarning = async () => {
+    if (!selectedUser) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          warning_count: (selectedUser.warning_count || 0) + 1,
+          last_warning_at: new Date().toISOString(),
+          last_warning_reason: warnReason.trim() || null
+        })
+        .eq('id', selectedUser.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Send warning message to user
+      try {
+        await db.createMessage({
+          sender_id: 'system@lancerfi.app',
+          recipient_id: selectedUser.wallet_address || selectedUser.id,
+          subject: 'Warning from Admin',
+          content: `You have been warned by an administrator.${warnReason.trim() ? ` Reason: ${warnReason.trim()}` : ''} Please review our terms of service and community guidelines.`
+        });
+      } catch (msgError) {
+        console.error('Error sending warning message:', msgError);
+      }
+
+      toast({
+        title: "Success",
+        description: `User warned successfully. Warning count: ${data.warning_count}`
+      });
+
+      setWarnDialogOpen(false);
+      setSelectedUser(null);
+      setWarnReason('');
+      loadUsers();
+    } catch (error) {
+      console.error('Error applying warning:', error);
+      toast({
+        title: "Error",
+        description: "Failed to apply warning",
+        variant: "destructive"
+      });
+    }
   };
 
   const applyRestriction = async () => {
@@ -82,10 +166,34 @@ const AdminUsers = () => {
         : null; // 0 or negative = permanent
       
       if (restrictionType === 'mute') {
+        // Check mute limit (3 mutes per week)
+        const muteCount = muteHistory[selectedUser.id] || 0;
+        if (muteCount >= 3) {
+          toast({
+            title: "Mute Limit Reached",
+            description: "This user has been muted 3 times in the past 7 days. Cannot mute again.",
+            variant: "destructive"
+          });
+          return;
+        }
+
         restrictions.is_muted = true;
         restrictions.restriction_type = 'mute';
         restrictions.restriction_expires_at = expiresAt;
         restrictions.restriction_reason = banReason.trim() || null;
+
+        // Record mute in history
+        try {
+          await supabase
+            .from('mute_history')
+            .insert({
+              profile_id: selectedUser.id,
+              muted_by_wallet: 'admin@lancerfi.app',
+              reason: banReason.trim() || null
+            });
+        } catch (historyError) {
+          console.error('Error recording mute history:', historyError);
+        }
       } else if (restrictionType === 'ban') {
         restrictions.is_banned = true;
         restrictions.restriction_type = 'ban_wallet';
@@ -127,7 +235,11 @@ const AdminUsers = () => {
       setIpAddress('');
       setBanReason('');
       setDuration('7');
-      loadUsers();
+      
+      // Reload users and mute history
+      const updatedUsers = await db.getAllProfiles();
+      setUsers(updatedUsers || []);
+      await loadMuteHistory(updatedUsers || []);
     } catch (error) {
       console.error('Error applying restriction:', error);
       toast({
@@ -138,14 +250,15 @@ const AdminUsers = () => {
     }
   };
 
-  const removeRestriction = async (user: Profile, type: 'mute' | 'ban') => {
+  const removeRestriction = async (user: Profile) => {
     try {
-      const restrictions: any = {};
-      if (type === 'mute') {
-        restrictions.is_muted = false;
-      } else if (type === 'ban') {
-        restrictions.is_banned = false;
-      }
+      const restrictions: any = {
+        is_muted: false,
+        is_banned: false,
+        restriction_type: null,
+        restriction_expires_at: null,
+        restriction_reason: null
+      };
 
       await db.updateUserRestrictions(user.id, restrictions);
       
@@ -154,7 +267,10 @@ const AdminUsers = () => {
         description: `Restriction removed successfully`
       });
       
-      loadUsers();
+      // Reload users and mute history
+      const updatedUsers = await db.getAllProfiles();
+      setUsers(updatedUsers || []);
+      await loadMuteHistory(updatedUsers || []);
     } catch (error) {
       console.error('Error removing restriction:', error);
       toast({
@@ -238,6 +354,11 @@ const AdminUsers = () => {
                           IP Banned ({user.banned_ip_addresses.length})
                         </Badge>
                       )}
+                      {muteHistory[user.id] !== undefined && muteHistory[user.id] >= 3 && (
+                        <Badge variant="outline" className="bg-orange-500/10 text-orange-700 dark:text-orange-400">
+                          Muted 3 times in past 7 days
+                        </Badge>
+                      )}
                     </div>
                     <div className="space-y-1 text-sm text-muted-foreground">
                       <p>Wallet: {user.wallet_address || 'N/A'}</p>
@@ -249,34 +370,45 @@ const AdminUsers = () => {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    {user.is_muted && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeRestriction(user, 'mute')}
-                      >
-                        <Volume2 className="w-4 h-4 mr-2" />
-                        Unmute
-                      </Button>
-                    )}
-                    {user.is_banned && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeRestriction(user, 'ban')}
-                      >
-                        Unban
-                      </Button>
-                    )}
                     {(!user.is_muted && !user.is_banned) && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleRestrict(user)}
-                      >
-                        <Shield className="w-4 h-4 mr-2" />
-                        Restrict
-                      </Button>
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleWarn(user)}
+                        >
+                          <Shield className="w-4 h-4 mr-2" />
+                          Warn
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRestrict(user)}
+                        >
+                          <Shield className="w-4 h-4 mr-2" />
+                          Restrict
+                        </Button>
+                      </>
+                    )}
+                    {(user.is_muted || user.is_banned) && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRestrict(user)}
+                        >
+                          <Shield className="w-4 h-4 mr-2" />
+                          Restrict
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeRestriction(user)}
+                        >
+                          <Volume2 className="w-4 h-4 mr-2" />
+                          Unrestrict
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -351,6 +483,37 @@ const AdminUsers = () => {
             </div>
             <Button onClick={applyRestriction} className="w-full">
               Apply Restriction
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Warning Dialog */}
+      <Dialog open={warnDialogOpen} onOpenChange={setWarnDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Warn User</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>User</Label>
+              <Input 
+                value={selectedUser?.wallet_address || ''} 
+                disabled 
+              />
+            </div>
+            <div>
+              <Label htmlFor="warn-reason">Reason (Optional)</Label>
+              <Textarea
+                id="warn-reason"
+                value={warnReason}
+                onChange={(e) => setWarnReason(e.target.value)}
+                placeholder="Enter reason for warning"
+                rows={3}
+              />
+            </div>
+            <Button onClick={applyWarning} className="w-full">
+              Send Warning
             </Button>
           </div>
         </DialogContent>
