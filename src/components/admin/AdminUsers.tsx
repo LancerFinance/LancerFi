@@ -194,9 +194,9 @@ const AdminUsers = () => {
                                      'ban_ip';
 
       // Authenticate with backend
-      // Force relative URL in production - no hardcoded backend URL
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 
-        (import.meta.env.DEV ? 'http://localhost:3001' : '');
+      // ALWAYS use relative URL in production - ignore VITE_API_URL env var for admin routes
+      // This ensures admin routes use same-domain API calls
+      const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
 
       // No signature required - admin wallet is already verified by dashboard access
       // Call backend API
@@ -257,9 +257,8 @@ const AdminUsers = () => {
     }
 
     try {
-      // Use relative URL in production (same domain), or env variable, or fallback
-      const API_BASE_URL = import.meta.env.VITE_API_URL ||
-        (import.meta.env.PROD ? '' : 'http://localhost:3001');
+      // ALWAYS use relative URL in production - ignore VITE_API_URL env var for admin routes
+      const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
 
       // No signature required - admin wallet is already verified by dashboard access
       // Call backend API
