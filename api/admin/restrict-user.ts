@@ -180,7 +180,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Send system message to user about the restriction (using service key to bypass RLS)
     if (userProfile?.wallet_address && (restrictionType === 'mute' || restrictionType === 'ban_wallet' || restrictionType === 'ban_ip')) {
       try {
-        const restrictionName = restrictionType === 'mute' ? 'muted' : restrictionType === 'ban_ip' ? 'IP banned (wallet also banned)' : 'banned';
+        const restrictionName = restrictionType === 'mute' ? 'muted' : restrictionType === 'ban_ip' ? 'IP banned' : 'banned';
         const expiresText = expiresAt 
           ? ` until ${new Date(expiresAt).toLocaleString()}`
           : ' permanently';
