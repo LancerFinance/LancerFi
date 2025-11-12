@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, User, Ban, Volume2, VolumeX, Shield } from "lucide-react";
+import { Search, User, Ban, Volume2, VolumeX, Shield, Copy, Check } from "lucide-react";
 import { db, Profile, supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -26,6 +26,7 @@ const AdminUsers = () => {
   const [warnDialogOpen, setWarnDialogOpen] = useState(false);
   const [warnReason, setWarnReason] = useState('');
   const [muteHistory, setMuteHistory] = useState<Record<string, number>>({}); // profile_id -> mute count in last 7 days
+  const [copiedWallet, setCopiedWallet] = useState<string | null>(null); // Track which wallet was copied
 
   useEffect(() => {
     loadUsers();
@@ -361,7 +362,41 @@ const AdminUsers = () => {
                       )}
                     </div>
                     <div className="space-y-1 text-sm text-muted-foreground">
-                      <p>Wallet: {user.wallet_address || 'N/A'}</p>
+                      <div className="flex items-center gap-2">
+                        <p>Wallet: {user.wallet_address || 'N/A'}</p>
+                        {user.wallet_address && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(user.wallet_address!);
+                                setCopiedWallet(user.wallet_address);
+                                toast({
+                                  title: "Wallet Copied",
+                                  description: "Wallet address copied to clipboard",
+                                });
+                                // Reset copied state after 2 seconds
+                                setTimeout(() => setCopiedWallet(null), 2000);
+                              } catch (err) {
+                                console.error('Failed to copy wallet:', err);
+                                toast({
+                                  title: "Copy Failed",
+                                  description: "Failed to copy wallet address",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          >
+                            {copiedWallet === user.wallet_address ? (
+                              <Check className="h-3 w-3 text-green-500" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
                       {user.email && <p>Email: {user.email}</p>}
                       {user.username && <p>Username: {user.username}</p>}
                       {user.created_at && (
