@@ -34,7 +34,7 @@ function verifyAdminWallet(req: any, res: Response, next: NextFunction) {
  * POST /api/admin/ban-ip
  * Ban an IP address
  */
-router.post('/ban-ip', generalRateLimiter, verifyWalletSignature, verifyAdminWallet, async (req: any, res: Response) => {
+router.post('/ban-ip', generalRateLimiter, verifyAdminWallet, async (req: any, res: Response) => {
   try {
     const { ipAddress, expiresAt, reason } = req.body;
 

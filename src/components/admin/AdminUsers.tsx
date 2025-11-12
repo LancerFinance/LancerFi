@@ -261,33 +261,13 @@ const AdminUsers = () => {
       const API_BASE_URL = import.meta.env.VITE_API_URL ||
         (import.meta.env.PROD ? '' : 'http://localhost:3001');
 
-      // Generate challenge and sign it
-      const timestamp = Date.now();
-      const nonce = Math.random().toString(36).substring(2);
-      const challenge = `LancerFi Admin Unrestrict\nTimestamp: ${timestamp}\nNonce: ${nonce}\n\nThis signature proves you own this wallet.`;
-      
-      let signature: Uint8Array;
-      try {
-        const signed = await signMessage(challenge);
-        signature = signed.signature;
-      } catch (signError: any) {
-        if (signError.message?.includes('canceled') || signError.message?.includes('rejected')) {
-          return; // User canceled, don't show error
-        }
-        throw signError;
-      }
-
-      // Convert signature to base64 (browser-compatible)
-      const signatureBase64 = btoa(String.fromCharCode(...Array.from(signature)));
-
+      // No signature required - admin wallet is already verified by dashboard access
       // Call backend API
       const response = await fetch(`${API_BASE_URL}/api/admin/unrestrict-user`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletAddress: address,
-          signature: signatureBase64,
-          message: challenge,
           profileId: user.id
         })
       });
