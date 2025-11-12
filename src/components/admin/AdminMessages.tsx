@@ -141,7 +141,7 @@ const AdminMessages = () => {
     const matchesFilter = filter === 'all' || 
       (filter === 'unread' && !message.is_read) ||
       (filter === 'read' && message.is_read) ||
-      (filter === 'admin' && message.sender_id === ADMIN_WALLET_ADDRESS);
+      (filter === 'admin' && (message.sender_id === ADMIN_WALLET_ADDRESS || message.sender_id === 'admin@lancerfi.app'));
     
     return matchesSearch && matchesFilter;
   });
