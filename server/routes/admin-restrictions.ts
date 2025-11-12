@@ -71,6 +71,141 @@ router.post('/ban-ip', generalRateLimiter, verifyWalletSignature, verifyAdminWal
 });
 
 /**
+ * POST /api/admin/restrict-user
+ * Apply restriction to a user (mute, ban, or IP ban)
+ */
+router.post('/restrict-user', generalRateLimiter, verifyWalletSignature, verifyAdminWallet, async (req: any, res: Response) => {
+  try {
+    const { profileId, restrictionType, expiresAt, reason, ipAddress } = req.body;
+
+    if (!profileId) {
+      return res.status(400).json({ error: 'profileId is required' });
+    }
+
+    if (!restrictionType || !['mute', 'ban_wallet', 'ban_ip'].includes(restrictionType)) {
+      return res.status(400).json({ error: 'Invalid restriction type. Must be mute, ban_wallet, or ban_ip' });
+    }
+
+    const restrictions: any = {
+      restriction_type: restrictionType,
+      restriction_expires_at: expiresAt || null,
+      restriction_reason: reason || null
+    };
+
+    if (restrictionType === 'mute') {
+      restrictions.is_muted = true;
+      restrictions.is_banned = false;
+    } else if (restrictionType === 'ban_wallet') {
+      restrictions.is_banned = true;
+      restrictions.is_muted = false;
+    } else if (restrictionType === 'ban_ip') {
+      // For IP ban, we don't set is_muted or is_banned on the profile
+      // The IP ban is handled separately in the banned_ip_addresses table
+    }
+
+    // Update user restrictions
+    const { data: updatedProfile, error: updateError } = await supabaseClient
+      .from('profiles')
+      .update(restrictions)
+      .eq('id', profileId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error updating user restrictions:', updateError);
+      return res.status(500).json({ error: 'Failed to update user restrictions' });
+    }
+
+    // Record mute in history if it's a mute
+    if (restrictionType === 'mute') {
+      try {
+        await supabaseClient
+          .from('mute_history')
+          .insert({
+            profile_id: profileId,
+            muted_by_wallet: req.walletAddress,
+            reason: reason || null
+          });
+      } catch (historyError) {
+        console.error('Error recording mute history:', historyError);
+        // Don't fail the request if history recording fails
+      }
+    }
+
+    // Handle IP ban separately
+    if (restrictionType === 'ban_ip' && ipAddress) {
+      try {
+        await supabaseClient
+          .from('banned_ip_addresses')
+          .upsert({
+            ip_address: ipAddress.trim(),
+            expires_at: expiresAt || null,
+            reason: reason || null,
+            banned_by_wallet: req.walletAddress
+          }, {
+            onConflict: 'ip_address'
+          });
+      } catch (ipBanError) {
+        console.error('Error banning IP:', ipBanError);
+        // Don't fail the request if IP ban fails
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `User ${restrictionType === 'mute' ? 'muted' : restrictionType === 'ban_wallet' ? 'banned' : 'IP banned'} successfully`,
+      data: updatedProfile
+    });
+  } catch (error: any) {
+    console.error('Error in restrict-user endpoint:', error);
+    res.status(500).json({ error: error.message || 'Failed to apply restriction' });
+  }
+});
+
+/**
+ * POST /api/admin/unrestrict-user
+ * Remove restriction from a user
+ */
+router.post('/unrestrict-user', generalRateLimiter, verifyWalletSignature, verifyAdminWallet, async (req: any, res: Response) => {
+  try {
+    const { profileId } = req.body;
+
+    if (!profileId) {
+      return res.status(400).json({ error: 'profileId is required' });
+    }
+
+    const restrictions: any = {
+      is_muted: false,
+      is_banned: false,
+      restriction_type: null,
+      restriction_expires_at: null,
+      restriction_reason: null
+    };
+
+    const { data: updatedProfile, error: updateError } = await supabaseClient
+      .from('profiles')
+      .update(restrictions)
+      .eq('id', profileId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error removing user restrictions:', updateError);
+      return res.status(500).json({ error: 'Failed to remove user restrictions' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Restriction removed successfully',
+      data: updatedProfile
+    });
+  } catch (error: any) {
+    console.error('Error in unrestrict-user endpoint:', error);
+    res.status(500).json({ error: error.message || 'Failed to remove restriction' });
+  }
+});
+
+/**
  * GET /api/admin/check-restriction
  * Check if a wallet or IP is restricted
  */

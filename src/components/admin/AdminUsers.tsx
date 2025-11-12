@@ -11,9 +11,11 @@ import { Search, User, Ban, Volume2, VolumeX, Shield, Copy, Check } from "lucide
 import { db, Profile, supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useWallet } from "@/hooks/useWallet";
 
 const AdminUsers = () => {
   const { toast } = useToast();
+  const { address, signMessage } = useWallet();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -138,6 +140,15 @@ const AdminUsers = () => {
   const applyRestriction = async () => {
     if (!selectedUser) return;
 
+    if (!address) {
+      toast({
+        title: "Error",
+        description: "Wallet not connected",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (restrictionType === 'ip_ban' && !ipAddress.trim()) {
       toast({
         title: "Error",
@@ -159,8 +170,6 @@ const AdminUsers = () => {
     }
 
     try {
-      const restrictions: any = {};
-      
       // Calculate expiration date (duration in days)
       const expiresAt = durationNum > 0 
         ? new Date(Date.now() + durationNum * 24 * 60 * 60 * 1000).toISOString()
@@ -177,53 +186,55 @@ const AdminUsers = () => {
           });
           return;
         }
-
-        restrictions.is_muted = true;
-        restrictions.restriction_type = 'mute';
-        restrictions.restriction_expires_at = expiresAt;
-        restrictions.restriction_reason = banReason.trim() || null;
-
-        // Record mute in history
-        try {
-          await supabase
-            .from('mute_history')
-            .insert({
-              profile_id: selectedUser.id,
-              muted_by_wallet: 'admin@lancerfi.app',
-              reason: banReason.trim() || null
-            });
-        } catch (historyError) {
-          console.error('Error recording mute history:', historyError);
-        }
-      } else if (restrictionType === 'ban') {
-        restrictions.is_banned = true;
-        restrictions.restriction_type = 'ban_wallet';
-        restrictions.restriction_expires_at = expiresAt;
-        restrictions.restriction_reason = banReason.trim() || null;
-      } else if (restrictionType === 'ip_ban') {
-        restrictions.restriction_type = 'ban_ip';
-        restrictions.restriction_expires_at = expiresAt;
-        restrictions.restriction_reason = banReason.trim() || null;
-        // Also add to banned IP addresses table via API
-        const API_BASE_URL = import.meta.env.VITE_API_URL ||
-          (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
-        
-        try {
-          await fetch(`${API_BASE_URL}/api/admin/ban-ip`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ipAddress: ipAddress.trim(),
-              expiresAt,
-              reason: banReason.trim() || null
-            })
-          });
-        } catch (ipBanError) {
-          console.error('Error banning IP:', ipBanError);
-        }
       }
 
-      await db.updateUserRestrictions(selectedUser.id, restrictions);
+      // Map frontend restriction types to backend types
+      const backendRestrictionType = restrictionType === 'mute' ? 'mute' : 
+                                     restrictionType === 'ban' ? 'ban_wallet' : 
+                                     'ban_ip';
+
+      // Authenticate with backend
+      const API_BASE_URL = import.meta.env.VITE_API_URL ||
+        (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+
+      // Generate challenge and sign it
+      const timestamp = Date.now();
+      const nonce = Math.random().toString(36).substring(2);
+      const challenge = `LancerFi Admin Restriction\nTimestamp: ${timestamp}\nNonce: ${nonce}\n\nThis signature proves you own this wallet.`;
+      
+      let signature: Uint8Array;
+      try {
+        const signed = await signMessage(challenge);
+        signature = signed.signature;
+      } catch (signError: any) {
+        if (signError.message?.includes('canceled') || signError.message?.includes('rejected')) {
+          return; // User canceled, don't show error
+        }
+        throw signError;
+      }
+
+      // Call backend API
+      const response = await fetch(`${API_BASE_URL}/api/admin/restrict-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: address,
+          signature: Buffer.from(signature).toString('base64'),
+          message: challenge,
+          profileId: selectedUser.id,
+          restrictionType: backendRestrictionType,
+          expiresAt,
+          reason: banReason.trim() || null,
+          ipAddress: restrictionType === 'ip_ban' ? ipAddress.trim() : undefined
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
       
       toast({
         title: "Success",
@@ -241,28 +252,63 @@ const AdminUsers = () => {
       const updatedUsers = await db.getAllProfiles();
       setUsers(updatedUsers || []);
       await loadMuteHistory(updatedUsers || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error applying restriction:', error);
       toast({
         title: "Error",
-        description: "Failed to apply restriction",
+        description: error.message || "Failed to apply restriction",
         variant: "destructive"
       });
     }
   };
 
   const removeRestriction = async (user: Profile) => {
-    try {
-      const restrictions: any = {
-        is_muted: false,
-        is_banned: false,
-        restriction_type: null,
-        restriction_expires_at: null,
-        restriction_reason: null
-      };
+    if (!address) {
+      toast({
+        title: "Error",
+        description: "Wallet not connected",
+        variant: "destructive"
+      });
+      return;
+    }
 
-      await db.updateUserRestrictions(user.id, restrictions);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL ||
+        (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
+
+      // Generate challenge and sign it
+      const timestamp = Date.now();
+      const nonce = Math.random().toString(36).substring(2);
+      const challenge = `LancerFi Admin Unrestrict\nTimestamp: ${timestamp}\nNonce: ${nonce}\n\nThis signature proves you own this wallet.`;
       
+      let signature: Uint8Array;
+      try {
+        const signed = await signMessage(challenge);
+        signature = signed.signature;
+      } catch (signError: any) {
+        if (signError.message?.includes('canceled') || signError.message?.includes('rejected')) {
+          return; // User canceled, don't show error
+        }
+        throw signError;
+      }
+
+      // Call backend API
+      const response = await fetch(`${API_BASE_URL}/api/admin/unrestrict-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: address,
+          signature: Buffer.from(signature).toString('base64'),
+          message: challenge,
+          profileId: user.id
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      }
+
       toast({
         title: "Success",
         description: `Restriction removed successfully`
@@ -272,11 +318,11 @@ const AdminUsers = () => {
       const updatedUsers = await db.getAllProfiles();
       setUsers(updatedUsers || []);
       await loadMuteHistory(updatedUsers || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error removing restriction:', error);
       toast({
         title: "Error",
-        description: "Failed to remove restriction",
+        description: error.message || "Failed to remove restriction",
         variant: "destructive"
       });
     }
