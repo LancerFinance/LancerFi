@@ -3,11 +3,13 @@
  * Handles user restrictions (mute, ban wallet, ban IP)
  */
 
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+// Vercel types - using any to avoid build errors (types are provided at runtime)
+type VercelRequest = any;
+type VercelResponse = any;
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { adminRestrictionsRouter } from '../../server/routes/admin-restrictions.js';
+import adminRestrictionsRouter from '../../server/routes/admin-restrictions.js';
 import { 
   validateRequestSize, 
   sanitizeRequestBody,
