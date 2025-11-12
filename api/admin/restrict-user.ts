@@ -106,16 +106,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       restrictions.is_banned = true;
       restrictions.is_muted = false;
     } else if (restrictionType === 'ban_ip') {
-      // For IP ban, we don't set is_muted or is_banned on the profile
-      // The IP ban is handled separately in the banned_ip_addresses table
+      // IP ban also applies wallet ban (prevents the wallet from doing anything)
+      restrictions.is_banned = true;
+      restrictions.is_muted = false;
     }
 
     console.log('Updating profile:', profileId, 'with restrictions:', restrictions);
 
-    // Get user profile first to get wallet_address for message
+    // Helper function to get client IP from request
+    function getClientIP(req: VercelRequest): string | null {
+      // Check various headers for IP (handles proxies/load balancers)
+      const forwarded = req.headers['x-forwarded-for'];
+      const realIP = req.headers['x-real-ip'];
+      const cfConnectingIP = req.headers['cf-connecting-ip']; // Cloudflare
+      
+      if (typeof forwarded === 'string') {
+        // x-forwarded-for can contain multiple IPs, take the first one
+        return forwarded.split(',')[0].trim();
+      }
+      
+      if (typeof realIP === 'string') {
+        return realIP;
+      }
+      
+      if (typeof cfConnectingIP === 'string') {
+        return cfConnectingIP;
+      }
+      
+      // Fallback to connection remote address
+      return req.socket?.remoteAddress || req.ip || null;
+    }
+
+    // Get user profile first to get wallet_address and last_ip_address
     const { data: userProfile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('wallet_address')
+      .select('wallet_address, last_ip_address')
       .eq('id', profileId)
       .single();
 
@@ -146,9 +171,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Send system message to user about the restriction (using service key to bypass RLS)
-    if (userProfile?.wallet_address && (restrictionType === 'mute' || restrictionType === 'ban_wallet')) {
+    if (userProfile?.wallet_address && (restrictionType === 'mute' || restrictionType === 'ban_wallet' || restrictionType === 'ban_ip')) {
       try {
-        const restrictionName = restrictionType === 'mute' ? 'muted' : 'banned';
+        const restrictionName = restrictionType === 'mute' ? 'muted' : restrictionType === 'ban_ip' ? 'IP banned (wallet also banned)' : 'banned';
         const expiresText = expiresAt 
           ? ` until ${new Date(expiresAt).toLocaleString()}`
           : ' permanently';
@@ -159,7 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .insert({
             sender_id: 'system@lancerfi.app',
             recipient_id: userProfile.wallet_address,
-            subject: `You have been ${restrictionName}`,
+            subject: `You have been ${restrictionType === 'ban_ip' ? 'IP banned' : restrictionName}`,
             content: `You have been ${restrictionName}${expiresText}.${reasonText}`,
             is_read: false
           });
@@ -198,12 +223,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Handle IP ban separately
-    if (restrictionType === 'ban_ip' && ipAddress) {
+    if (restrictionType === 'ban_ip') {
+      // Get IP address: use provided IP, or user's last known IP from profile, or from recent projects
+      let ipToBan = ipAddress?.trim();
+      
+      if (!ipToBan && userProfile?.last_ip_address) {
+        ipToBan = userProfile.last_ip_address;
+        console.log('Using user\'s last known IP address from profile:', ipToBan);
+      }
+      
+      // If still no IP, check user's recent projects for their IP
+      if (!ipToBan && userProfile?.wallet_address) {
+        try {
+          const { data: recentProject, error: projectError } = await supabaseClient
+            .from('projects')
+            .select('client_ip')
+            .eq('client_id', userProfile.wallet_address)
+            .not('client_ip', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (!projectError && recentProject?.client_ip) {
+            ipToBan = recentProject.client_ip;
+            console.log('Using IP address from user\'s recent project:', ipToBan);
+            
+            // Also update the profile's last_ip_address for future reference
+            await supabaseClient
+              .from('profiles')
+              .update({ last_ip_address: ipToBan })
+              .eq('id', profileId);
+          }
+        } catch (projectLookupError: any) {
+          console.error('Error looking up user IP from projects:', projectLookupError);
+          // Continue without failing
+        }
+      }
+      
+      if (!ipToBan) {
+        console.error('Cannot ban IP: No IP address found for user');
+        return res.status(400).json({ 
+          error: 'Cannot ban IP: User has no recorded IP address. Please ensure the user has created a project or interacted with the platform recently. You can also manually enter an IP address.' 
+        });
+      }
+      
       try {
         const { error: ipBanError } = await supabaseClient
           .from('banned_ip_addresses')
           .upsert({
-            ip_address: ipAddress.trim(),
+            ip_address: ipToBan,
             expires_at: expiresAt || null,
             reason: reason || null,
             banned_by_wallet: walletAddress
@@ -213,11 +281,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         if (ipBanError) {
           console.error('Error banning IP:', ipBanError);
-          // Don't fail the request if IP ban fails
+          return res.status(500).json({ 
+            error: 'Failed to ban IP address', 
+            details: ipBanError.message 
+          });
         }
+        
+        console.log('IP address banned successfully:', ipToBan);
       } catch (ipBanError: any) {
         console.error('Exception banning IP:', ipBanError);
-        // Don't fail the request if IP ban fails
+        return res.status(500).json({ 
+          error: 'Failed to ban IP address', 
+          details: ipBanError.message 
+        });
       }
     }
 

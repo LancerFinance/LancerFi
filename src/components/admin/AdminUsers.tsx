@@ -161,14 +161,7 @@ const AdminUsers = () => {
       return;
     }
 
-    if (restrictionType === 'ip_ban' && !ipAddress.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter an IP address",
-        variant: "destructive"
-      });
-      return;
-    }
+    // IP address is optional for IP ban - will use user's last known IP if not provided
 
     // Validate duration (0 = permanent, otherwise must be >= 0.1)
     const durationNum = parseFloat(duration);
@@ -542,13 +535,16 @@ const AdminUsers = () => {
             </div>
             {restrictionType === 'ip_ban' && (
               <div>
-                <Label htmlFor="ip-address">IP Address</Label>
+                <Label htmlFor="ip-address">IP Address (Optional)</Label>
                 <Input
                   id="ip-address"
                   value={ipAddress}
                   onChange={(e) => setIpAddress(e.target.value)}
-                  placeholder="Enter IP address to ban"
+                  placeholder="Leave empty to use user's last known IP"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  If left empty, the system will automatically use the user's last known IP address. IP ban also applies wallet ban.
+                </p>
               </div>
             )}
             <div>
