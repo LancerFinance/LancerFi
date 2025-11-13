@@ -104,6 +104,21 @@
           return originalAppendChild.call(this, child);
         };
         
+        function loadReactScripts() {
+          if (isBanned) return; // Don't load if banned
+          
+          // Load React scripts dynamically
+          var polyfillsScript = document.createElement('script');
+          polyfillsScript.type = 'module';
+          polyfillsScript.src = '/src/polyfills.ts';
+          document.body.appendChild(polyfillsScript);
+          
+          var mainScript = document.createElement('script');
+          mainScript.type = 'module';
+          mainScript.src = '/src/main.tsx';
+          document.body.appendChild(mainScript);
+        }
+        
         // Quick check - if banned, block immediately
         fetch('/api/admin/check-restriction?t=' + Date.now(), {
           method: 'GET',
@@ -124,25 +139,27 @@
                 // IP is banned - block forever
                 blockForever();
               } else {
-                // Not banned - allow scripts to load
+                // Not banned - load React scripts
                 checkComplete = true;
+                loadReactScripts();
               }
             }).catch(function() {
               // JSON parse error - allow React to load (fail open)
               checkComplete = true;
+              loadReactScripts();
             });
           } else {
             // Not OK - allow React to load (fail open)
             checkComplete = true;
+            loadReactScripts();
           }
         })
         .catch(function() {
           // Network error - allow React to load (fail open)
           checkComplete = true;
+          loadReactScripts();
         });
       })();
     </script>
-    <script type="module" src="/src/polyfills.ts"></script>
-    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
