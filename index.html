@@ -27,18 +27,13 @@
 
   <body>
     <div id="root"></div>
-    <!-- IP Ban Check - Runs in background, only blocks if banned -->
+    <!-- IP Ban Check - Only blocks if actually banned, no loading screen for normal users -->
     <script>
       (function() {
-        var checkCount = 0;
-        var maxChecks = 2; // Limit retries
         var isBanned = false;
-        var checkComplete = false;
         var loadingOverlay = null;
-        var showLoadingTimeout = null;
-        var LOADING_DELAY = 300; // Only show loading if check takes more than 300ms
         
-        // Create loading overlay
+        // Create loading overlay (only used if banned)
         function createLoadingOverlay() {
           if (loadingOverlay) return loadingOverlay;
           loadingOverlay = document.createElement('div');
@@ -51,41 +46,11 @@
           return loadingOverlay;
         }
         
-        // Show loading overlay (with delay)
-        function showLoading() {
-          if (showLoadingTimeout) return; // Already scheduled
-          showLoadingTimeout = setTimeout(function() {
-            if (!checkComplete && !isBanned) {
-              var overlay = createLoadingOverlay();
-              if (!document.body.contains(overlay)) {
-                document.body.appendChild(overlay);
-              }
-            }
-          }, LOADING_DELAY);
-        }
-        
-        // Hide loading overlay
-        function hideLoading() {
-          if (showLoadingTimeout) {
-            clearTimeout(showLoadingTimeout);
-            showLoadingTimeout = null;
-          }
-          if (loadingOverlay && document.body.contains(loadingOverlay)) {
-            loadingOverlay.remove();
-          }
-          checkComplete = true;
-        }
-        
         function blockForever() {
           if (isBanned) return; // Already blocked
           isBanned = true;
           
-          // Cancel delayed loading, show immediately
-          if (showLoadingTimeout) {
-            clearTimeout(showLoadingTimeout);
-            showLoadingTimeout = null;
-          }
-          
+          // Show loading screen immediately
           var overlay = createLoadingOverlay();
           if (!document.body.contains(overlay)) {
             document.body.appendChild(overlay);
@@ -111,70 +76,36 @@
           };
         }
         
-        function checkIPBan() {
-          checkCount++;
-          
-          // Schedule loading screen (only shows if check takes too long)
-          if (!checkComplete && !isBanned) {
-            showLoading();
+        // Quick background check - no loading screen unless banned
+        fetch('/api/admin/check-restriction?t=' + Date.now(), {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          credentials: 'omit'
+        })
+        .then(function(response) {
+          if (response.status === 403) {
+            // IP is banned - block forever
+            blockForever();
+            return;
           }
           
-          // Check IP ban status
-          var startTime = Date.now();
-          fetch('/api/admin/check-restriction?t=' + Date.now(), {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            cache: 'no-store',
-            credentials: 'omit'
-          })
-          .then(function(response) {
-            var elapsed = Date.now() - startTime;
-            
-            if (response.status === 403) {
-              // IP is banned - block forever
-              blockForever();
-              return;
-            }
-            
-            if (response.ok) {
-              return response.json().then(function(data) {
-                if (data.isRestricted && data.restrictionType === 'ban_ip') {
-                  // IP is banned - block forever
-                  blockForever();
-                  return;
-                }
-                
-                // IP not banned - hide loading immediately
-                hideLoading();
-              }).catch(function(err) {
-                // JSON parse error - allow React to load (fail open)
-                if (checkCount >= maxChecks) {
-                  hideLoading();
-                } else {
-                  setTimeout(checkIPBan, 500);
-                }
-              });
-            } else {
-              // Non-200 response - allow React to load
-              if (checkCount >= maxChecks) {
-                hideLoading();
-              } else {
-                setTimeout(checkIPBan, 500);
+          if (response.ok) {
+            return response.json().then(function(data) {
+              if (data.isRestricted && data.restrictionType === 'ban_ip') {
+                // IP is banned - block forever
+                blockForever();
               }
-            }
-          })
-          .catch(function(error) {
-            // Network error - allow React to load (fail open)
-            if (checkCount >= maxChecks) {
-              hideLoading();
-            } else {
-              setTimeout(checkIPBan, 500);
-            }
-          });
-        }
-        
-        // Start check immediately (but don't show loading unless it takes too long)
-        checkIPBan();
+              // If not banned, do nothing - let React load normally
+            }).catch(function() {
+              // JSON parse error - allow React to load (fail open)
+            });
+          }
+          // If not OK, allow React to load (fail open)
+        })
+        .catch(function() {
+          // Network error - allow React to load (fail open)
+        });
       })();
     </script>
     <script type="module" src="/src/polyfills.ts"></script>
