@@ -11,10 +11,9 @@ interface IPBanGuardProps {
 }
 
 export const IPBanGuard = ({ children }: IPBanGuardProps) => {
-  // Start with checking=true to block ALL rendering until check completes
-  const [isChecking, setIsChecking] = useState(true);
+  // Start with checking=false since index.html already checked before React loaded
+  // Only show loading if we detect a ban during periodic checks
   const [isBanned, setIsBanned] = useState(false);
-  const [hasChecked, setHasChecked] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -22,30 +21,25 @@ export const IPBanGuard = ({ children }: IPBanGuardProps) => {
 
     const checkIPBan = async () => {
       try {
-        // Get user's IP address (we'll use a backend endpoint to get it)
         const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
         
-        // Check IP ban status via backend (no parameters = checks request IP)
-        const response = await fetch(`${API_BASE_URL}/api/admin/check-restriction`, {
+        // Check IP ban status (lightweight background check)
+        const response = await fetch(`${API_BASE_URL}/api/admin/check-restriction?t=${Date.now()}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
-          // Add cache-busting to prevent cached responses
           cache: 'no-store',
-          // Add timestamp to prevent caching
           credentials: 'omit',
         });
 
         if (!isMounted) return;
 
         if (response.status === 403) {
-          // IP is banned - NEVER allow access
+          // IP is banned - block access
           setIsBanned(true);
-          setIsChecking(true); // Keep in loading state forever
-          setHasChecked(true);
           
-          // Continue checking in a loop to ensure ban persists
+          // Continue checking periodically
           if (checkInterval) {
             clearInterval(checkInterval);
           }
@@ -53,18 +47,15 @@ export const IPBanGuard = ({ children }: IPBanGuardProps) => {
             if (isMounted) {
               checkIPBan();
             }
-          }, 2000); // Check every 2 seconds
+          }, 2000);
           return;
         } else if (response.ok) {
-          // Check response body to see if IP is banned
           const data = await response.json().catch(() => ({}));
           if (data.isRestricted && data.restrictionType === 'ban_ip') {
-            // IP is banned - NEVER allow access
+            // IP is banned - block access
             setIsBanned(true);
-            setIsChecking(true); // Keep in loading state forever
-            setHasChecked(true);
             
-            // Continue checking in a loop to ensure ban persists
+            // Continue checking periodically
             if (checkInterval) {
               clearInterval(checkInterval);
             }
@@ -72,32 +63,32 @@ export const IPBanGuard = ({ children }: IPBanGuardProps) => {
               if (isMounted) {
                 checkIPBan();
               }
-            }, 2000); // Check every 2 seconds
+            }, 2000);
             return;
           }
         }
         
-        // IP is not banned - allow access ONLY after check completes
+        // IP is not banned - allow access
         if (isMounted) {
           setIsBanned(false);
-          setIsChecking(false);
-          setHasChecked(true);
         }
       } catch (error) {
-        // On error, keep checking (fail closed for security - block access)
-        if (isMounted) {
-          setIsChecking(true); // Keep checking
-          setTimeout(() => {
-            if (isMounted) {
-              checkIPBan();
-            }
-          }, 2000);
-        }
+        // On error, fail open (don't block) since index.html already checked
+        // Just log and continue
+        console.error('IP ban check error (non-blocking):', error);
       }
     };
 
-    // Initial check - BLOCK ALL RENDERING until this completes
+    // Do a quick background check (non-blocking)
+    // Don't block initial render since index.html already checked
     checkIPBan();
+    
+    // Periodic checks every 10 seconds (less frequent than banned users)
+    checkInterval = setInterval(() => {
+      if (isMounted) {
+        checkIPBan();
+      }
+    }, 10000);
 
     // Cleanup
     return () => {
@@ -108,38 +99,32 @@ export const IPBanGuard = ({ children }: IPBanGuardProps) => {
     };
   }, []);
 
-  // CRITICAL: If checking OR banned, show ONLY loading screen - NEVER render children
-  // This blocks ALL content from rendering
-  if (isChecking || isBanned || !hasChecked) {
+  // Only block if actually banned (index.html should have caught this, but this is a fallback)
+  if (isBanned) {
     return (
-      <>
-        {/* Block ALL content with a full-screen overlay */}
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 999999,
-            backgroundColor: '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading...</p>
-          </div>
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 999999,
+          backgroundColor: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
-        {/* Prevent any children from rendering by returning null */}
-        {null}
-      </>
+      </div>
     );
   }
 
-  // ONLY render children if check completed AND not banned
+  // Render children normally (no blocking on initial load)
   return <>{children}</>;
 };
 
