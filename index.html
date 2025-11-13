@@ -107,6 +107,11 @@
         function loadReactScripts() {
           if (isBanned) return; // Don't load if banned
           
+          // Prevent double-loading
+          if (checkComplete && document.querySelector('script[src="/src/polyfills.ts"]')) {
+            return; // Already loaded
+          }
+          
           // Load React scripts dynamically
           var polyfillsScript = document.createElement('script');
           polyfillsScript.type = 'module';
@@ -119,6 +124,15 @@
           document.body.appendChild(mainScript);
         }
         
+        // Set a timeout to load React if check takes too long (fail open)
+        var loadTimeout = setTimeout(function() {
+          if (!checkComplete && !isBanned) {
+            console.log('IP check timeout - loading React (fail open)');
+            checkComplete = true;
+            loadReactScripts();
+          }
+        }, 3000); // 3 second timeout
+        
         // Quick check - if banned, block immediately
         fetch('/api/admin/check-restriction?t=' + Date.now(), {
           method: 'GET',
@@ -127,6 +141,8 @@
           credentials: 'omit'
         })
         .then(function(response) {
+          clearTimeout(loadTimeout);
+          
           if (response.status === 403) {
             // IP is banned - block forever
             blockForever();
@@ -143,19 +159,23 @@
                 checkComplete = true;
                 loadReactScripts();
               }
-            }).catch(function() {
+            }).catch(function(err) {
               // JSON parse error - allow React to load (fail open)
+              console.error('JSON parse error:', err);
               checkComplete = true;
               loadReactScripts();
             });
           } else {
             // Not OK - allow React to load (fail open)
+            console.log('Non-200 response, loading React (fail open)');
             checkComplete = true;
             loadReactScripts();
           }
         })
-        .catch(function() {
+        .catch(function(error) {
+          clearTimeout(loadTimeout);
           // Network error - allow React to load (fail open)
+          console.error('Network error, loading React (fail open):', error);
           checkComplete = true;
           loadReactScripts();
         });
