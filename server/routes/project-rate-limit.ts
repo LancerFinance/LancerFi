@@ -300,12 +300,12 @@ router.post('/record-project-creation', async (req: Request, res: Response) => {
 });
 
 /**
- * Reset rate limit for testing (development only)
+ * Reset rate limit endpoint
  * Updates project creation times to be older than 24 hours
  */
 router.post('/reset-rate-limit', async (req: Request, res: Response) => {
   try {
-    // Allow rate limit reset for testing (can be restricted later if needed)
+    // Rate limit reset endpoint
     const { walletAddress } = req.body;
     
     if (!walletAddress) {
