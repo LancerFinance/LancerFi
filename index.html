@@ -33,7 +33,7 @@
         var isBanned = false;
         var checkComplete = false;
         var loadingOverlay = null;
-        var reactScripts = [];
+        var reactScriptsBlocked = false;
         
         // Create loading overlay (only used if banned)
         function createLoadingOverlay() {
@@ -52,6 +52,7 @@
           if (isBanned) return; // Already blocked
           isBanned = true;
           checkComplete = true;
+          reactScriptsBlocked = true;
           
           // Show loading screen immediately
           var overlay = createLoadingOverlay();
@@ -65,6 +66,23 @@
             root.innerHTML = '';
           }
           
+          // Remove React scripts if they exist
+          var scripts = document.querySelectorAll('script[src*="/src/"]');
+          scripts.forEach(function(script) {
+            script.remove();
+          });
+          
+          // Block any future script execution
+          var originalCreateElement = document.createElement;
+          document.createElement = function(tagName) {
+            var element = originalCreateElement.call(document, tagName);
+            if (tagName.toLowerCase() === 'script' && isBanned) {
+              element.setAttribute('data-blocked', 'true');
+              element.type = 'text/plain'; // Prevent execution
+            }
+            return element;
+          };
+          
           // IP is banned - keep loading forever, never allow React to render
           setInterval(function() {
             fetch('/api/admin/check-restriction?t=' + Date.now(), {
@@ -76,57 +94,55 @@
           }, 2000);
         }
         
-        function loadReactScripts() {
-          if (isBanned) return; // Don't load if banned
-          
-          // Load React scripts
-          reactScripts.forEach(function(scriptSrc) {
-            var script = document.createElement('script');
-            script.type = 'module';
-            script.src = scriptSrc;
-            document.body.appendChild(script);
-          });
-        }
+        // Intercept script loading
+        var originalAppendChild = Node.prototype.appendChild;
+        Node.prototype.appendChild = function(child) {
+          if (isBanned && child && child.tagName && child.tagName.toLowerCase() === 'script') {
+            // Block React scripts if banned
+            return child;
+          }
+          return originalAppendChild.call(this, child);
+        };
         
-        // Store React script sources (they're defined below but we'll load them after check)
-        reactScripts.push('/src/polyfills.ts');
-        reactScripts.push('/src/main.tsx');
-        
-        // BLOCKING check - must complete before React loads
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', '/api/admin/check-restriction?t=' + Date.now(), false); // false = synchronous
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        try {
-          xhr.send();
-          
-          if (xhr.status === 403) {
+        // Quick check - if banned, block immediately
+        fetch('/api/admin/check-restriction?t=' + Date.now(), {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          credentials: 'omit'
+        })
+        .then(function(response) {
+          if (response.status === 403) {
             // IP is banned - block forever
             blockForever();
             return;
           }
           
-          if (xhr.status === 200) {
-            try {
-              var data = JSON.parse(xhr.responseText);
+          if (response.ok) {
+            return response.json().then(function(data) {
               if (data.isRestricted && data.restrictionType === 'ban_ip') {
                 // IP is banned - block forever
                 blockForever();
-                return;
+              } else {
+                // Not banned - allow scripts to load
+                checkComplete = true;
               }
-            } catch(e) {
+            }).catch(function() {
               // JSON parse error - allow React to load (fail open)
-            }
+              checkComplete = true;
+            });
+          } else {
+            // Not OK - allow React to load (fail open)
+            checkComplete = true;
           }
-          
-          // Not banned - load React scripts
-          checkComplete = true;
-          loadReactScripts();
-        } catch(error) {
+        })
+        .catch(function() {
           // Network error - allow React to load (fail open)
           checkComplete = true;
-          loadReactScripts();
-        }
+        });
       })();
     </script>
+    <script type="module" src="/src/polyfills.ts"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
