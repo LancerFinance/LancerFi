@@ -160,15 +160,7 @@ export const db = {
   async getProjects(filters?: { status?: string; category?: string }) {
     let query = supabase
       .from('projects')
-      .select(`
-        *,
-        profiles!projects_client_id_fkey(
-          is_muted,
-          is_banned,
-          restriction_type,
-          restriction_expires_at
-        )
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (filters?.status) {
@@ -182,10 +174,31 @@ export const db = {
     if (error) throw error;
     
     // Filter out projects from muted/banned users
-    if (data) {
+    if (data && data.length > 0) {
       const now = new Date();
+      
+      // Get all unique client wallet addresses
+      const clientWallets = [...new Set(data.map((p: any) => p.client_id).filter(Boolean))];
+      
+      // Fetch profiles for all clients in one query
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('wallet_address, is_muted, is_banned, restriction_type, restriction_expires_at')
+        .in('wallet_address', clientWallets);
+      
+      // Create a map of wallet -> profile for quick lookup
+      const profileMap = new Map();
+      if (profiles && !profileError) {
+        profiles.forEach((profile: any) => {
+          profileMap.set(profile.wallet_address, profile);
+        });
+      }
+      
+      // Filter projects based on profile restrictions
       return data.filter((project: any) => {
-        const profile = project.profiles;
+        if (!project.client_id) return true; // No client = allow
+        
+        const profile = profileMap.get(project.client_id);
         if (!profile) return true; // No profile = allow
         
         // Check if restriction has expired
@@ -199,7 +212,7 @@ export const db = {
       });
     }
     
-    return data;
+    return data || [];
   },
 
   async getProject(id: string) {
