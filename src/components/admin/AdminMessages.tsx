@@ -91,11 +91,41 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
     setReplyDialogOpen(true);
   };
 
+  const handleMarkAllAsRead = async () => {
+    try {
+      await db.markAllAdminMessagesAsRead();
+      // Update local state
+      setMessages(prev => prev.map(msg => {
+        const isToAdmin = msg.recipient_id === 'admin@lancerfi.app' || msg.recipient_id === ADMIN_WALLET_ADDRESS;
+        return isToAdmin ? { ...msg, is_read: true } : msg;
+      }));
+      // Trigger notification update
+      window.dispatchEvent(new CustomEvent('messageRead'));
+      toast({
+        title: "Success",
+        description: "All messages marked as read",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to mark all messages as read",
+        variant: "destructive"
+      });
+    }
+  };
+
 
   const supportMessages = messages.filter(
     msg => msg.recipient_id === 'admin@lancerfi.app'
   );
   const unreadSupportCount = supportMessages.filter(msg => !msg.is_read).length;
+  
+  // Calculate total unread messages for admin (support + any messages to admin wallet)
+  const unreadMessages = messages.filter(msg => {
+    const isToAdmin = msg.recipient_id === 'admin@lancerfi.app' || msg.recipient_id === ADMIN_WALLET_ADDRESS;
+    return isToAdmin && !msg.is_read;
+  });
+  const unreadCount = unreadMessages.length;
 
   // Notify parent component of support count changes
   useEffect(() => {
@@ -138,18 +168,29 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
           <h2 className="text-xl sm:text-2xl font-bold text-foreground">All Messages</h2>
           <p className="text-sm text-muted-foreground mt-1">Total: {messages.length} messages</p>
         </div>
-        <Button
-          onClick={() => {
-            const recipient = prompt('Enter wallet address:');
-            if (recipient) {
-              setNewMessageRecipient(recipient);
-              setNewMessageDialogOpen(true);
-            }
-          }}
-        >
-          <Send className="w-4 h-4 mr-2" />
-          New Message
-        </Button>
+        <div className="flex gap-2">
+          {unreadCount > 0 && (
+            <Button
+              onClick={handleMarkAllAsRead}
+              variant="default"
+            >
+              <MailOpen className="w-4 h-4 mr-2" />
+              Read All Messages
+            </Button>
+          )}
+          <Button
+            onClick={() => {
+              const recipient = prompt('Enter wallet address:');
+              if (recipient) {
+                setNewMessageRecipient(recipient);
+                setNewMessageDialogOpen(true);
+              }
+            }}
+          >
+            <Send className="w-4 h-4 mr-2" />
+            New Message
+          </Button>
+        </div>
         {newMessageRecipient && (
           <MessageDialog
             recipientId={newMessageRecipient}

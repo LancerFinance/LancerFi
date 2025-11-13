@@ -480,6 +480,18 @@ export const db = {
     return data;
   },
 
+  async markAllAdminMessagesAsRead() {
+    const { data, error } = await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .or('recipient_id.eq.admin@lancerfi.app,recipient_id.eq.AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U')
+      .eq('is_read', false)
+      .select();
+    
+    if (error) throw error;
+    return data;
+  },
+
   // Proposals
   async getProposals(projectId: string) {
     const { data, error } = await supabase
