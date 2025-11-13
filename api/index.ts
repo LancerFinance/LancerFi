@@ -10,13 +10,15 @@ import projectCleanupRouter from '../server/routes/project-cleanup.js';
 import adminAuthRouter from '../server/routes/admin-auth.js';
 import adminRestrictionsRouter from '../server/routes/admin-restrictions.js';
 import systemStatusRouter from '../server/routes/system-status.js';
+import messagesRouter from '../server/routes/messages.js';
 import { 
   validateRequestSize, 
   sanitizeRequestBody,
   generalRateLimiter,
   paymentRateLimiter,
   rpcRateLimiter,
-  checkIPBan
+  checkIPBan,
+  trackUserIP
 } from '../server/middleware/security.js';
 
 // Load environment variables
@@ -97,6 +99,9 @@ app.use(sanitizeRequestBody);
 // Check IP bans before any other processing (blocks all requests from banned IPs)
 app.use(checkIPBan);
 
+// Track user IP addresses from API requests (after IP ban check)
+app.use(trackUserIP);
+
 // Apply general rate limiting to all routes
 app.use(generalRateLimiter);
 
@@ -114,6 +119,7 @@ app.use('/api/project', projectCleanupRouter);
 app.use('/api/admin', adminAuthRouter);
 app.use('/api/admin', adminRestrictionsRouter);
 app.use('/api/system-status', systemStatusRouter);
+app.use('/api/messages', messagesRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
