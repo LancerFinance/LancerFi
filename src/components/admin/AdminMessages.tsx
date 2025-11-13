@@ -11,6 +11,8 @@ import { MessageSquare, Send, Search, Mail, MailOpen, Reply, Shield, Paperclip }
 import { db, Message } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import MessageDialog from "@/components/MessageDialog";
+import { useWallet } from "@/hooks/useWallet";
 
 // Admin wallet address
 const ADMIN_WALLET_ADDRESS = 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U';
@@ -28,13 +30,9 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
   const [lastSupportCheck, setLastSupportCheck] = useState<number>(Date.now());
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
+  const [replyMessage, setReplyMessage] = useState<Message | null>(null);
   const [newMessageDialogOpen, setNewMessageDialogOpen] = useState(false);
-  const [replyRecipient, setReplyRecipient] = useState('');
-  const [replySubject, setReplySubject] = useState('');
-  const [replyContent, setReplyContent] = useState('');
   const [newMessageRecipient, setNewMessageRecipient] = useState('');
-  const [newMessageSubject, setNewMessageSubject] = useState('');
-  const [newMessageContent, setNewMessageContent] = useState('');
 
   const loadMessages = async () => {
     try {
@@ -89,83 +87,10 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
   }, []);
 
   const handleReply = (message: Message) => {
-    setReplyRecipient(message.sender_id === 'admin@lancerfi.app' ? message.recipient_id : message.sender_id);
-    setReplySubject(message.subject ? `Re: ${message.subject}` : '');
-    setReplyContent('');
+    setReplyMessage(message);
     setReplyDialogOpen(true);
   };
 
-  const sendReply = async () => {
-    if (!replyRecipient || !replyContent.trim()) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      await db.createMessage({
-        sender_id: 'admin@lancerfi.app',
-        recipient_id: replyRecipient,
-        subject: replySubject || 'Message from Admin',
-        content: replyContent
-      });
-      toast({
-        title: "Success",
-        description: "Message sent successfully"
-      });
-      setReplyDialogOpen(false);
-      setReplyRecipient('');
-      setReplySubject('');
-      setReplyContent('');
-      loadMessages();
-    } catch (error) {
-      console.error('Error sending reply:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send message",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const sendNewMessage = async () => {
-    if (!newMessageRecipient || !newMessageContent.trim()) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      await db.createMessage({
-        sender_id: 'admin@lancerfi.app',
-        recipient_id: newMessageRecipient,
-        subject: newMessageSubject || 'Message from Admin',
-        content: newMessageContent
-      });
-      toast({
-        title: "Success",
-        description: "Message sent successfully"
-      });
-      setNewMessageDialogOpen(false);
-      setNewMessageRecipient('');
-      setNewMessageSubject('');
-      setNewMessageContent('');
-      loadMessages();
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send message",
-        variant: "destructive"
-      });
-    }
-  };
 
   const supportMessages = messages.filter(
     msg => msg.recipient_id === 'admin@lancerfi.app'
@@ -213,52 +138,37 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
           <h2 className="text-xl sm:text-2xl font-bold text-foreground">All Messages</h2>
           <p className="text-sm text-muted-foreground mt-1">Total: {messages.length} messages</p>
         </div>
-        <Dialog open={newMessageDialogOpen} onOpenChange={setNewMessageDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Send className="w-4 h-4 mr-2" />
-              New Message
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Send New Message</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="recipient">Recipient Wallet Address</Label>
-                <Input
-                  id="recipient"
-                  value={newMessageRecipient}
-                  onChange={(e) => setNewMessageRecipient(e.target.value)}
-                  placeholder="Enter wallet address"
-                />
-              </div>
-              <div>
-                <Label htmlFor="subject">Subject</Label>
-                <Input
-                  id="subject"
-                  value={newMessageSubject}
-                  onChange={(e) => setNewMessageSubject(e.target.value)}
-                  placeholder="Message subject"
-                />
-              </div>
-              <div>
-                <Label htmlFor="content">Message</Label>
-                <Textarea
-                  id="content"
-                  value={newMessageContent}
-                  onChange={(e) => setNewMessageContent(e.target.value)}
-                  placeholder="Enter your message"
-                  rows={5}
-                />
-              </div>
-              <Button onClick={sendNewMessage} className="w-full">
-                Send Message
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button
+          onClick={() => {
+            const recipient = prompt('Enter wallet address:');
+            if (recipient) {
+              setNewMessageRecipient(recipient);
+              setNewMessageDialogOpen(true);
+            }
+          }}
+        >
+          <Send className="w-4 h-4 mr-2" />
+          New Message
+        </Button>
+        {newMessageRecipient && (
+          <MessageDialog
+            recipientId={newMessageRecipient}
+            recipientName={newMessageRecipient.slice(0, 8) + '...' + newMessageRecipient.slice(-6)}
+            triggerClassName="hidden"
+            open={newMessageDialogOpen}
+            onOpenChange={(open) => {
+              setNewMessageDialogOpen(open);
+              if (!open) {
+                setNewMessageRecipient('');
+              }
+            }}
+            onMessageSent={() => {
+              setNewMessageDialogOpen(false);
+              setNewMessageRecipient('');
+              loadMessages();
+            }}
+          />
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
@@ -391,42 +301,25 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
       </div>
 
       {/* Reply Dialog */}
-      <Dialog open={replyDialogOpen} onOpenChange={setReplyDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Reply to Message</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>To</Label>
-              <Input value={replyRecipient} disabled />
-            </div>
-            <div>
-              <Label htmlFor="reply-subject">Subject</Label>
-              <Input
-                id="reply-subject"
-                value={replySubject}
-                onChange={(e) => setReplySubject(e.target.value)}
-                placeholder="Message subject"
-              />
-            </div>
-            <div>
-              <Label htmlFor="reply-content">Message</Label>
-              <Textarea
-                id="reply-content"
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                placeholder="Enter your reply"
-                rows={5}
-              />
-            </div>
-            <Button onClick={sendReply} className="w-full">
-              <Send className="w-4 h-4 mr-2" />
-              Send Reply
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {replyMessage && (
+        <MessageDialog
+          recipientId={replyMessage.sender_id === 'admin@lancerfi.app' || replyMessage.sender_id === ADMIN_WALLET_ADDRESS
+            ? replyMessage.recipient_id
+            : replyMessage.sender_id}
+          recipientName={replyMessage.sender_id === 'admin@lancerfi.app' || replyMessage.sender_id === ADMIN_WALLET_ADDRESS
+            ? replyMessage.recipient_id.slice(0, 8) + '...' + replyMessage.recipient_id.slice(-6)
+            : replyMessage.sender_id.slice(0, 8) + '...' + replyMessage.sender_id.slice(-6)}
+          projectTitle={replyMessage.subject ? replyMessage.subject.replace(/^Re: /, '') : undefined}
+          triggerClassName="hidden"
+          open={replyDialogOpen}
+          onOpenChange={setReplyDialogOpen}
+          onMessageSent={() => {
+            setReplyDialogOpen(false);
+            setReplyMessage(null);
+            loadMessages();
+          }}
+        />
+      )}
 
       {/* Message Detail Dialog */}
       {selectedMessage && (
