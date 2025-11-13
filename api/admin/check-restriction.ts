@@ -1,7 +1,7 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseClient } from '../../server/services/supabase.js';
 import { getClientIPFromVercelRequest } from '../../server/middleware/ip-ban-check.js';
 
+type VercelRequest = any;
 type VercelResponse = any;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
