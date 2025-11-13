@@ -1,10 +1,17 @@
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Shield, CreditCard, Users, Zap } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowLeft, Shield, CreditCard, Users, Zap, HelpCircle, MessageSquare } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import MessageDialog from "@/components/MessageDialog";
+import { useWallet } from "@/hooks/useWallet";
 
 const FAQ = () => {
+  const navigate = useNavigate();
+  const { address, isConnected } = useWallet();
+  const [showSupportDialog, setShowSupportDialog] = useState(false);
+
   const faqs = [
     {
       icon: <Shield className="w-5 h-5" />,
@@ -35,6 +42,11 @@ const FAQ = () => {
       icon: <CreditCard className="w-5 h-5" />,
       question: "Can I get refunds if work is not delivered?",
       answer: "Yes. If a freelancer fails to deliver according to the agreed terms, the smart contract automatically refunds your escrowed funds minus any completed milestones. Our reputation system also protects against unreliable freelancers."
+    },
+    {
+      icon: <MessageSquare className="w-5 h-5" />,
+      question: "How do I contact support?",
+      answer: "You can contact our support team directly through the Messages page. Click on the 'Support' button to send a message to admin@lancerfi.app. Our team typically responds within 24 hours. For urgent matters, please include 'URGENT' in your subject line."
     }
   ];
 
@@ -89,11 +101,40 @@ const FAQ = () => {
                 <p className="text-muted-foreground mb-6">
                   Our team is here to help you navigate the Web3 freelance ecosystem
                 </p>
-                <Link to="/post-project">
-                  <Button variant="default" size="lg">
-                    Post a Project
-                  </Button>
-                </Link>
+                <Button 
+                  variant="default" 
+                  size="lg"
+                  onClick={() => {
+                    if (!isConnected || !address) {
+                      // If not connected, show wallet connection prompt
+                      // The MessageDialog will handle this, but we can also navigate to messages
+                      navigate('/messages');
+                      return;
+                    }
+                    setShowSupportDialog(true);
+                  }}
+                >
+                  <HelpCircle className="w-4 h-4 mr-2" />
+                  Ask Support
+                </Button>
+                {showSupportDialog && (
+                  <MessageDialog
+                    recipientId="admin@lancerfi.app"
+                    recipientName="Support"
+                    triggerVariant="outline"
+                    triggerClassName="hidden"
+                    triggerText="Ask Support"
+                    triggerIcon={<HelpCircle className="w-4 h-4 mr-2" />}
+                    requireSubject={true}
+                    onMessageSent={() => {
+                      setShowSupportDialog(false);
+                      // Navigate to messages page after sending
+                      navigate('/messages');
+                    }}
+                    open={showSupportDialog}
+                    onOpenChange={setShowSupportDialog}
+                  />
+                )}
               </CardContent>
             </Card>
           </div>
