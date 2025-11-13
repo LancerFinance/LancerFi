@@ -39,7 +39,8 @@ const FeaturedServices = () => {
       // Featured service IDs to always show
       const featuredServiceIds = [
         'fbd2f08c-a7b9-46bd-ba97-12e95b293b36', // NFT Platform LandingPage
-        '49c35814-853a-481d-8161-71050fc005bb'  // Defi Trading Platform
+        '49c35814-853a-481d-8161-71050fc005bb', // Defi Trading Platform
+        'c40fcb19-770c-40b9-b4a1-5f1a9e3a2cf4'  // Crypto DApp
       ];
       
       // Get the featured services by ID first
@@ -66,7 +67,7 @@ const FeaturedServices = () => {
 
       setServices(allFeaturedServices as Service[]);
     } catch (error) {
-      console.error('Error loading featured services:', error);
+      // Error loading services
     } finally {
       setLoading(false);
     }
