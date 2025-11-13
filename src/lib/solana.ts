@@ -350,12 +350,6 @@ export async function createAndFundEscrow(
     const totalLamports = Math.round(totalAmount * LAMPORTS_PER_SOL);
     
     // Verify accounts exist before creating transaction (use backend proxy to avoid 403)
-      from: clientWallet.toString(),
-      to: escrowAccount.toString(),
-      amount: totalAmount,
-      lamports: totalLamports,
-      network: SOLANA_NETWORK,
-    });
     
     // Verify balance via backend proxy (already checked in useEscrow, but double-check here)
     try {
@@ -366,12 +360,8 @@ export async function createAndFundEscrow(
       if (accountData.balance < totalLamports) {
         throw new Error(`Insufficient balance: account has ${accountData.balanceSOL} SOL but needs ${totalAmount} SOL`);
       }
-        fromAccountExists: accountData.accountExists,
-        fromBalance: accountData.balanceSOL,
-      });
     } catch (error) {
-      // If backend proxy fails, log warning but continue (balance was already checked)
-      console.warn('Account verification via proxy failed, but continuing:', error);
+      // If backend proxy fails, continue (balance was already checked)
     }
     
     // Add SOL transfer instruction
@@ -381,12 +371,6 @@ export async function createAndFundEscrow(
       lamports: totalLamports,
     });
     
-      from: clientWallet.toString(),
-      to: escrowAccount.toString(),
-      lamports: totalLamports,
-      programId: transferInstruction.programId.toString(),
-      keys: transferInstruction.keys.length
-    });
     
     transaction.add(transferInstruction);
   } else {

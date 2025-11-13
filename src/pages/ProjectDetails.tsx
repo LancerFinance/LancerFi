@@ -111,12 +111,6 @@ const ProjectDetails = () => {
             const escrowData = await db.getEscrow(id);
             setEscrow(escrowData);
             
-            // Debug: Log escrow data to help diagnose display issues
-              payment_currency: escrowData.payment_currency,
-              amount_usdc: escrowData.amount_usdc,
-              platform_fee: escrowData.platform_fee,
-              total_locked: escrowData.total_locked,
-            });
             
             // Load SOL price if escrow was paid with SOL (or if payment_currency is not set, assume SOLANA for older escrows)
             const paymentCurrency = escrowData.payment_currency || 'SOLANA';
@@ -435,13 +429,10 @@ const ProjectDetails = () => {
             const remainingProposals = await db.getProposals(id);
             const stillExists = remainingProposals.some(p => p.freelancer_id === freelancer.id);
             if (stillExists) {
-              console.error(`⚠️ WARNING: Some proposals from freelancer ${freelancer.id} still exist after deletion! Retrying...`);
               // Try to delete again
               await db.deleteProposalsByFreelancer(id, freelancer.id);
-            } else {
             }
           } catch (verifyError) {
-            console.warn('Could not verify proposal deletion:', verifyError);
             // Continue anyway - deletion was attempted
           }
         } catch (proposalError) {

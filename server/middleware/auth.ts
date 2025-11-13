@@ -46,12 +46,7 @@ export async function verifyWalletSignature(
     const messageBytes = new TextEncoder().encode(messageToVerify);
     const signatureBytes = Uint8Array.from(Buffer.from(signature, 'base64'));
 
-    // Log verification attempt (without sensitive data)
-      walletAddress,
-      messageLength: messageToVerify.length,
-      hasNewlines: messageToVerify.includes('\n'),
-      signatureLength: signatureBytes.length
-    });
+    // Verify signature silently
 
     const isValid = nacl.sign.detached.verify(
       messageBytes,

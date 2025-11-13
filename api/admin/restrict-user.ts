@@ -223,10 +223,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
       } catch (ipBanError: any) {
-        console.error('Exception banning IP:', ipBanError);
         return res.status(500).json({ 
-          error: 'Failed to ban IP address', 
-          details: ipBanError.message || 'Unknown error'
+          error: 'Failed to ban IP address'
         });
       }
     }
@@ -289,12 +287,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         
         if (messageError) {
-          console.error('Error sending restriction message:', messageError);
           // Don't fail the request if message fails
-        } else {
         }
       } catch (msgError: any) {
-        console.error('Exception sending restriction message:', msgError);
         // Don't fail the request if message fails
       }
     }
