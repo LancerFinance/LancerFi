@@ -27,11 +27,13 @@
 
   <body>
     <div id="root"></div>
-    <!-- IP Ban Check - Only blocks if actually banned, no loading screen for normal users -->
+    <!-- IP Ban Check - BLOCKS React from loading if banned -->
     <script>
       (function() {
         var isBanned = false;
+        var checkComplete = false;
         var loadingOverlay = null;
+        var reactScripts = [];
         
         // Create loading overlay (only used if banned)
         function createLoadingOverlay() {
@@ -49,11 +51,18 @@
         function blockForever() {
           if (isBanned) return; // Already blocked
           isBanned = true;
+          checkComplete = true;
           
           // Show loading screen immediately
           var overlay = createLoadingOverlay();
           if (!document.body.contains(overlay)) {
             document.body.appendChild(overlay);
+          }
+          
+          // Clear root element to prevent any rendering
+          var root = document.getElementById('root');
+          if (root) {
+            root.innerHTML = '';
           }
           
           // IP is banned - keep loading forever, never allow React to render
@@ -65,50 +74,59 @@
               credentials: 'omit'
             }).catch(function() {});
           }, 2000);
-          
-          // Block React from rendering
-          var originalAppendChild = Node.prototype.appendChild;
-          Node.prototype.appendChild = function(child) {
-            if (isBanned && child && child.id === 'root') {
-              return child;
-            }
-            return originalAppendChild.call(this, child);
-          };
         }
         
-        // Quick background check - no loading screen unless banned
-        fetch('/api/admin/check-restriction?t=' + Date.now(), {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          cache: 'no-store',
-          credentials: 'omit'
-        })
-        .then(function(response) {
-          if (response.status === 403) {
+        function loadReactScripts() {
+          if (isBanned) return; // Don't load if banned
+          
+          // Load React scripts
+          reactScripts.forEach(function(scriptSrc) {
+            var script = document.createElement('script');
+            script.type = 'module';
+            script.src = scriptSrc;
+            document.body.appendChild(script);
+          });
+        }
+        
+        // Store React script sources (they're defined below but we'll load them after check)
+        reactScripts.push('/src/polyfills.ts');
+        reactScripts.push('/src/main.tsx');
+        
+        // BLOCKING check - must complete before React loads
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/admin/check-restriction?t=' + Date.now(), false); // false = synchronous
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        try {
+          xhr.send();
+          
+          if (xhr.status === 403) {
             // IP is banned - block forever
             blockForever();
             return;
           }
           
-          if (response.ok) {
-            return response.json().then(function(data) {
+          if (xhr.status === 200) {
+            try {
+              var data = JSON.parse(xhr.responseText);
               if (data.isRestricted && data.restrictionType === 'ban_ip') {
                 // IP is banned - block forever
                 blockForever();
+                return;
               }
-              // If not banned, do nothing - let React load normally
-            }).catch(function() {
+            } catch(e) {
               // JSON parse error - allow React to load (fail open)
-            });
+            }
           }
-          // If not OK, allow React to load (fail open)
-        })
-        .catch(function() {
+          
+          // Not banned - load React scripts
+          checkComplete = true;
+          loadReactScripts();
+        } catch(error) {
           // Network error - allow React to load (fail open)
-        });
+          checkComplete = true;
+          loadReactScripts();
+        }
       })();
     </script>
-    <script type="module" src="/src/polyfills.ts"></script>
-    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
