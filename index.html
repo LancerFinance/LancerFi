@@ -27,16 +27,18 @@
 
   <body>
     <div id="root"></div>
-    <!-- IP Ban Check - Runs BEFORE React loads to block entire page -->
+    <!-- IP Ban Check - Runs in background, only blocks if banned -->
     <script>
       (function() {
         var checkCount = 0;
-        var maxChecks = 3; // Limit retries to prevent infinite loops
+        var maxChecks = 2; // Limit retries
         var isBanned = false;
         var checkComplete = false;
         var loadingOverlay = null;
+        var showLoadingTimeout = null;
+        var LOADING_DELAY = 300; // Only show loading if check takes more than 300ms
         
-        // Create loading overlay (but don't show it yet)
+        // Create loading overlay
         function createLoadingOverlay() {
           if (loadingOverlay) return loadingOverlay;
           loadingOverlay = document.createElement('div');
@@ -49,16 +51,25 @@
           return loadingOverlay;
         }
         
-        // Show loading overlay
+        // Show loading overlay (with delay)
         function showLoading() {
-          var overlay = createLoadingOverlay();
-          if (!document.body.contains(overlay)) {
-            document.body.appendChild(overlay);
-          }
+          if (showLoadingTimeout) return; // Already scheduled
+          showLoadingTimeout = setTimeout(function() {
+            if (!checkComplete && !isBanned) {
+              var overlay = createLoadingOverlay();
+              if (!document.body.contains(overlay)) {
+                document.body.appendChild(overlay);
+              }
+            }
+          }, LOADING_DELAY);
         }
         
-        // Hide loading overlay and allow React to load
+        // Hide loading overlay
         function hideLoading() {
+          if (showLoadingTimeout) {
+            clearTimeout(showLoadingTimeout);
+            showLoadingTimeout = null;
+          }
           if (loadingOverlay && document.body.contains(loadingOverlay)) {
             loadingOverlay.remove();
           }
@@ -68,7 +79,17 @@
         function blockForever() {
           if (isBanned) return; // Already blocked
           isBanned = true;
-          showLoading(); // Keep showing loading screen
+          
+          // Cancel delayed loading, show immediately
+          if (showLoadingTimeout) {
+            clearTimeout(showLoadingTimeout);
+            showLoadingTimeout = null;
+          }
+          
+          var overlay = createLoadingOverlay();
+          if (!document.body.contains(overlay)) {
+            document.body.appendChild(overlay);
+          }
           
           // IP is banned - keep loading forever, never allow React to render
           setInterval(function() {
@@ -80,12 +101,11 @@
             }).catch(function() {});
           }, 2000);
           
-          // Block React from rendering by intercepting render calls
-          // This is a fallback in case React tries to load
+          // Block React from rendering
           var originalAppendChild = Node.prototype.appendChild;
           Node.prototype.appendChild = function(child) {
             if (isBanned && child && child.id === 'root') {
-              return child; // Prevent root from being added
+              return child;
             }
             return originalAppendChild.call(this, child);
           };
@@ -94,12 +114,13 @@
         function checkIPBan() {
           checkCount++;
           
-          // Show loading while checking
-          if (!checkComplete) {
+          // Schedule loading screen (only shows if check takes too long)
+          if (!checkComplete && !isBanned) {
             showLoading();
           }
           
-          // Check IP ban status with timestamp to prevent caching
+          // Check IP ban status
+          var startTime = Date.now();
           fetch('/api/admin/check-restriction?t=' + Date.now(), {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
@@ -107,6 +128,8 @@
             credentials: 'omit'
           })
           .then(function(response) {
+            var elapsed = Date.now() - startTime;
+            
             if (response.status === 403) {
               // IP is banned - block forever
               blockForever();
@@ -121,39 +144,36 @@
                   return;
                 }
                 
-                // IP not banned - hide loading and allow React to load
+                // IP not banned - hide loading immediately
                 hideLoading();
               }).catch(function(err) {
-                // JSON parse error - if we've tried a few times, allow React to load (fail open)
+                // JSON parse error - allow React to load (fail open)
                 if (checkCount >= maxChecks) {
                   hideLoading();
                 } else {
-                  setTimeout(checkIPBan, 1000);
+                  setTimeout(checkIPBan, 500);
                 }
               });
             } else {
-              // Non-200 response that's not 403 - if we've tried a few times, allow React to load
+              // Non-200 response - allow React to load
               if (checkCount >= maxChecks) {
                 hideLoading();
               } else {
-                setTimeout(checkIPBan, 1000);
+                setTimeout(checkIPBan, 500);
               }
             }
           })
           .catch(function(error) {
-            // Network error - if we've tried a few times, allow React to load (fail open)
+            // Network error - allow React to load (fail open)
             if (checkCount >= maxChecks) {
               hideLoading();
             } else {
-              setTimeout(checkIPBan, 1000);
+              setTimeout(checkIPBan, 500);
             }
           });
         }
         
-        // Show loading immediately
-        showLoading();
-        
-        // Initial check
+        // Start check immediately (but don't show loading unless it takes too long)
         checkIPBan();
       })();
     </script>
