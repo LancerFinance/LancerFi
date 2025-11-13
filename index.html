@@ -94,35 +94,32 @@
           }, 2000);
         }
         
-        // Intercept script execution - block if banned
-        var originalCreateElement = document.createElement;
-        document.createElement = function(tagName, options) {
-          var element = originalCreateElement.call(document, tagName, options);
-          if (tagName.toLowerCase() === 'script' && isBanned) {
-            // Block script execution by changing type
-            element.setAttribute('data-blocked', 'true');
-            var originalSetAttribute = element.setAttribute;
-            element.setAttribute = function(name, value) {
-              if (name === 'src' && isBanned) {
-                // Don't set src if banned
-                return;
-              }
-              return originalSetAttribute.call(this, name, value);
-            };
-          }
-          return element;
-        };
+        // Block scripts immediately - run before scripts below execute
+        (function() {
+          var scripts = document.querySelectorAll('script[src*="polyfills"], script[src*="main"]');
+          scripts.forEach(function(script) {
+            // Temporarily disable scripts until check completes
+            script.setAttribute('data-conditional', 'true');
+            var originalSrc = script.src;
+            script.removeAttribute('src');
+            
+            // Store original src to restore later
+            script.dataset.originalSrc = originalSrc;
+          });
+        })();
         
-        // Block existing scripts from executing if banned
-        document.addEventListener('DOMContentLoaded', function() {
-          if (isBanned) {
-            var scripts = document.querySelectorAll('script[src*="polyfills"], script[src*="main"]');
-            scripts.forEach(function(script) {
-              script.type = 'text/plain';
-              script.setAttribute('data-blocked', 'true');
-            });
-          }
-        });
+        function enableScripts() {
+          if (isBanned) return; // Don't enable if banned
+          
+          var scripts = document.querySelectorAll('script[data-conditional="true"]');
+          scripts.forEach(function(script) {
+            var originalSrc = script.dataset.originalSrc;
+            if (originalSrc) {
+              script.src = originalSrc;
+              script.removeAttribute('data-conditional');
+            }
+          });
+        }
         
         // Set a timeout to allow React if check takes too long (fail open)
         var loadTimeout = setTimeout(function() {
@@ -155,18 +152,21 @@
                 // IP is banned - block forever
                 blockForever();
               } else {
-                // Not banned - allow scripts to load
+                // Not banned - enable scripts
                 checkComplete = true;
+                enableScripts();
               }
             }).catch(function(err) {
               // JSON parse error - allow React to load (fail open)
               console.error('JSON parse error:', err);
               checkComplete = true;
+              enableScripts();
             });
           } else {
             // Not OK - allow React to load (fail open)
             console.log('Non-200 response, allowing React (fail open)');
             checkComplete = true;
+            enableScripts();
           }
         })
         .catch(function(error) {
@@ -174,7 +174,20 @@
           // Network error - allow React to load (fail open)
           console.error('Network error, allowing React (fail open):', error);
           checkComplete = true;
+          enableScripts();
         });
+        
+        // Also enable scripts if timeout fires
+        var originalTimeout = setTimeout;
+        setTimeout = function(callback, delay) {
+          if (callback.toString().includes('IP check timeout')) {
+            return originalTimeout(function() {
+              callback();
+              enableScripts();
+            }, delay);
+          }
+          return originalTimeout(callback, delay);
+        };
       })();
     </script>
     <!-- React scripts - Vite will inject correct production paths during build -->
