@@ -228,9 +228,15 @@ export async function trackUserIP(req: Request, res: Response, next: NextFunctio
 /**
  * Middleware to check if IP address is banned and block all requests
  * This should be applied early in the middleware chain
+ * Allows /api/admin/check-restriction endpoint so frontend can check ban status
  */
 export async function checkIPBan(req: Request, res: Response, next: NextFunction) {
   try {
+    // Allow check-restriction endpoint to work even for banned IPs (so frontend can check)
+    if (req.path === '/api/admin/check-restriction' || req.path.startsWith('/api/admin/check-restriction')) {
+      return next();
+    }
+    
     const clientIP = getClientIP(req);
     
     // Skip check if IP is unknown or localhost (for development)
@@ -247,8 +253,11 @@ export async function checkIPBan(req: Request, res: Response, next: NextFunction
     
     if (error) {
       console.error('Error checking IP ban:', error);
-      // On error, allow request (fail open for availability)
-      return next();
+      // On error, block request (fail closed for security)
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'Unable to verify access. Please try again later.'
+      });
     }
     
     if (ipBan) {
@@ -259,7 +268,7 @@ export async function checkIPBan(req: Request, res: Response, next: NextFunction
       
       if (!isExpired) {
         // IP is banned and not expired - block the request
-        console.log(`Blocked request from banned IP: ${clientIP}`);
+        console.log(`Blocked request from banned IP: ${clientIP} to ${req.path}`);
         return res.status(403).json({
           error: 'Access denied',
           message: 'Your IP address has been banned from accessing this service.',
@@ -285,8 +294,11 @@ export async function checkIPBan(req: Request, res: Response, next: NextFunction
     next();
   } catch (error: any) {
     console.error('Exception in IP ban check:', error);
-    // On exception, allow request (fail open for availability)
-    next();
+    // On exception, block request (fail closed for security)
+    return res.status(403).json({
+      error: 'Access denied',
+      message: 'Unable to verify access. Please try again later.'
+    });
   }
 }
 
