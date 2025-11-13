@@ -334,10 +334,7 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
                         {isFromAdmin ? (
-                          <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-white font-semibold">
-                            <Shield className="w-3 h-3 mr-1" />
-                            Admin
-                          </Badge>
+                          <Badge variant="outline">From</Badge>
                         ) : (
                           <Badge variant="outline">From</Badge>
                         )}
@@ -348,13 +345,13 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
                         )}
                         <span className={`text-sm font-medium truncate ${isFromAdmin ? 'text-amber-700 dark:text-amber-400 font-bold' : ''}`}>
                           {isFromAdmin 
-                            ? 'Admin' 
+                            ? 'Administrator' 
                             : `${message.sender_id.slice(0, 8)}...${message.sender_id.slice(-6)}`}
                         </span>
                         <span className="text-muted-foreground">→</span>
                         <span className={`text-sm font-medium truncate ${isToAdmin ? 'text-amber-700 dark:text-amber-400 font-bold' : ''}`}>
                           {isToAdmin
-                            ? 'Admin'
+                            ? 'Administrator'
                             : `${message.recipient_id.slice(0, 8)}...${message.recipient_id.slice(-6)}`}
                         </span>
                         {!message.is_read && (

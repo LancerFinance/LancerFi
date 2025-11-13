@@ -430,14 +430,8 @@ const Messages = () => {
                               <div className="flex items-center justify-between mb-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <h4 className={`font-medium truncate ${isOtherPartyAdmin ? 'text-amber-700 dark:text-amber-400 font-bold' : 'text-foreground'}`}>
-                                    {isOtherPartyAdmin ? 'Admin' : (otherParty.name || 'Unknown User')}
+                                    {isOtherPartyAdmin ? 'Administrator' : (otherParty.name || 'Unknown User')}
                                   </h4>
-                                  {isOtherPartyAdmin && (
-                                    <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold">
-                                      <Shield className="w-3 h-3 mr-1" />
-                                      Admin
-                                    </Badge>
-                                  )}
                                   <Badge variant="outline" className="text-xs">
                                     {isReceived ? 'From' : 'To'}
                                   </Badge>
@@ -499,14 +493,8 @@ const Messages = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className={`font-semibold ${isOtherPartyAdmin ? 'text-amber-700 dark:text-amber-400' : ''}`}>
-                              {isOtherPartyAdmin ? 'Admin' : (otherPartyName || 'Unknown User')}
+                              {isOtherPartyAdmin ? 'Administrator' : (otherPartyName || 'Unknown User')}
                             </h3>
-                            {isOtherPartyAdmin && (
-                              <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold">
-                                <Shield className="w-3 h-3 mr-1" />
-                                Admin
-                              </Badge>
-                            )}
                           </div>
                           <p className="text-sm text-muted-foreground">
                             {new Date(selectedMessage.created_at).toLocaleString()}
