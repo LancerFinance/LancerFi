@@ -89,7 +89,7 @@ router.post('/check-support-rate-limit', async (req: Request, res: Response) => 
  */
 router.post('/create-support-message', async (req: Request, res: Response) => {
   try {
-    const { walletAddress, subject, content } = req.body;
+    const { walletAddress, subject, content, attachments } = req.body;
     
     if (!walletAddress || !content) {
       return res.status(400).json({ 
@@ -145,6 +145,7 @@ router.post('/create-support-message', async (req: Request, res: Response) => {
         recipient_id: 'admin@lancerfi.app',
         subject: subject || null,
         content: content.trim(),
+        attachments: attachments && Array.isArray(attachments) ? attachments : [],
         is_read: false
       })
       .select()

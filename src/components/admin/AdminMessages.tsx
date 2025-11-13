@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { MessageSquare, Send, Search, Mail, MailOpen, Reply, Shield } from "lucide-react";
+import { MessageSquare, Send, Search, Mail, MailOpen, Reply, Shield, Paperclip } from "lucide-react";
 import { db, Message } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -362,6 +362,12 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
                       <h4 className="font-medium text-sm mb-1">{message.subject}</h4>
                     )}
                     <p className="text-sm text-muted-foreground line-clamp-2">{message.content}</p>
+                    {message.attachments && message.attachments.length > 0 && (
+                      <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Paperclip className="w-3 h-3" />
+                        <span>{message.attachments.length} attachment{message.attachments.length > 1 ? 's' : ''}</span>
+                      </div>
+                    )}
                     <p className="text-xs text-muted-foreground mt-2">
                       {format(new Date(message.created_at), 'PPp')}
                     </p>
@@ -445,6 +451,46 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
               <div>
                 <Label>Message</Label>
                 <p className="text-sm whitespace-pre-wrap">{selectedMessage.content}</p>
+                
+                {/* Display Attachments */}
+                {selectedMessage.attachments && selectedMessage.attachments.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <Label>Attachments:</Label>
+                    {selectedMessage.attachments.map((url, index) => {
+                      const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+                      const fileName = url.split('/').pop() || `attachment-${index + 1}`;
+                      
+                      return (
+                        <div key={index} className="border rounded-lg p-2 bg-muted/30">
+                          {isImage ? (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block"
+                            >
+                              <img
+                                src={url}
+                                alt={fileName}
+                                className="max-w-full max-h-64 object-contain rounded cursor-pointer hover:opacity-80 transition-opacity"
+                              />
+                            </a>
+                          ) : (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-primary hover:underline"
+                            >
+                              <Paperclip className="w-4 h-4" />
+                              <span className="text-sm">{fileName}</span>
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button

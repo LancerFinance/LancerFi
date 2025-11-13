@@ -117,6 +117,7 @@ export interface Message {
   subject?: string;
   content: string;
   is_read: boolean;
+  attachments?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -437,11 +438,13 @@ export const db = {
     recipient_id: string;
     subject?: string;
     content: string;
+    attachments?: string[];
   }) {
     const { data, error } = await supabase
       .from('messages')
       .insert({
         ...message,
+        attachments: message.attachments || [],
         is_read: false
       })
       .select()
