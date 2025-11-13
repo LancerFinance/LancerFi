@@ -340,10 +340,6 @@ const Messages = () => {
                 <CardContent className="p-0">
                   <SupportButtonWrapper 
                     address={address} 
-                    messages={messages} 
-                    setFilter={setFilter}
-                    setSelectedMessage={setSelectedMessage}
-                    markAsRead={markAsRead}
                     loadMessages={loadMessages}
                   />
                 </CardContent>
@@ -547,50 +543,17 @@ const Messages = () => {
 // Support Button Component
 interface SupportButtonWrapperProps {
   address: string | null;
-  messages: MessageWithSender[];
-  setFilter: (filter: 'all' | 'received' | 'sent') => void;
-  setSelectedMessage: (message: MessageWithSender | null) => void;
-  markAsRead: (messageId: string) => void;
   loadMessages: () => void;
 }
 
-const SupportButtonWrapper = ({ address, messages, setFilter, setSelectedMessage, markAsRead, loadMessages }: SupportButtonWrapperProps) => {
+const SupportButtonWrapper = ({ address, loadMessages }: SupportButtonWrapperProps) => {
   const [showDialog, setShowDialog] = useState(false);
   const { toast } = useToast();
   
   const handleSupportClick = () => {
     if (!address) return;
-    
-    // Check if there's an existing conversation with support
-    const supportMessages = messages.filter(
-      msg => (msg.sender_id === address && msg.recipient_id === 'admin@lancerfi.app') ||
-             (msg.recipient_id === address && msg.sender_id === 'admin@lancerfi.app')
-    );
-    
-    if (supportMessages.length > 0) {
-      // Navigate to the most recent support message
-      const mostRecent = supportMessages.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )[0];
-      
-      // Set filter to 'all' to ensure the message is visible
-      setFilter('all');
-      
-      // Scroll to and select the message
-      setTimeout(() => {
-        const messageCard = document.querySelector(`[data-message-id="${mostRecent.id}"]`);
-        if (messageCard) {
-          messageCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          setSelectedMessage(mostRecent);
-          if (mostRecent.recipient_id === address && !mostRecent.is_read) {
-            markAsRead(mostRecent.id);
-          }
-        }
-      }, 100);
-    } else {
-      // No existing conversation, open dialog
-      setShowDialog(true);
-    }
+    // Always open new message dialog
+    setShowDialog(true);
   };
 
   return (

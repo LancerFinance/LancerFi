@@ -164,7 +164,9 @@ const AdminDashboard = () => {
                     <span className="text-xs sm:text-sm font-medium">{section.label}</span>
                   </Button>
                   {isMessages && unreadSupportCount > 0 && (
-                    <span className="absolute top-0 right-0 w-3 h-3 bg-destructive rounded-full border-2 border-background"></span>
+                    <span className="absolute -top-1 -right-1 w-6 h-6 bg-destructive rounded-full border-2 border-background flex items-center justify-center text-white text-xs font-bold">
+                      {unreadSupportCount > 9 ? '9+' : unreadSupportCount}
+                    </span>
                   )}
                 </div>
               );
