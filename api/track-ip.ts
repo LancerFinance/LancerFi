@@ -73,20 +73,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'walletAddress is required' });
     }
 
-    // Update user's last_ip_address in profile
-    const { error: updateError } = await supabaseClient
+    // Upsert user's last_ip_address in profile (create profile if it doesn't exist)
+    // First check if profile exists
+    const { data: existingProfile, error: checkError } = await supabaseClient
       .from('profiles')
-      .update({ last_ip_address: clientIP })
-      .eq('wallet_address', walletAddress);
+      .select('id')
+      .eq('wallet_address', walletAddress)
+      .maybeSingle();
 
-    if (updateError) {
-      console.error('Error updating user IP:', updateError);
-      // Don't fail - IP tracking is not critical
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking profile:', checkError);
       return res.status(200).json({ 
         success: false, 
         message: 'IP tracking failed but request can continue',
-        error: updateError.message 
+        error: checkError.message 
       });
+    }
+
+    if (existingProfile) {
+      // Profile exists, update it
+      const { error: updateError } = await supabaseClient
+        .from('profiles')
+        .update({ last_ip_address: clientIP })
+        .eq('wallet_address', walletAddress);
+
+      if (updateError) {
+        console.error('Error updating user IP:', updateError);
+        return res.status(200).json({ 
+          success: false, 
+          message: 'IP tracking failed but request can continue',
+          error: updateError.message 
+        });
+      }
+    } else {
+      // Profile doesn't exist, create it with IP address
+      const { error: insertError } = await supabaseClient
+        .from('profiles')
+        .insert({
+          wallet_address: walletAddress,
+          last_ip_address: clientIP,
+          username: null,
+          full_name: null,
+          bio: null,
+          rating: 5.0,
+          completed_projects: 0,
+          total_earned: 0
+        });
+
+      if (insertError) {
+        console.error('Error creating profile with IP:', insertError);
+        return res.status(200).json({ 
+          success: false, 
+          message: 'IP tracking failed but request can continue',
+          error: insertError.message 
+        });
+      }
     }
 
     return res.status(200).json({

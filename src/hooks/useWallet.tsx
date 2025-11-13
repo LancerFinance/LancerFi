@@ -63,6 +63,22 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
           const address = w.solana.publicKey?.toString?.();
           if (address) {
             setWallet({ address, isConnected: true, isConnecting: false, provider: w.solana });
+            
+            // Track IP address when wallet auto-connects
+            try {
+              const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
+              await fetch(`${API_BASE_URL}/api/track-ip`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ walletAddress: address })
+              }).catch(err => {
+                // Silently fail - IP tracking is not critical
+                console.error('Failed to track IP on wallet auto-connect:', err);
+              });
+            } catch (ipError) {
+              // Silently fail - IP tracking is not critical
+              console.error('Exception tracking IP on wallet auto-connect:', ipError);
+            }
           }
         }
       } catch {}
@@ -99,6 +115,22 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         const address = pubkey?.toString?.() || w.solana?.publicKey?.toString?.();
         if (address) {
           setWallet(prev => ({ ...prev, address, isConnected: true, provider: w.solana }));
+          
+          // Track IP address when wallet connects via event listener
+          try {
+            const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
+            fetch(`${API_BASE_URL}/api/track-ip`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ walletAddress: address })
+            }).catch(err => {
+              // Silently fail - IP tracking is not critical
+              console.error('Failed to track IP on wallet connect event:', err);
+            });
+          } catch (ipError) {
+            // Silently fail - IP tracking is not critical
+            console.error('Exception tracking IP on wallet connect event:', ipError);
+          }
         }
       });
     }
