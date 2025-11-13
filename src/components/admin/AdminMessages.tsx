@@ -15,7 +15,11 @@ import { format } from "date-fns";
 // Admin wallet address
 const ADMIN_WALLET_ADDRESS = 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U';
 
-const AdminMessages = () => {
+interface AdminMessagesProps {
+  onSupportCountChange?: (count: number) => void;
+}
+
+const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps = {}) => {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
