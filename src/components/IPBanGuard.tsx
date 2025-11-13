@@ -74,8 +74,7 @@ export const IPBanGuard = ({ children }: IPBanGuardProps) => {
         }
       } catch (error) {
         // On error, fail open (don't block) since index.html already checked
-        // Just log and continue
-        console.error('IP ban check error (non-blocking):', error);
+        // Continue silently
       }
     };
 

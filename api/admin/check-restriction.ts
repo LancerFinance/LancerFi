@@ -97,10 +97,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       reason
     });
   } catch (error: any) {
-    console.error('Error checking restriction:', error);
     // Always return JSON, even on error
     return res.status(500).json({ 
-      error: error.message || 'Failed to check restriction',
+      error: 'Failed to check restriction',
       isRestricted: false,
       restrictionType: null,
       expiresAt: null,

@@ -174,7 +174,6 @@ export const useEscrow = (): UseEscrowReturn => {
           funded_at: new Date().toISOString(),
         };
 
-        console.log('Creating escrow with data:', escrowData);
         
         let escrow;
         try {
@@ -185,7 +184,6 @@ export const useEscrow = (): UseEscrowReturn => {
             throw new Error('Failed to create escrow record - no data returned');
           }
 
-          console.log('Escrow created successfully:', escrow.id);
         } catch (escrowCreateError: any) {
           console.error('Exception during escrow creation:', escrowCreateError);
           // Log full error details for debugging

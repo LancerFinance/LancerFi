@@ -112,7 +112,6 @@ const ProjectDetails = () => {
             setEscrow(escrowData);
             
             // Debug: Log escrow data to help diagnose display issues
-            console.log('Escrow data loaded:', {
               payment_currency: escrowData.payment_currency,
               amount_usdc: escrowData.amount_usdc,
               platform_fee: escrowData.platform_fee,
@@ -125,7 +124,6 @@ const ProjectDetails = () => {
               try {
                 const priceData = await getSolanaPrice();
                 setSolPrice(priceData.price_usd);
-                console.log('SOL price loaded:', priceData.price_usd);
               } catch (error) {
                 console.error('Error loading SOL price:', error);
               }
@@ -140,7 +138,6 @@ const ProjectDetails = () => {
           const clientData = await db.getProfileByWallet(projectData.client_id);
           setClient(clientData);
         } catch (error) {
-          console.log('No client profile found');
         }
       }
 
@@ -150,7 +147,6 @@ const ProjectDetails = () => {
           const freelancerData = await db.getProfile(projectData.freelancer_id);
           setFreelancer(freelancerData);
         } catch (error) {
-          console.log('No freelancer profile found');
         }
       } else {
         // Load proposal count if no freelancer assigned
@@ -432,8 +428,6 @@ const ProjectDetails = () => {
       if (freelancer?.id) {
         try {
           const deletedProposals = await db.deleteProposalsByFreelancer(id, freelancer.id);
-          console.log(`✅ PERMANENTLY deleted ${deletedProposals?.length || 0} proposal(s) for kicked-off freelancer ${freelancer.id}`);
-          console.log(`✅ This freelancer will need to submit a BRAND NEW proposal if they want to apply again`);
           
           // Double-check: verify proposals are actually deleted (wait a moment for DB to sync)
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -445,14 +439,12 @@ const ProjectDetails = () => {
               // Try to delete again
               await db.deleteProposalsByFreelancer(id, freelancer.id);
             } else {
-              console.log(`✅ Verified: All proposals from freelancer ${freelancer.id} have been deleted`);
             }
           } catch (verifyError) {
             console.warn('Could not verify proposal deletion:', verifyError);
             // Continue anyway - deletion was attempted
           }
         } catch (proposalError) {
-          console.error('❌ CRITICAL ERROR deleting proposals:', proposalError);
           // Don't fail the kick-off if proposal deletion fails, but log it prominently
           toast({
             title: "Warning",

@@ -38,7 +38,6 @@ export async function verifyWalletSignature(
       if (timestampMatch && nonceMatch) {
         messageToVerify = `LancerFi Payment Release Challenge\nTimestamp: ${timestampMatch[1]}\nNonce: ${nonceMatch[1]}\n\nThis signature proves you own this wallet.`;
         // Don't log full message - just indicate reconstruction happened
-        console.log('⚠️ Message missing newlines - reconstructed');
       }
     }
 
@@ -48,7 +47,6 @@ export async function verifyWalletSignature(
     const signatureBytes = Uint8Array.from(Buffer.from(signature, 'base64'));
 
     // Log verification attempt (without sensitive data)
-    console.log('🔍 Verifying signature:', {
       walletAddress,
       messageLength: messageToVerify.length,
       hasNewlines: messageToVerify.includes('\n'),
@@ -62,7 +60,6 @@ export async function verifyWalletSignature(
     );
 
     if (!isValid) {
-      console.error('❌ Signature verification failed for wallet:', walletAddress);
       return res.status(401).json({
         error: 'Invalid wallet signature. Authentication failed.'
       });

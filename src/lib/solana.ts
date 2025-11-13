@@ -98,7 +98,6 @@ export async function getAccountBalanceViaProxy(address: string): Promise<{ bala
     
     if (response.ok) {
       const data = await response.json();
-      console.log('Backend balance response:', data);
       if (data.success) {
         return {
           balance: data.balance,
@@ -141,7 +140,6 @@ export async function sendRawTransactionViaProxy(serializedTransaction: Uint8Arr
   const API_BASE_URL = import.meta.env.VITE_API_URL || 
     (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');
   
-  console.log('🔍 Backend URL:', API_BASE_URL);
   
   try {
     // Convert Uint8Array to base64 for transmission
@@ -156,8 +154,6 @@ export async function sendRawTransactionViaProxy(serializedTransaction: Uint8Arr
       base64Transaction = btoa(binary);
     }
     
-    console.log('Sending transaction to backend proxy:', API_BASE_URL);
-    console.log('Transaction size:', serializedTransaction.length, 'bytes');
     
     const response = await fetch(`${API_BASE_URL}/api/rpc/send-transaction`, {
       method: 'POST',
@@ -354,7 +350,6 @@ export async function createAndFundEscrow(
     const totalLamports = Math.round(totalAmount * LAMPORTS_PER_SOL);
     
     // Verify accounts exist before creating transaction (use backend proxy to avoid 403)
-    console.log('Creating SOL transfer:', {
       from: clientWallet.toString(),
       to: escrowAccount.toString(),
       amount: totalAmount,
@@ -371,7 +366,6 @@ export async function createAndFundEscrow(
       if (accountData.balance < totalLamports) {
         throw new Error(`Insufficient balance: account has ${accountData.balanceSOL} SOL but needs ${totalAmount} SOL`);
       }
-      console.log('Account verification passed:', {
         fromAccountExists: accountData.accountExists,
         fromBalance: accountData.balanceSOL,
       });
@@ -387,7 +381,6 @@ export async function createAndFundEscrow(
       lamports: totalLamports,
     });
     
-    console.log('Transfer instruction created:', {
       from: clientWallet.toString(),
       to: escrowAccount.toString(),
       lamports: totalLamports,

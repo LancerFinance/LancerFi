@@ -24,11 +24,6 @@ const RPC_ENDPOINTS = MAINNET_RPC_ENDPOINTS.length > 0
 
 const RPC_ENDPOINT = RPC_ENDPOINTS[0];
 
-console.log(`🚀🚀🚀 VERSION 2.0 - PRODUCTION MODE: Using MAINNET-BETA ONLY 🚀🚀🚀`);
-console.log(`🚀 RPC Endpoints:`, RPC_ENDPOINTS);
-console.log(`🚀 Primary Endpoint:`, RPC_ENDPOINT);
-console.log(`🚀 BUILD TIMESTAMP: ${new Date().toISOString()}`);
-console.log(`🚀 IF YOU SEE DEVNET IN LOGS, VERCEL IS SERVING OLD CODE`);
 
 // Create connection to mainnet
 const connection = new Connection(RPC_ENDPOINT, {
@@ -465,7 +460,6 @@ router.post('/send-transaction', async (req, res) => {
   res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   
-  console.log(`🚀 SEND TRANSACTION: Using MAINNET endpoints only:`, RPC_ENDPOINTS);
   
   try {
     const { transaction, options } = req.body;
@@ -481,7 +475,6 @@ router.post('/send-transaction', async (req, res) => {
     let transactionBuffer: Buffer;
     try {
       transactionBuffer = Buffer.from(transaction, 'base64');
-      console.log('Received transaction buffer, size:', transactionBuffer.length, 'bytes');
       
       if (transactionBuffer.length === 0 || transactionBuffer.length > 1232) {
         return res.status(400).json({
@@ -523,7 +516,6 @@ router.post('/send-transaction', async (req, res) => {
         
         // Send transaction directly to MAINNET - RPC will validate it
         try {
-          console.log(`🚀 Sending transaction to MAINNET via ${endpoint}...`);
           
           const signature = await testConnection.sendRawTransaction(
             transactionBuffer,
@@ -535,7 +527,6 @@ router.post('/send-transaction', async (req, res) => {
             }
           );
           
-          console.log(`✅ Transaction sent to MAINNET, signature: ${signature}`);
           
           // Wait for transaction to be included in a block
           await new Promise(resolve => setTimeout(resolve, 8000));
@@ -547,7 +538,6 @@ router.post('/send-transaction', async (req, res) => {
           
           while (!found && attempts < maxAttempts) {
             attempts++;
-            console.log(`Checking transaction status on MAINNET (attempt ${attempts}/${maxAttempts})...`);
             
             try {
               const statusResult = await testConnection.getSignatureStatus(signature, {
@@ -559,7 +549,6 @@ router.post('/send-transaction', async (req, res) => {
                   throw new Error(`Transaction failed on-chain: ${statusResult.value.err.toString()}`);
                 } else {
                   found = true;
-                  console.log(`✅ Transaction verified on MAINNET:`, {
                     signature,
                     confirmationStatus: statusResult.value.confirmationStatus,
                     slot: statusResult.value.slot
@@ -574,7 +563,6 @@ router.post('/send-transaction', async (req, res) => {
             } catch (statusError: any) {
               const errorMsg = statusError?.message || String(statusError);
               if (errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
-                console.warn(`⚠️ RPC access blocked (403) - continuing...`);
                 if (attempts < maxAttempts) {
                   await new Promise(resolve => setTimeout(resolve, 3000));
                 }

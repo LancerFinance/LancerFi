@@ -73,16 +73,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = await parseBody(req);
     const { walletAddress, profileId, restrictionType, expiresAt, reason, ipAddress } = body;
 
-    console.log('Request received:', { walletAddress, profileId, restrictionType, hasBody: !!body });
 
     // Verify admin wallet
     if (!walletAddress) {
-      console.error('Missing wallet address');
       return res.status(401).json({ error: 'Wallet address is required' });
     }
 
     if (walletAddress !== ADMIN_WALLET_ADDRESS) {
-      console.error('Unauthorized wallet:', walletAddress);
       return res.status(403).json({ 
         error: 'Unauthorized: This wallet does not have admin access' 
       });
@@ -90,12 +87,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Validate required fields
     if (!profileId) {
-      console.error('Missing profileId');
       return res.status(400).json({ error: 'profileId is required' });
     }
 
     if (!restrictionType || !['mute', 'ban_wallet', 'ban_ip'].includes(restrictionType)) {
-      console.error('Invalid restriction type:', restrictionType);
       return res.status(400).json({ error: 'Invalid restriction type. Must be mute, ban_wallet, or ban_ip' });
     }
 
@@ -118,7 +113,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       restrictions.is_muted = false;
     }
 
-    console.log('Updating profile:', profileId, 'with restrictions:', restrictions);
 
     // Helper function to get client IP from request
     function getClientIP(req: VercelRequest): string | null {
@@ -168,7 +162,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       if (!ipToBan && userProfile?.last_ip_address) {
         ipToBan = userProfile.last_ip_address;
-        console.log('Using user\'s last known IP address from profile:', ipToBan);
       }
       
       // If still no IP, check user's recent projects for their IP
@@ -185,7 +178,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           
           if (!projectError && recentProject?.client_ip) {
             ipToBan = recentProject.client_ip;
-            console.log('Using IP address from user\'s recent project:', ipToBan);
             
             // Also update the profile's last_ip_address for future reference
             await supabaseClient
@@ -230,7 +222,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         }
         
-        console.log('IP address banned successfully:', ipToBan);
       } catch (ipBanError: any) {
         console.error('Exception banning IP:', ipBanError);
         return res.status(500).json({ 
@@ -301,7 +292,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           console.error('Error sending restriction message:', messageError);
           // Don't fail the request if message fails
         } else {
-          console.log('Restriction message sent to:', userProfile.wallet_address);
         }
       } catch (msgError: any) {
         console.error('Exception sending restriction message:', msgError);
@@ -309,7 +299,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    console.log('Restriction applied successfully');
 
     return res.status(200).json({
       success: true,
@@ -317,8 +306,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       data: updatedProfile
     });
   } catch (error: any) {
-    console.error('Exception in restrict-user endpoint:', error);
-    console.error('Error stack:', error.stack);
     return res.status(500).json({ 
       error: error.message || 'Failed to apply restriction',
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined

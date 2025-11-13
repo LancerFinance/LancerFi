@@ -73,16 +73,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = await parseBody(req);
     const { walletAddress, profileId } = body;
 
-    console.log('Unrestrict request received:', { walletAddress, profileId, hasBody: !!body });
 
     // Verify admin wallet
     if (!walletAddress) {
-      console.error('Missing wallet address');
       return res.status(401).json({ error: 'Wallet address is required' });
     }
 
     if (walletAddress !== ADMIN_WALLET_ADDRESS) {
-      console.error('Unauthorized wallet:', walletAddress);
       return res.status(403).json({ 
         error: 'Unauthorized: This wallet does not have admin access' 
       });
@@ -90,7 +87,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Validate required fields
     if (!profileId) {
-      console.error('Missing profileId');
       return res.status(400).json({ error: 'profileId is required' });
     }
 
@@ -103,7 +99,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       restriction_reason: null
     };
 
-    console.log('Removing restrictions for profile:', profileId);
 
     const { data: updatedProfile, error: updateError } = await supabaseClient
       .from('profiles')
@@ -121,7 +116,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    console.log('Restriction removed successfully');
 
     return res.status(200).json({
       success: true,
@@ -129,8 +123,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       data: updatedProfile
     });
   } catch (error: any) {
-    console.error('Exception in unrestrict-user endpoint:', error);
-    console.error('Error stack:', error.stack);
     return res.status(500).json({ 
       error: error.message || 'Failed to remove restriction',
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined

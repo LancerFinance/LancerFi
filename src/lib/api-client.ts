@@ -65,9 +65,6 @@ export async function releasePaymentToFreelancer(
     // Convert signature to base64 for transmission
     const signatureBase64 = Buffer.from(signature).toString('base64');
     
-    // Log verification attempt (without sensitive signature data)
-    console.log('📤 Sending signature verification for wallet:', walletAddress);
-    
     // Call backend API
     const response = await fetch(`${API_BASE_URL}/api/payment/release`, {
       method: 'POST',

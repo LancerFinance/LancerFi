@@ -268,7 +268,6 @@ export async function checkIPBan(req: Request, res: Response, next: NextFunction
       
       if (!isExpired) {
         // IP is banned and not expired - block the request
-        console.log(`Blocked request from banned IP: ${clientIP} to ${req.path}`);
         return res.status(403).json({
           error: 'Access denied',
           message: 'Your IP address has been banned from accessing this service.',

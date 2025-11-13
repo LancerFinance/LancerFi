@@ -151,7 +151,6 @@
         // Set a timeout to allow React if check takes too long (fail open)
         var loadTimeout = setTimeout(function() {
           if (!checkComplete && !isBanned) {
-            console.log('IP check timeout - allowing React (fail open)');
             checkComplete = true;
             // Scripts will load normally from HTML
           }
@@ -185,13 +184,11 @@
               }
             }).catch(function(err) {
               // JSON parse error - allow React to load (fail open)
-              console.error('JSON parse error:', err);
               checkComplete = true;
               enableScripts();
             });
           } else {
             // Not OK - allow React to load (fail open)
-            console.log('Non-200 response, allowing React (fail open)');
             checkComplete = true;
             enableScripts();
           }
@@ -199,7 +196,6 @@
         .catch(function(error) {
           clearTimeout(loadTimeout);
           // Network error - allow React to load (fail open)
-          console.error('Network error, allowing React (fail open):', error);
           checkComplete = true;
           enableScripts();
         });

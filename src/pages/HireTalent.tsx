@@ -131,14 +131,11 @@ const HireTalent = () => {
           // The database total_earned is stored in SOL, so convert to USD
           const solAmount = Number(freelancer.total_earned);
           usdEarned = solAmount * solPrice;
-          console.log(`Converting ${solAmount} SOL to USD for freelancer ${freelancer.id}: ${solAmount} * ${solPrice} = ${usdEarned}`);
         }
         
         earningsMap[freelancer.id] = usdEarned;
       }
       
-      console.log('Final earningsMap:', earningsMap);
-      console.log('SOL Price used:', solPrice);
 
       setUsdEarnings(earningsMap);
       setFreelancers(freelancerList);
