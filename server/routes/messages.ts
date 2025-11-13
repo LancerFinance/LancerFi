@@ -117,23 +117,31 @@ router.post('/create-support-message', async (req: Request, res: Response) => {
       // Don't block legitimate users due to database errors
     } else {
       const messageCount = recentMessages?.length || 0;
+      // Only block if they've sent 3+ messages in the last minute
+      // This prevents rapid spam but allows normal usage
       if (messageCount >= 3) {
-        // Calculate time until oldest message expires
-        let remainingSeconds = 60;
+        // Find the oldest message in the last minute
         if (recentMessages && recentMessages.length > 0) {
-          const oldestMessage = recentMessages[recentMessages.length - 1];
+          // Sort by created_at ascending to get oldest first
+          const sortedMessages = [...recentMessages].sort((a, b) => 
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          const oldestMessage = sortedMessages[0];
           const oldestMessageTime = new Date(oldestMessage.created_at);
           const secondsSinceOldest = (now.getTime() - oldestMessageTime.getTime()) / 1000;
-          remainingSeconds = Math.ceil(60 - secondsSinceOldest);
+          const remainingSeconds = Math.max(1, Math.ceil(60 - secondsSinceOldest));
+          
+          // Only block if we're still within the 1-minute window
+          if (remainingSeconds > 0) {
+            return res.status(429).json({
+              error: `Please wait ${remainingSeconds} second${remainingSeconds > 1 ? 's' : ''} before sending another message.`,
+              success: false,
+              count: messageCount,
+              limit: 3,
+              remainingSeconds
+            });
+          }
         }
-        
-        return res.status(429).json({
-          error: `Please wait ${remainingSeconds} second${remainingSeconds > 1 ? 's' : ''} before sending another message.`,
-          success: false,
-          count: messageCount,
-          limit: 3,
-          remainingSeconds
-        });
       }
     }
     

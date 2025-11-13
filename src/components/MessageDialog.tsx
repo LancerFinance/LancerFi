@@ -12,6 +12,9 @@ import { validateMessage } from "@/lib/validation";
 import { validateImageFile, validateDocumentFile } from "@/lib/file-security";
 import { checkImageForNSFW } from "@/lib/nsfw-detection";
 
+// Feature flag: Set to true to enable attachments feature
+const ENABLE_ATTACHMENTS = false;
+
 interface MessageDialogProps {
   recipientId: string;
   recipientName: string;
@@ -258,8 +261,8 @@ const MessageDialog = ({
     setErrors({});
 
     try {
-      // Upload attachments first
-      const attachmentUrls = await uploadAttachments();
+      // Upload attachments first (only if feature is enabled)
+      const attachmentUrls = ENABLE_ATTACHMENTS ? await uploadAttachments() : [];
 
       // For support messages, use backend endpoint that enforces rate limiting
       if (recipientId === 'admin@lancerfi.app') {
@@ -403,6 +406,7 @@ const MessageDialog = ({
           </div>
 
           {/* Attachments Section */}
+          {ENABLE_ATTACHMENTS && (
           <div>
             <Label>Attachments</Label>
             <div
@@ -475,6 +479,7 @@ const MessageDialog = ({
               </div>
             )}
           </div>
+          )}
 
           <div className="flex gap-2">
             <Button onClick={() => setOpen(false)} variant="outline" className="flex-1">
@@ -482,7 +487,7 @@ const MessageDialog = ({
             </Button>
             <Button 
               onClick={handleSubmit} 
-              disabled={sending || uploadingAttachments || !formData.content.trim() || (requireSubject && !formData.subject.trim())}
+              disabled={sending || (ENABLE_ATTACHMENTS && uploadingAttachments) || !formData.content.trim() || (requireSubject && !formData.subject.trim())}
               className="flex-1"
             >
               {sending ? (
