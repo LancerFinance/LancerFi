@@ -18,7 +18,8 @@ import {
   Reply,
   Trash2,
   ArrowLeft,
-  Loader2
+  Loader2,
+  HelpCircle
 } from "lucide-react";
 import { db, Message } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -327,6 +328,18 @@ const Messages = () => {
                   </div>
                 </CardContent>
               </Card>
+              
+              {/* Support Button */}
+              <div className="mt-4">
+                <MessageDialog
+                  recipientId="admin@lancerfi.app"
+                  recipientName="Support"
+                  triggerVariant="outline"
+                  triggerClassName="w-full justify-start"
+                  triggerText="Support"
+                  triggerIcon={<HelpCircle className="w-4 h-4 mr-2" />}
+                />
+              </div>
             </div>
 
             {/* Messages List */}

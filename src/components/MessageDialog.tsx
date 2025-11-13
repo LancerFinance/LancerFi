@@ -17,6 +17,8 @@ interface MessageDialogProps {
   triggerVariant?: "outline" | "default" | "ghost";
   triggerSize?: "sm" | "default" | "lg";
   triggerClassName?: string;
+  triggerText?: string;
+  triggerIcon?: React.ReactNode;
 }
 
 const MessageDialog = ({ 
@@ -25,7 +27,9 @@ const MessageDialog = ({
   projectTitle,
   triggerVariant = "outline",
   triggerSize = "sm",
-  triggerClassName = "w-full"
+  triggerClassName = "w-full",
+  triggerText,
+  triggerIcon
 }: MessageDialogProps) => {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
@@ -121,8 +125,8 @@ const MessageDialog = ({
           className={triggerClassName}
           disabled={!isConnected}
         >
-          <MessageSquare className="w-4 h-4 mr-2" />
-          Send Message
+          {triggerIcon || <MessageSquare className="w-4 h-4 mr-2" />}
+          {triggerText || "Send Message"}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
