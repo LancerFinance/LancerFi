@@ -34,7 +34,6 @@ interface MessageWithSender extends Message {
 const Messages = () => {
   const { toast } = useToast();
   const { isConnected, address, connectWallet } = useWallet();
-  const navigate = useNavigate();
   
   const [messages, setMessages] = useState<MessageWithSender[]>([]);
   const [loading, setLoading] = useState(true);
@@ -342,7 +341,6 @@ const Messages = () => {
                   <SupportButtonWrapper 
                     address={address} 
                     messages={messages} 
-                    navigate={navigate}
                     setFilter={setFilter}
                     setSelectedMessage={setSelectedMessage}
                     markAsRead={markAsRead}
@@ -550,14 +548,13 @@ const Messages = () => {
 interface SupportButtonWrapperProps {
   address: string | null;
   messages: MessageWithSender[];
-  navigate: any;
   setFilter: (filter: 'all' | 'received' | 'sent') => void;
   setSelectedMessage: (message: MessageWithSender | null) => void;
   markAsRead: (messageId: string) => void;
   loadMessages: () => void;
 }
 
-const SupportButtonWrapper = ({ address, messages, navigate, setFilter, setSelectedMessage, markAsRead, loadMessages }: SupportButtonWrapperProps) => {
+const SupportButtonWrapper = ({ address, messages, setFilter, setSelectedMessage, markAsRead, loadMessages }: SupportButtonWrapperProps) => {
   const [showDialog, setShowDialog] = useState(false);
   const { toast } = useToast();
   
