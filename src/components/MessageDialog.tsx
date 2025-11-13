@@ -84,32 +84,6 @@ const MessageDialog = ({
       // Continue if check fails
     }
 
-    // Check rate limit for support messages
-    if (recipientId === 'admin@lancerfi.app') {
-      try {
-        const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
-        const response = await fetch(`${API_BASE_URL}/api/messages/check-support-rate-limit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ walletAddress: address })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (!data.allowed) {
-            toast({
-              title: "Rate Limit Exceeded",
-              description: data.reason || "You've sent too many support messages. Please wait before sending another.",
-              variant: "destructive",
-            });
-            return;
-          }
-        }
-      } catch (rateLimitError) {
-        // Continue if rate limit check fails (fail open)
-      }
-    }
-
     // Validate form
     if (requireSubject && !formData.subject.trim()) {
       setErrors({ subject: 'Subject is required' });
@@ -130,12 +104,47 @@ const MessageDialog = ({
     setErrors({});
 
     try {
-      await db.createMessage({
-        sender_id: address,
-        recipient_id: recipientId,
-        subject: formData.subject.trim() || undefined,
-        content: formData.content.trim()
-      });
+      // For support messages, use backend endpoint that enforces rate limiting
+      if (recipientId === 'admin@lancerfi.app') {
+        const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
+        const response = await fetch(`${API_BASE_URL}/api/messages/create-support-message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            walletAddress: address,
+            subject: formData.subject.trim() || undefined,
+            content: formData.content.trim()
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          if (response.status === 429) {
+            // Rate limit exceeded
+            toast({
+              title: "Rate Limit Exceeded",
+              description: errorData.error || "You've sent too many support messages. Please wait before sending another.",
+              variant: "destructive",
+            });
+            setSending(false);
+            return;
+          }
+          throw new Error(errorData.error || 'Failed to send message');
+        }
+        
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to send message');
+        }
+      } else {
+        // For non-support messages, use direct Supabase
+        await db.createMessage({
+          sender_id: address,
+          recipient_id: recipientId,
+          subject: formData.subject.trim() || undefined,
+          content: formData.content.trim()
+        });
+      }
 
       toast({
         title: "Message Sent!",
