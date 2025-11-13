@@ -549,10 +549,6 @@ router.post('/send-transaction', async (req, res) => {
                   throw new Error(`Transaction failed on-chain: ${statusResult.value.err.toString()}`);
                 } else {
                   found = true;
-                    signature,
-                    confirmationStatus: statusResult.value.confirmationStatus,
-                    slot: statusResult.value.slot
-                  });
                   break;
                 }
               } else {
@@ -581,12 +577,9 @@ router.post('/send-transaction', async (req, res) => {
             signature
           });
         } catch (sendError: any) {
-          const errorMsg = sendError?.message || String(sendError);
-          console.error(`❌ Failed to send transaction to MAINNET:`, errorMsg);
           throw sendError;
         }
       } catch (error) {
-        console.error(`❌ Failed via MAINNET endpoint ${endpoint}:`, error);
         lastError = error instanceof Error ? error : new Error(String(error));
         // Continue to next MAINNET endpoint
       }
@@ -596,7 +589,6 @@ router.post('/send-transaction', async (req, res) => {
     throw lastError || new Error('All MAINNET RPC endpoints failed');
     
   } catch (error) {
-    console.error('Error sending transaction to MAINNET:', error);
     const errorMessage = error instanceof Error ? error.message : 'Failed to send transaction';
     
     res.status(500).json({
