@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { MessageSquare, Send, Search, Mail, MailOpen, Reply } from "lucide-react";
+import { MessageSquare, Send, Search, Mail, MailOpen, Reply, Shield } from "lucide-react";
 import { db, Message } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -301,39 +301,50 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
             </CardContent>
           </Card>
         ) : (
-          filteredMessages.map((message) => (
-            <Card 
-              key={message.id}
-              className={`cursor-pointer hover:bg-muted/50 ${!message.is_read ? 'border-l-4 border-l-primary' : ''}`}
-              onClick={() => setSelectedMessage(message)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant={message.sender_id === 'admin@lancerfi.app' ? 'default' : 'outline'}>
-                        {message.sender_id === 'admin@lancerfi.app' ? 'Admin' : 'From'}
-                      </Badge>
-                      {message.recipient_id === 'admin@lancerfi.app' && (
-                        <Badge variant="default" className="bg-blue-600 text-white">
-                          Support
-                        </Badge>
-                      )}
-                      <span className="text-sm font-medium truncate">
-                        {message.sender_id === 'admin@lancerfi.app' 
-                          ? 'Admin' 
-                          : `${message.sender_id.slice(0, 8)}...${message.sender_id.slice(-6)}`}
-                      </span>
-                      <span className="text-muted-foreground">→</span>
-                      <span className="text-sm font-medium truncate">
-                        {message.recipient_id === 'admin@lancerfi.app'
-                          ? 'Admin'
-                          : `${message.recipient_id.slice(0, 8)}...${message.recipient_id.slice(-6)}`}
-                      </span>
-                      {!message.is_read && (
-                        <Badge variant="destructive" className="text-xs">New</Badge>
-                      )}
-                    </div>
+          filteredMessages.map((message) => {
+            const isFromAdmin = message.sender_id === 'admin@lancerfi.app' || message.sender_id === ADMIN_WALLET_ADDRESS;
+            const isToAdmin = message.recipient_id === 'admin@lancerfi.app' || message.recipient_id === ADMIN_WALLET_ADDRESS;
+            
+            return (
+              <Card 
+                key={message.id}
+                className={`cursor-pointer hover:bg-muted/50 ${!message.is_read ? 'border-l-4 border-l-primary' : ''} ${
+                  isFromAdmin ? 'border-2 border-amber-400/50 bg-amber-50/30 dark:bg-amber-950/20' : ''
+                }`}
+                onClick={() => setSelectedMessage(message)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        {isFromAdmin ? (
+                          <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-white font-semibold">
+                            <Shield className="w-3 h-3 mr-1" />
+                            Admin
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">From</Badge>
+                        )}
+                        {isToAdmin && (
+                          <Badge variant="default" className="bg-blue-600 text-white">
+                            Support
+                          </Badge>
+                        )}
+                        <span className={`text-sm font-medium truncate ${isFromAdmin ? 'text-amber-700 dark:text-amber-400 font-bold' : ''}`}>
+                          {isFromAdmin 
+                            ? 'Admin' 
+                            : `${message.sender_id.slice(0, 8)}...${message.sender_id.slice(-6)}`}
+                        </span>
+                        <span className="text-muted-foreground">→</span>
+                        <span className={`text-sm font-medium truncate ${isToAdmin ? 'text-amber-700 dark:text-amber-400 font-bold' : ''}`}>
+                          {isToAdmin
+                            ? 'Admin'
+                            : `${message.recipient_id.slice(0, 8)}...${message.recipient_id.slice(-6)}`}
+                        </span>
+                        {!message.is_read && (
+                          <Badge variant="destructive" className="text-xs">New</Badge>
+                        )}
+                      </div>
                     {message.subject && (
                       <h4 className="font-medium text-sm mb-1">{message.subject}</h4>
                     )}

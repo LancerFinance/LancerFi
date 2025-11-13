@@ -19,7 +19,8 @@ import {
   Trash2,
   ArrowLeft,
   Loader2,
-  HelpCircle
+  HelpCircle,
+  Shield
 } from "lucide-react";
 import { db, Message } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +31,16 @@ interface MessageWithSender extends Message {
   sender_name?: string;
   recipient_name?: string;
 }
+
+// Admin identifiers
+const ADMIN_EMAIL = 'admin@lancerfi.app';
+const ADMIN_WALLET_ADDRESS = 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U';
+
+// Helper function to check if a user is admin
+const isAdmin = (userId: string | null | undefined): boolean => {
+  if (!userId) return false;
+  return userId === ADMIN_EMAIL || userId === ADMIN_WALLET_ADDRESS;
+};
 
 const Messages = () => {
   const { toast } = useToast();
@@ -380,6 +391,7 @@ const Messages = () => {
                     const otherParty = isReceived 
                       ? { id: message.sender_id, name: message.sender_name }
                       : { id: message.recipient_id, name: message.recipient_name };
+                    const isOtherPartyAdmin = isAdmin(otherParty.id);
                     
                     return (
                       <Card 
@@ -391,6 +403,8 @@ const Messages = () => {
                           isReceived && !message.is_read 
                             ? 'border-l-4 border-l-web3-primary !bg-white' 
                             : '!bg-muted/30'
+                        } ${
+                          isOtherPartyAdmin ? 'border-2 border-amber-400/50 bg-amber-50/30 dark:bg-amber-950/20' : ''
                         }`}
                         onClick={() => {
                           setSelectedMessage(message);
@@ -401,19 +415,29 @@ const Messages = () => {
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start gap-4">
-                            <Avatar className="w-10 h-10">
+                            <Avatar className={`w-10 h-10 ${isOtherPartyAdmin ? 'ring-2 ring-amber-400' : ''}`}>
                               <AvatarImage src="" />
-                              <AvatarFallback>
-                                {otherParty.name?.slice(0, 2).toUpperCase() || 'U'}
+                              <AvatarFallback className={isOtherPartyAdmin ? 'bg-amber-500 text-white font-bold' : ''}>
+                                {isOtherPartyAdmin ? (
+                                  <Shield className="w-5 h-5" />
+                                ) : (
+                                  otherParty.name?.slice(0, 2).toUpperCase() || 'U'
+                                )}
                               </AvatarFallback>
                             </Avatar>
                             
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between mb-1">
-                                <div className="flex items-center gap-2">
-                                  <h4 className="font-medium text-foreground truncate">
-                                    {otherParty.name || 'Unknown User'}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className={`font-medium truncate ${isOtherPartyAdmin ? 'text-amber-700 dark:text-amber-400 font-bold' : 'text-foreground'}`}>
+                                    {isOtherPartyAdmin ? 'Admin' : (otherParty.name || 'Unknown User')}
                                   </h4>
+                                  {isOtherPartyAdmin && (
+                                    <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold">
+                                      <Shield className="w-3 h-3 mr-1" />
+                                      Admin
+                                    </Badge>
+                                  )}
                                   <Badge variant="outline" className="text-xs">
                                     {isReceived ? 'From' : 'To'}
                                   </Badge>
@@ -450,38 +474,52 @@ const Messages = () => {
           </div>
 
           {/* Message Detail Modal/Panel */}
-          {selectedMessage && (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-              <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden">
-                <CardHeader className="border-b">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src="" />
-                        <AvatarFallback>
-                          {(selectedMessage.sender_id === address 
-                            ? selectedMessage.recipient_name 
-                            : selectedMessage.sender_name)?.slice(0, 2).toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h3 className="font-semibold">
-                          {selectedMessage.sender_id === address 
-                            ? selectedMessage.recipient_name 
-                            : selectedMessage.sender_name}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(selectedMessage.created_at).toLocaleString()}
-                        </p>
+          {selectedMessage && (() => {
+            const isReceived = selectedMessage.recipient_id === address;
+            const otherPartyId = isReceived ? selectedMessage.sender_id : selectedMessage.recipient_id;
+            const otherPartyName = isReceived ? selectedMessage.sender_name : selectedMessage.recipient_name;
+            const isOtherPartyAdmin = isAdmin(otherPartyId);
+            
+            return (
+              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <Card className={`w-full max-w-2xl max-h-[80vh] overflow-hidden ${isOtherPartyAdmin ? 'border-2 border-amber-400/50' : ''}`}>
+                  <CardHeader className={`border-b ${isOtherPartyAdmin ? 'bg-amber-50/30 dark:bg-amber-950/20' : ''}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar className={isOtherPartyAdmin ? 'ring-2 ring-amber-400' : ''}>
+                          <AvatarImage src="" />
+                          <AvatarFallback className={isOtherPartyAdmin ? 'bg-amber-500 text-white font-bold' : ''}>
+                            {isOtherPartyAdmin ? (
+                              <Shield className="w-5 h-5" />
+                            ) : (
+                              (otherPartyName?.slice(0, 2).toUpperCase() || 'U')
+                            )}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className={`font-semibold ${isOtherPartyAdmin ? 'text-amber-700 dark:text-amber-400' : ''}`}>
+                              {isOtherPartyAdmin ? 'Admin' : (otherPartyName || 'Unknown User')}
+                            </h3>
+                            {isOtherPartyAdmin && (
+                              <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold">
+                                <Shield className="w-3 h-3 mr-1" />
+                                Admin
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(selectedMessage.created_at).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedMessage(null)}>
+                        ✕
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedMessage(null)}>
-                      ✕
-                    </Button>
-                  </div>
-                </CardHeader>
+                  </CardHeader>
                 
-                <CardContent className="p-6 overflow-y-auto">
+                <CardContent className={`p-6 overflow-y-auto ${isOtherPartyAdmin ? 'bg-amber-50/10 dark:bg-amber-950/10' : ''}`}>
                   {selectedMessage.subject && (
                     <div className="mb-4">
                       <h4 className="font-medium text-foreground">Subject:</h4>
@@ -533,7 +571,8 @@ const Messages = () => {
                 </CardContent>
               </Card>
             </div>
-          )}
+            );
+          })()}
         </div>
       </main>
     </div>
