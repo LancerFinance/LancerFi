@@ -20,7 +20,8 @@ const AdminMessages = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState<'all' | 'unread' | 'read' | 'admin'>('all');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'read' | 'admin' | 'support'>('all');
+  const [lastSupportCheck, setLastSupportCheck] = useState<number>(Date.now());
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
   const [newMessageDialogOpen, setNewMessageDialogOpen] = useState(false);
@@ -33,6 +34,12 @@ const AdminMessages = () => {
 
   useEffect(() => {
     loadMessages();
+    // Check for new support messages periodically
+    const interval = setInterval(() => {
+      checkForNewSupportMessages();
+    }, 10000); // Check every 10 seconds
+    
+    return () => clearInterval(interval);
   }, []);
 
   const loadMessages = async () => {
@@ -40,8 +47,8 @@ const AdminMessages = () => {
       setLoading(true);
       const data = await db.getAllMessages();
       setMessages(data || []);
+      setLastSupportCheck(Date.now());
     } catch (error) {
-      console.error('Error loading messages:', error);
       toast({
         title: "Error",
         description: "Failed to load messages",
@@ -49,6 +56,32 @@ const AdminMessages = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkForNewSupportMessages = async () => {
+    try {
+      const data = await db.getAllMessages();
+      const supportMessages = (data || []).filter(
+        msg => msg.recipient_id === 'admin@lancerfi.app' && !msg.is_read
+      );
+      
+      // Check if there are new unread support messages since last check
+      const newSupportMessages = supportMessages.filter(
+        msg => new Date(msg.created_at).getTime() > lastSupportCheck
+      );
+      
+      if (newSupportMessages.length > 0) {
+        toast({
+          title: "New Support Message",
+          description: `You have ${newSupportMessages.length} new support message${newSupportMessages.length > 1 ? 's' : ''}`,
+        });
+        setLastSupportCheck(Date.now());
+        // Reload messages to update the UI
+        setMessages(data || []);
+      }
+    } catch (error) {
+      // Silently fail - don't spam errors
     }
   };
 
@@ -131,6 +164,18 @@ const AdminMessages = () => {
     }
   };
 
+  const supportMessages = messages.filter(
+    msg => msg.recipient_id === 'admin@lancerfi.app'
+  );
+  const unreadSupportCount = supportMessages.filter(msg => !msg.is_read).length;
+
+  // Notify parent component of support count changes
+  useEffect(() => {
+    if (onSupportCountChange) {
+      onSupportCountChange(unreadSupportCount);
+    }
+  }, [unreadSupportCount, onSupportCountChange]);
+
   const filteredMessages = messages.filter(message => {
     const matchesSearch = searchTerm === '' || 
       message.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -141,7 +186,8 @@ const AdminMessages = () => {
     const matchesFilter = filter === 'all' || 
       (filter === 'unread' && !message.is_read) ||
       (filter === 'read' && message.is_read) ||
-      (filter === 'admin' && (message.sender_id === ADMIN_WALLET_ADDRESS || message.sender_id === 'admin@lancerfi.app'));
+      (filter === 'admin' && (message.sender_id === ADMIN_WALLET_ADDRESS || message.sender_id === 'admin@lancerfi.app')) ||
+      (filter === 'support' && message.recipient_id === 'admin@lancerfi.app');
     
     return matchesSearch && matchesFilter;
   });
@@ -222,17 +268,23 @@ const AdminMessages = () => {
             className="pl-9"
           />
         </div>
-        <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Filter" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Messages</SelectItem>
-            <SelectItem value="unread">Unread</SelectItem>
-            <SelectItem value="read">Read</SelectItem>
-            <SelectItem value="admin">Admin Messages</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="relative">
+          <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Filter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Messages</SelectItem>
+              <SelectItem value="unread">Unread</SelectItem>
+              <SelectItem value="read">Read</SelectItem>
+              <SelectItem value="admin">Admin Messages</SelectItem>
+              <SelectItem value="support">Support Messages</SelectItem>
+            </SelectContent>
+          </Select>
+          {unreadSupportCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full border-2 border-background"></span>
+          )}
+        </div>
       </div>
 
       <div className="space-y-2 max-h-[600px] overflow-y-auto">
@@ -257,6 +309,11 @@ const AdminMessages = () => {
                       <Badge variant={message.sender_id === 'admin@lancerfi.app' ? 'default' : 'outline'}>
                         {message.sender_id === 'admin@lancerfi.app' ? 'Admin' : 'From'}
                       </Badge>
+                      {message.recipient_id === 'admin@lancerfi.app' && (
+                        <Badge variant="default" className="bg-blue-600 text-white">
+                          Support
+                        </Badge>
+                      )}
                       <span className="text-sm font-medium truncate">
                         {message.sender_id === 'admin@lancerfi.app' 
                           ? 'Admin' 

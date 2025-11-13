@@ -19,6 +19,7 @@ const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState<AdminSection>('messages');
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [isVerifying, setIsVerifying] = useState(true);
+  const [unreadSupportCount, setUnreadSupportCount] = useState(0);
   const { address, isConnected } = useWallet();
 
   const sections = [
@@ -151,16 +152,21 @@ const AdminDashboard = () => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8">
             {sections.map((section) => {
               const Icon = section.icon;
+              const isMessages = section.id === 'messages';
               return (
-                <Button
-                  key={section.id}
-                  variant={activeSection === section.id ? 'default' : 'outline'}
-                  className="h-auto py-4 sm:py-6 flex flex-col items-center gap-2 sm:gap-3"
-                  onClick={() => setActiveSection(section.id)}
-                >
-                  <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
-                  <span className="text-xs sm:text-sm font-medium">{section.label}</span>
-                </Button>
+                <div key={section.id} className="relative">
+                  <Button
+                    variant={activeSection === section.id ? 'default' : 'outline'}
+                    className="h-auto py-4 sm:py-6 flex flex-col items-center gap-2 sm:gap-3 w-full"
+                    onClick={() => setActiveSection(section.id)}
+                  >
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <span className="text-xs sm:text-sm font-medium">{section.label}</span>
+                  </Button>
+                  {isMessages && unreadSupportCount > 0 && (
+                    <span className="absolute top-0 right-0 w-3 h-3 bg-destructive rounded-full border-2 border-background"></span>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -168,7 +174,7 @@ const AdminDashboard = () => {
           {/* Content Section */}
           <Card>
             <CardContent className="p-4 sm:p-6">
-              {activeSection === 'messages' && <AdminMessages />}
+              {activeSection === 'messages' && <AdminMessages onSupportCountChange={setUnreadSupportCount} />}
               {activeSection === 'system' && <AdminSystemStatus />}
               {activeSection === 'projects' && <AdminProjects />}
               {activeSection === 'users' && <AdminUsers />}
