@@ -366,7 +366,8 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
                 </div>
               </CardContent>
             </Card>
-          ))
+            );
+          })
         )}
       </div>
 
