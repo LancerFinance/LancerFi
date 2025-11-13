@@ -19,7 +19,7 @@ interface AdminMessagesProps {
   onSupportCountChange?: (count: number) => void;
 }
 
-const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps = {}) => {
+const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,16 +35,6 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps = {}) => {
   const [newMessageRecipient, setNewMessageRecipient] = useState('');
   const [newMessageSubject, setNewMessageSubject] = useState('');
   const [newMessageContent, setNewMessageContent] = useState('');
-
-  useEffect(() => {
-    loadMessages();
-    // Check for new support messages periodically
-    const interval = setInterval(() => {
-      checkForNewSupportMessages();
-    }, 10000); // Check every 10 seconds
-    
-    return () => clearInterval(interval);
-  }, []);
 
   const loadMessages = async () => {
     try {
@@ -63,31 +53,40 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps = {}) => {
     }
   };
 
-  const checkForNewSupportMessages = async () => {
-    try {
-      const data = await db.getAllMessages();
-      const supportMessages = (data || []).filter(
-        msg => msg.recipient_id === 'admin@lancerfi.app' && !msg.is_read
-      );
-      
-      // Check if there are new unread support messages since last check
-      const newSupportMessages = supportMessages.filter(
-        msg => new Date(msg.created_at).getTime() > lastSupportCheck
-      );
-      
-      if (newSupportMessages.length > 0) {
-        toast({
-          title: "New Support Message",
-          description: `You have ${newSupportMessages.length} new support message${newSupportMessages.length > 1 ? 's' : ''}`,
+  useEffect(() => {
+    loadMessages();
+    // Check for new support messages periodically
+    const interval = setInterval(async () => {
+      try {
+        const data = await db.getAllMessages();
+        const supportMessages = (data || []).filter(
+          msg => msg.recipient_id === 'admin@lancerfi.app' && !msg.is_read
+        );
+        
+        // Check if there are new unread support messages since last check
+        setLastSupportCheck(prevCheck => {
+          const newSupportMessages = supportMessages.filter(
+            msg => new Date(msg.created_at).getTime() > prevCheck
+          );
+          
+          if (newSupportMessages.length > 0) {
+            toast({
+              title: "New Support Message",
+              description: `You have ${newSupportMessages.length} new support message${newSupportMessages.length > 1 ? 's' : ''}`,
+            });
+            // Reload messages to update the UI
+            setMessages(data || []);
+            return Date.now();
+          }
+          return prevCheck;
         });
-        setLastSupportCheck(Date.now());
-        // Reload messages to update the UI
-        setMessages(data || []);
+      } catch (error) {
+        // Silently fail - don't spam errors
       }
-    } catch (error) {
-      // Silently fail - don't spam errors
-    }
-  };
+    }, 10000); // Check every 10 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const handleReply = (message: Message) => {
     setReplyRecipient(message.sender_id === 'admin@lancerfi.app' ? message.recipient_id : message.sender_id);
