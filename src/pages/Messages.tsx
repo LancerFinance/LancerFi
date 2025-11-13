@@ -31,6 +31,8 @@ import MessageDialog from "@/components/MessageDialog";
 interface MessageWithSender extends Message {
   sender_name?: string;
   recipient_name?: string;
+  sender_photo_url?: string;
+  recipient_photo_url?: string;
 }
 
 // Admin identifiers
@@ -68,17 +70,20 @@ const Messages = () => {
       setLoading(true);
       const messagesData = await db.getMessagesForUser(address);
       
-      // Enhance messages with sender/recipient names by looking up profiles
+      // Enhance messages with sender/recipient names and profile images by looking up profiles
       const enhancedMessages = await Promise.all(
         messagesData.map(async (message) => {
           let sender_name = message.sender_id;
           let recipient_name = message.recipient_id;
+          let sender_photo_url: string | undefined;
+          let recipient_photo_url: string | undefined;
           
           try {
             // Try to get sender profile
             const senderProfile = await db.getProfileByWallet(message.sender_id);
             if (senderProfile) {
               sender_name = senderProfile.full_name || senderProfile.username || message.sender_id;
+              sender_photo_url = senderProfile.profile_photo_url;
             }
           } catch {
             // Use wallet address if profile not found
@@ -90,13 +95,14 @@ const Messages = () => {
             const recipientProfile = await db.getProfileByWallet(message.recipient_id);
             if (recipientProfile) {
               recipient_name = recipientProfile.full_name || recipientProfile.username || message.recipient_id;
+              recipient_photo_url = recipientProfile.profile_photo_url;
             }
           } catch {
             // Use wallet address if profile not found
             recipient_name = `${message.recipient_id.slice(0, 6)}...${message.recipient_id.slice(-4)}`;
           }
           
-          return { ...message, sender_name, recipient_name };
+          return { ...message, sender_name, recipient_name, sender_photo_url, recipient_photo_url };
         })
       );
       
@@ -390,8 +396,8 @@ const Messages = () => {
                   {filteredMessages.map((message) => {
                     const isReceived = message.recipient_id === address;
                     const otherParty = isReceived 
-                      ? { id: message.sender_id, name: message.sender_name }
-                      : { id: message.recipient_id, name: message.recipient_name };
+                      ? { id: message.sender_id, name: message.sender_name, photo_url: message.sender_photo_url }
+                      : { id: message.recipient_id, name: message.recipient_name, photo_url: message.recipient_photo_url };
                     const isOtherPartyAdmin = isAdmin(otherParty.id);
                     
                     return (
@@ -417,7 +423,7 @@ const Messages = () => {
                         <CardContent className="p-4">
                           <div className="flex items-start gap-4">
                             <Avatar className={`w-10 h-10 ${isOtherPartyAdmin ? 'ring-2 ring-amber-400' : ''}`}>
-                              <AvatarImage src="" />
+                              <AvatarImage src={isOtherPartyAdmin ? "" : (otherParty.photo_url || "")} />
                               <AvatarFallback className={isOtherPartyAdmin ? 'bg-amber-500 text-white font-bold' : ''}>
                                 {isOtherPartyAdmin ? (
                                   <Shield className="w-5 h-5" />
@@ -479,6 +485,7 @@ const Messages = () => {
             const isReceived = selectedMessage.recipient_id === address;
             const otherPartyId = isReceived ? selectedMessage.sender_id : selectedMessage.recipient_id;
             const otherPartyName = isReceived ? selectedMessage.sender_name : selectedMessage.recipient_name;
+            const otherPartyPhotoUrl = isReceived ? selectedMessage.sender_photo_url : selectedMessage.recipient_photo_url;
             const isOtherPartyAdmin = isAdmin(otherPartyId);
             
             return (
@@ -488,7 +495,7 @@ const Messages = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Avatar className={isOtherPartyAdmin ? 'ring-2 ring-amber-400' : ''}>
-                          <AvatarImage src="" />
+                          <AvatarImage src={isOtherPartyAdmin ? "" : (otherPartyPhotoUrl || "")} />
                           <AvatarFallback className={isOtherPartyAdmin ? 'bg-amber-500 text-white font-bold' : ''}>
                             {isOtherPartyAdmin ? (
                               <Shield className="w-5 h-5" />
