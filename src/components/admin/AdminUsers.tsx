@@ -202,8 +202,29 @@ const AdminUsers = () => {
       // This ensures admin routes use same-domain API calls
       const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
 
-      // No signature required - admin wallet is already verified by dashboard access
-      // Call backend API
+      // CRITICAL SECURITY: Get challenge and sign it to prove wallet ownership
+      const challengeResponse = await fetch(`${API_BASE_URL}/api/admin/challenge`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!challengeResponse.ok) {
+        throw new Error('Failed to get authentication challenge');
+      }
+
+      const { challenge } = await challengeResponse.json();
+
+      // Sign the challenge with wallet
+      const w: any = window as any;
+      if (!w.solana || !w.solana.isPhantom || !w.solana.isConnected) {
+        throw new Error('Wallet not connected');
+      }
+
+      const encodedMessage = new TextEncoder().encode(challenge);
+      const signed = await w.solana.signMessage(encodedMessage, 'utf8');
+      const signatureBase64 = btoa(String.fromCharCode(...signed.signature));
+
+      // Call backend API with signature
       const response = await fetch(`${API_BASE_URL}/api/admin/restrict-user`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -213,7 +234,9 @@ const AdminUsers = () => {
           restrictionType: backendRestrictionType,
           expiresAt,
           reason: banReason.trim() || null,
-          ipAddress: restrictionType === 'ip_ban' ? ipAddress.trim() : undefined
+          ipAddress: restrictionType === 'ip_ban' ? ipAddress.trim() : undefined,
+          signature: signatureBase64,
+          message: challenge
         })
       });
 
@@ -283,14 +306,37 @@ const AdminUsers = () => {
       // ALWAYS use relative URL in production - ignore VITE_API_URL env var for admin routes
       const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
 
-      // No signature required - admin wallet is already verified by dashboard access
-      // Call backend API
+      // CRITICAL SECURITY: Get challenge and sign it to prove wallet ownership
+      const challengeResponse = await fetch(`${API_BASE_URL}/api/admin/challenge`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!challengeResponse.ok) {
+        throw new Error('Failed to get authentication challenge');
+      }
+
+      const { challenge } = await challengeResponse.json();
+
+      // Sign the challenge with wallet
+      const w: any = window as any;
+      if (!w.solana || !w.solana.isPhantom || !w.solana.isConnected) {
+        throw new Error('Wallet not connected');
+      }
+
+      const encodedMessage = new TextEncoder().encode(challenge);
+      const signed = await w.solana.signMessage(encodedMessage, 'utf8');
+      const signatureBase64 = btoa(String.fromCharCode(...signed.signature));
+
+      // Call backend API with signature
       const response = await fetch(`${API_BASE_URL}/api/admin/unrestrict-user`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletAddress: address,
-          profileId: user.id
+          profileId: user.id,
+          signature: signatureBase64,
+          message: challenge
         })
       });
 

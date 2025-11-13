@@ -9,6 +9,7 @@ type VercelResponse = any;
 
 import { supabaseClient } from '../../server/services/supabase.js';
 import { checkIPBanForVercel } from '../../server/middleware/ip-ban-check.js';
+import { verifyWalletSignatureForVercel } from '../middleware/verify-signature.js';
 
 // Admin wallet address - only this wallet can access admin endpoints
 const ADMIN_WALLET_ADDRESS = 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U';
@@ -71,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // Parse request body
     const body = await parseBody(req);
-    const { walletAddress, profileId } = body;
+    const { walletAddress, profileId, signature, message } = body;
 
 
     // Verify admin wallet
@@ -82,6 +83,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (walletAddress !== ADMIN_WALLET_ADDRESS) {
       return res.status(403).json({ 
         error: 'Unauthorized: This wallet does not have admin access' 
+      });
+    }
+
+    // CRITICAL SECURITY: Verify cryptographic signature to prove wallet ownership
+    if (!signature || !message) {
+      return res.status(401).json({ 
+        error: 'Signature verification required. Please sign the challenge message with your wallet.' 
+      });
+    }
+
+    const isValidSignature = await verifyWalletSignatureForVercel(walletAddress, signature, message);
+    if (!isValidSignature) {
+      return res.status(401).json({ 
+        error: 'Invalid signature. Authentication failed.' 
       });
     }
 

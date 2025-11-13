@@ -71,10 +71,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // Parse request body
     const body = await parseBody(req);
-    const { walletAddress, profileId, restrictionType, expiresAt, reason, ipAddress } = body;
+    const { walletAddress, profileId, restrictionType, expiresAt, reason, ipAddress, signature, message } = body;
 
-
-    // Verify admin wallet
+    // Verify admin wallet address
     if (!walletAddress) {
       return res.status(401).json({ error: 'Wallet address is required' });
     }
@@ -82,6 +81,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (walletAddress !== ADMIN_WALLET_ADDRESS) {
       return res.status(403).json({ 
         error: 'Unauthorized: This wallet does not have admin access' 
+      });
+    }
+
+    // CRITICAL SECURITY: Verify cryptographic signature to prove wallet ownership
+    if (!signature || !message) {
+      return res.status(401).json({ 
+        error: 'Signature verification required. Please sign the challenge message with your wallet.' 
+      });
+    }
+
+    const isValidSignature = await verifyWalletSignatureForVercel(walletAddress, signature, message);
+    if (!isValidSignature) {
+      return res.status(401).json({ 
+        error: 'Invalid signature. Authentication failed.' 
       });
     }
 
