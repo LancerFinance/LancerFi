@@ -94,22 +94,49 @@
           }, 2000);
         }
         
-        // Block scripts immediately - run before scripts below execute
-        (function() {
+        // Block scripts - use MutationObserver to catch scripts as they're added
+        var scriptObserver = new MutationObserver(function(mutations) {
+          mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+              if (node.nodeName === 'SCRIPT' && node.src && (node.src.includes('polyfills') || node.src.includes('main'))) {
+                if (isBanned || !checkComplete) {
+                  // Block script by removing src temporarily
+                  node.setAttribute('data-conditional', 'true');
+                  var originalSrc = node.src;
+                  node.removeAttribute('src');
+                  node.dataset.originalSrc = originalSrc;
+                }
+              }
+            });
+          });
+        });
+        
+        // Start observing immediately
+        scriptObserver.observe(document.documentElement, {
+          childList: true,
+          subtree: true
+        });
+        
+        // Also block any scripts that already exist
+        setTimeout(function() {
           var scripts = document.querySelectorAll('script[src*="polyfills"], script[src*="main"]');
           scripts.forEach(function(script) {
-            // Temporarily disable scripts until check completes
-            script.setAttribute('data-conditional', 'true');
-            var originalSrc = script.src;
-            script.removeAttribute('src');
-            
-            // Store original src to restore later
-            script.dataset.originalSrc = originalSrc;
+            if (isBanned || !checkComplete) {
+              script.setAttribute('data-conditional', 'true');
+              var originalSrc = script.src;
+              script.removeAttribute('src');
+              script.dataset.originalSrc = originalSrc;
+            }
           });
-        })();
+        }, 0);
         
         function enableScripts() {
           if (isBanned) return; // Don't enable if banned
+          
+          // Stop observing
+          if (scriptObserver) {
+            scriptObserver.disconnect();
+          }
           
           var scripts = document.querySelectorAll('script[data-conditional="true"]');
           scripts.forEach(function(script) {
