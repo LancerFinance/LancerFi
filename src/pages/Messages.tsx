@@ -34,6 +34,7 @@ interface MessageWithSender extends Message {
 const Messages = () => {
   const { toast } = useToast();
   const { isConnected, address, connectWallet } = useWallet();
+  const navigate = useNavigate();
   
   const [messages, setMessages] = useState<MessageWithSender[]>([]);
   const [loading, setLoading] = useState(true);
@@ -297,6 +298,8 @@ const Messages = () => {
                   
                   <div className="space-y-2">
                     <Button
+                      data-filter-button
+                      data-filter="all"
                       variant={filter === 'all' ? 'default' : 'ghost'}
                       className="w-full justify-start"
                       onClick={() => setFilter('all')}
@@ -305,6 +308,8 @@ const Messages = () => {
                       All Messages ({messages.length})
                     </Button>
                     <Button
+                      data-filter-button
+                      data-filter="received"
                       variant={filter === 'received' ? 'default' : 'ghost'}
                       className="w-full justify-start"
                       onClick={() => setFilter('received')}
@@ -318,6 +323,8 @@ const Messages = () => {
                       )}
                     </Button>
                     <Button
+                      data-filter-button
+                      data-filter="sent"
                       variant={filter === 'sent' ? 'default' : 'ghost'}
                       className="w-full justify-start"
                       onClick={() => setFilter('sent')}
@@ -330,16 +337,19 @@ const Messages = () => {
               </Card>
               
               {/* Support Button */}
-              <div className="mt-4">
-                <MessageDialog
-                  recipientId="admin@lancerfi.app"
-                  recipientName="Support"
-                  triggerVariant="outline"
-                  triggerClassName="w-full justify-start"
-                  triggerText="Support"
-                  triggerIcon={<HelpCircle className="w-4 h-4 mr-2" />}
-                />
-              </div>
+              <Card className="mt-4 bg-white">
+                <CardContent className="p-0">
+                  <SupportButtonWrapper 
+                    address={address} 
+                    messages={messages} 
+                    navigate={navigate}
+                    setFilter={setFilter}
+                    setSelectedMessage={setSelectedMessage}
+                    markAsRead={markAsRead}
+                    loadMessages={loadMessages}
+                  />
+                </CardContent>
+              </Card>
             </div>
 
             {/* Messages List */}
@@ -379,7 +389,8 @@ const Messages = () => {
                     
                     return (
                       <Card 
-                        key={message.id} 
+                        key={message.id}
+                        data-message-id={message.id}
                         className={`cursor-pointer transition-colors hover:bg-muted/50 ${
                           selectedMessage?.id === message.id ? 'border-web3-primary' : ''
                         } ${
@@ -532,6 +543,87 @@ const Messages = () => {
         </div>
       </main>
     </div>
+  );
+};
+
+// Support Button Component
+interface SupportButtonWrapperProps {
+  address: string | null;
+  messages: MessageWithSender[];
+  navigate: any;
+  setFilter: (filter: 'all' | 'received' | 'sent') => void;
+  setSelectedMessage: (message: MessageWithSender | null) => void;
+  markAsRead: (messageId: string) => void;
+  loadMessages: () => void;
+}
+
+const SupportButtonWrapper = ({ address, messages, navigate, setFilter, setSelectedMessage, markAsRead, loadMessages }: SupportButtonWrapperProps) => {
+  const [showDialog, setShowDialog] = useState(false);
+  const { toast } = useToast();
+  
+  const handleSupportClick = () => {
+    if (!address) return;
+    
+    // Check if there's an existing conversation with support
+    const supportMessages = messages.filter(
+      msg => (msg.sender_id === address && msg.recipient_id === 'admin@lancerfi.app') ||
+             (msg.recipient_id === address && msg.sender_id === 'admin@lancerfi.app')
+    );
+    
+    if (supportMessages.length > 0) {
+      // Navigate to the most recent support message
+      const mostRecent = supportMessages.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+      
+      // Set filter to 'all' to ensure the message is visible
+      setFilter('all');
+      
+      // Scroll to and select the message
+      setTimeout(() => {
+        const messageCard = document.querySelector(`[data-message-id="${mostRecent.id}"]`);
+        if (messageCard) {
+          messageCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setSelectedMessage(mostRecent);
+          if (mostRecent.recipient_id === address && !mostRecent.is_read) {
+            markAsRead(mostRecent.id);
+          }
+        }
+      }, 100);
+    } else {
+      // No existing conversation, open dialog
+      setShowDialog(true);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        className="w-full justify-center bg-white hover:bg-muted/50"
+        onClick={handleSupportClick}
+      >
+        <HelpCircle className="w-4 h-4 mr-2" />
+        Support
+      </Button>
+      {showDialog && (
+        <MessageDialog
+          recipientId="admin@lancerfi.app"
+          recipientName="Support"
+          triggerVariant="outline"
+          triggerClassName="hidden"
+          triggerText="Support"
+          triggerIcon={<HelpCircle className="w-4 h-4 mr-2" />}
+          requireSubject={true}
+          onMessageSent={() => {
+            setShowDialog(false);
+            loadMessages();
+          }}
+          open={showDialog}
+          onOpenChange={setShowDialog}
+        />
+      )}
+    </>
   );
 };
 

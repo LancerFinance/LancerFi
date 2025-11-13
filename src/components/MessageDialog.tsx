@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,10 @@ interface MessageDialogProps {
   triggerClassName?: string;
   triggerText?: string;
   triggerIcon?: React.ReactNode;
+  requireSubject?: boolean;
+  onMessageSent?: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const MessageDialog = ({ 
@@ -29,9 +33,15 @@ const MessageDialog = ({
   triggerSize = "sm",
   triggerClassName = "w-full",
   triggerText,
-  triggerIcon
+  triggerIcon,
+  requireSubject = false,
+  onMessageSent,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange
 }: MessageDialogProps) => {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = controlledOnOpenChange || setInternalOpen;
   const [sending, setSending] = useState(false);
   const [formData, setFormData] = useState({
     subject: projectTitle ? `Re: ${projectTitle}` : '',
@@ -71,11 +81,42 @@ const MessageDialog = ({
         }
       }
     } catch (error) {
-      console.error('Error checking restriction:', error);
+      // Continue if check fails
+    }
+
+    // Check rate limit for support messages
+    if (recipientId === 'admin@lancerfi.app') {
+      try {
+        const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
+        const response = await fetch(`${API_BASE_URL}/api/messages/check-support-rate-limit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ walletAddress: address })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (!data.allowed) {
+            toast({
+              title: "Rate Limit Exceeded",
+              description: data.reason || "You've sent too many support messages. Please wait before sending another.",
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      } catch (rateLimitError) {
+        // Continue if rate limit check fails (fail open)
+      }
     }
 
     // Validate form
-    const validationErrors = validateMessage(formData.content, formData.subject);
+    if (requireSubject && !formData.subject.trim()) {
+      setErrors({ subject: 'Subject is required' });
+      return;
+    }
+
+    const validationErrors = validateMessage(formData.content, formData.subject, requireSubject);
     if (validationErrors.length > 0) {
       const errorMap: Record<string, string> = {};
       validationErrors.forEach(error => {
@@ -104,8 +145,12 @@ const MessageDialog = ({
       // Reset form and close dialog
       setFormData({ subject: '', content: '' });
       setOpen(false);
+      
+      // Call callback if provided
+      if (onMessageSent) {
+        onMessageSent();
+      }
     } catch (error) {
-      console.error('Error sending message:', error);
       toast({
         title: "Failed to Send Message",
         description: "Please try again later",
@@ -116,19 +161,28 @@ const MessageDialog = ({
     }
   };
 
+  // Auto-open if trigger is hidden (for programmatic opening)
+  useEffect(() => {
+    if (triggerClassName === "hidden" && controlledOpen === undefined) {
+      setInternalOpen(true);
+    }
+  }, [triggerClassName, controlledOpen]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button 
-          variant={triggerVariant} 
-          size={triggerSize} 
-          className={triggerClassName}
-          disabled={!isConnected}
-        >
-          {triggerIcon || <MessageSquare className="w-4 h-4 mr-2" />}
-          {triggerText || "Send Message"}
-        </Button>
-      </DialogTrigger>
+      {triggerClassName !== "hidden" && (
+        <DialogTrigger asChild>
+          <Button 
+            variant={triggerVariant} 
+            size={triggerSize} 
+            className={triggerClassName}
+            disabled={!isConnected}
+          >
+            {triggerIcon || <MessageSquare className="w-4 h-4 mr-2" />}
+            {triggerText || "Send Message"}
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="break-words">
@@ -142,7 +196,7 @@ const MessageDialog = ({
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label htmlFor="subject">Subject (Optional)</Label>
+            <Label htmlFor="subject">Subject {requireSubject ? '*' : '(Optional)'}</Label>
             <Input
               id="subject"
               value={formData.subject}
@@ -151,6 +205,7 @@ const MessageDialog = ({
               className={`${errors.subject ? "border-destructive" : ""} min-w-0`}
               maxLength={200}
               title={formData.subject}
+              required={requireSubject}
             />
             {errors.subject && (
               <p className="text-sm text-destructive mt-1">{errors.subject}</p>
@@ -178,7 +233,7 @@ const MessageDialog = ({
             </Button>
             <Button 
               onClick={handleSubmit} 
-              disabled={sending || !formData.content.trim()}
+              disabled={sending || !formData.content.trim() || (requireSubject && !formData.subject.trim())}
               className="flex-1"
             >
               {sending ? (

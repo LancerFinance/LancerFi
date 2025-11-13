@@ -10,6 +10,7 @@ import projectCleanupRouter from './routes/project-cleanup.js';
 import adminAuthRouter from './routes/admin-auth.js';
 import adminRestrictionsRouter from './routes/admin-restrictions.js';
 import systemStatusRouter from './routes/system-status.js';
+import messagesRouter from './routes/messages.js';
 import { 
   validateRequestSize, 
   sanitizeRequestBody,
@@ -118,6 +119,7 @@ app.use('/api/project', projectCleanupRouter);
 app.use('/api/admin', adminAuthRouter);
 app.use('/api/admin', adminRestrictionsRouter);
 app.use('/api/system-status', systemStatusRouter);
+app.use('/api/messages', messagesRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

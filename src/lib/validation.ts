@@ -128,7 +128,7 @@ export const validateProfile = (profileData: {
   return errors;
 };
 
-export const validateMessage = (content: string, subject?: string): ValidationError[] => {
+export const validateMessage = (content: string, subject?: string, requireSubject: boolean = false): ValidationError[] => {
   const errors: ValidationError[] = [];
 
   if (!content.trim()) {
@@ -139,8 +139,12 @@ export const validateMessage = (content: string, subject?: string): ValidationEr
     errors.push({ field: 'content', message: 'Message cannot exceed 2000 characters' });
   }
 
-  if (subject && subject.length > 100) {
+  if (requireSubject && !subject?.trim()) {
+    errors.push({ field: 'subject', message: 'Subject is required' });
+  } else if (subject && subject.length > 100) {
     errors.push({ field: 'subject', message: 'Subject cannot exceed 100 characters' });
+  } else if (subject && subject.trim().length < 3) {
+    errors.push({ field: 'subject', message: 'Subject must be at least 3 characters' });
   }
 
   return errors;
