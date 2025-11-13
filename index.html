@@ -94,44 +94,44 @@
           }, 2000);
         }
         
-        // Intercept script loading
-        var originalAppendChild = Node.prototype.appendChild;
-        Node.prototype.appendChild = function(child) {
-          if (isBanned && child && child.tagName && child.tagName.toLowerCase() === 'script') {
-            // Block React scripts if banned
-            return child;
+        // Intercept script execution - block if banned
+        var originalCreateElement = document.createElement;
+        document.createElement = function(tagName, options) {
+          var element = originalCreateElement.call(document, tagName, options);
+          if (tagName.toLowerCase() === 'script' && isBanned) {
+            // Block script execution by changing type
+            element.setAttribute('data-blocked', 'true');
+            var originalSetAttribute = element.setAttribute;
+            element.setAttribute = function(name, value) {
+              if (name === 'src' && isBanned) {
+                // Don't set src if banned
+                return;
+              }
+              return originalSetAttribute.call(this, name, value);
+            };
           }
-          return originalAppendChild.call(this, child);
+          return element;
         };
         
-        function loadReactScripts() {
-          if (isBanned) return; // Don't load if banned
-          
-          // Prevent double-loading
-          if (checkComplete && document.querySelector('script[src="/src/polyfills.ts"]')) {
-            return; // Already loaded
+        // Block existing scripts from executing if banned
+        document.addEventListener('DOMContentLoaded', function() {
+          if (isBanned) {
+            var scripts = document.querySelectorAll('script[src*="polyfills"], script[src*="main"]');
+            scripts.forEach(function(script) {
+              script.type = 'text/plain';
+              script.setAttribute('data-blocked', 'true');
+            });
           }
-          
-          // Load React scripts dynamically
-          var polyfillsScript = document.createElement('script');
-          polyfillsScript.type = 'module';
-          polyfillsScript.src = '/src/polyfills.ts';
-          document.body.appendChild(polyfillsScript);
-          
-          var mainScript = document.createElement('script');
-          mainScript.type = 'module';
-          mainScript.src = '/src/main.tsx';
-          document.body.appendChild(mainScript);
-        }
+        });
         
-        // Set a timeout to load React if check takes too long (fail open)
+        // Set a timeout to allow React if check takes too long (fail open)
         var loadTimeout = setTimeout(function() {
           if (!checkComplete && !isBanned) {
-            console.log('IP check timeout - loading React (fail open)');
+            console.log('IP check timeout - allowing React (fail open)');
             checkComplete = true;
-            loadReactScripts();
+            // Scripts will load normally from HTML
           }
-        }, 3000); // 3 second timeout
+        }, 2000); // 2 second timeout
         
         // Quick check - if banned, block immediately
         fetch('/api/admin/check-restriction?t=' + Date.now(), {
@@ -155,31 +155,31 @@
                 // IP is banned - block forever
                 blockForever();
               } else {
-                // Not banned - load React scripts
+                // Not banned - allow scripts to load
                 checkComplete = true;
-                loadReactScripts();
               }
             }).catch(function(err) {
               // JSON parse error - allow React to load (fail open)
               console.error('JSON parse error:', err);
               checkComplete = true;
-              loadReactScripts();
             });
           } else {
             // Not OK - allow React to load (fail open)
-            console.log('Non-200 response, loading React (fail open)');
+            console.log('Non-200 response, allowing React (fail open)');
             checkComplete = true;
-            loadReactScripts();
           }
         })
         .catch(function(error) {
           clearTimeout(loadTimeout);
           // Network error - allow React to load (fail open)
-          console.error('Network error, loading React (fail open):', error);
+          console.error('Network error, allowing React (fail open):', error);
           checkComplete = true;
-          loadReactScripts();
         });
       })();
     </script>
+    <!-- React scripts - Vite will inject correct production paths during build -->
+    <!-- These are blocked from executing if IP is banned by the script above -->
+    <script type="module" src="/src/polyfills.ts"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
