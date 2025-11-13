@@ -30,59 +30,14 @@
     <!-- IP Ban Check - Runs BEFORE React loads to block entire page -->
     <script>
       (function() {
+        var checkCount = 0;
+        var maxChecks = 3; // Limit retries to prevent infinite loops
+        
         // Show loading screen immediately
         document.body.innerHTML = '<div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 999999; background: #ffffff; display: flex; align-items: center; justify-content: center;"><div style="text-align: center;"><div style="border: 4px solid #f3f4f6; border-top: 4px solid #3b82f6; border-radius: 50%; width: 48px; height: 48px; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div><p style="color: #6b7280; font-family: system-ui, -apple-system, sans-serif;">Loading...</p></div></div><style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>';
         
-        // Check IP ban status
-        fetch('/api/admin/check-restriction', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          cache: 'no-store',
-          credentials: 'omit'
-        })
-        .then(function(response) {
-          if (response.status === 403) {
-            // IP is banned - keep loading forever, never load React
-            setInterval(function() {
-              fetch('/api/admin/check-restriction', {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-                cache: 'no-store',
-                credentials: 'omit'
-              }).catch(function() {});
-            }, 2000);
-            return; // Never load React
-          }
-          
-          if (response.ok) {
-            return response.json().then(function(data) {
-              if (data.isRestricted && data.restrictionType === 'ban_ip') {
-                // IP is banned - keep loading forever, never load React
-                setInterval(function() {
-                  fetch('/api/admin/check-restriction', {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' },
-                    cache: 'no-store',
-                    credentials: 'omit'
-                  }).catch(function() {});
-                }, 2000);
-                return; // Never load React
-              }
-              
-              // IP not banned - allow React to load
-              document.body.innerHTML = '<div id="root"></div>';
-              var polyfills = document.createElement('script');
-              polyfills.type = 'module';
-              polyfills.src = '/src/polyfills.ts';
-              document.body.appendChild(polyfills);
-              var main = document.createElement('script');
-              main.type = 'module';
-              main.src = '/src/main.tsx';
-              document.body.appendChild(main);
-            });
-          }
-          
-          // On error or if not banned, allow React to load
+        function loadReact() {
+          // IP not banned - allow React to load
           document.body.innerHTML = '<div id="root"></div>';
           var polyfills = document.createElement('script');
           polyfills.type = 'module';
@@ -92,13 +47,78 @@
           main.type = 'module';
           main.src = '/src/main.tsx';
           document.body.appendChild(main);
-        })
-        .catch(function(error) {
-          // On error, keep checking (fail closed - block access)
-          setTimeout(function() {
-            location.reload();
-          }, 2000);
-        });
+        }
+        
+        function checkIPBan() {
+          checkCount++;
+          
+          // Check IP ban status with timestamp to prevent caching
+          fetch('/api/admin/check-restriction?t=' + Date.now(), {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            cache: 'no-store',
+            credentials: 'omit'
+          })
+          .then(function(response) {
+            if (response.status === 403) {
+              // IP is banned - keep loading forever, never load React
+              setInterval(function() {
+                fetch('/api/admin/check-restriction?t=' + Date.now(), {
+                  method: 'GET',
+                  headers: { 'Content-Type': 'application/json' },
+                  cache: 'no-store',
+                  credentials: 'omit'
+                }).catch(function() {});
+              }, 2000);
+              return; // Never load React
+            }
+            
+            if (response.ok) {
+              return response.json().then(function(data) {
+                if (data.isRestricted && data.restrictionType === 'ban_ip') {
+                  // IP is banned - keep loading forever, never load React
+                  setInterval(function() {
+                    fetch('/api/admin/check-restriction?t=' + Date.now(), {
+                      method: 'GET',
+                      headers: { 'Content-Type': 'application/json' },
+                      cache: 'no-store',
+                      credentials: 'omit'
+                    }).catch(function() {});
+                  }, 2000);
+                  return; // Never load React
+                }
+                
+                // IP not banned - load React
+                loadReact();
+              }).catch(function(err) {
+                // JSON parse error - if we've tried a few times, allow React to load (fail open)
+                if (checkCount >= maxChecks) {
+                  loadReact();
+                } else {
+                  setTimeout(checkIPBan, 1000);
+                }
+              });
+            } else {
+              // Non-200 response that's not 403 - if we've tried a few times, allow React to load
+              if (checkCount >= maxChecks) {
+                loadReact();
+              } else {
+                setTimeout(checkIPBan, 1000);
+              }
+            }
+          })
+          .catch(function(error) {
+            // Network error - if we've tried a few times, allow React to load (fail open)
+            if (checkCount >= maxChecks) {
+              loadReact();
+            } else {
+              setTimeout(checkIPBan, 1000);
+            }
+          });
+        }
+        
+        // Initial check
+        checkIPBan();
       })();
     </script>
   </body>
