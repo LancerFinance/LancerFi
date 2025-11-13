@@ -66,7 +66,6 @@ export async function verifyWalletSignature(
     req.walletAddress = walletAddress;
     next();
   } catch (error) {
-    console.error('Auth verification error:', error);
     return res.status(401).json({
       error: 'Authentication failed. Invalid wallet address or signature.'
     });

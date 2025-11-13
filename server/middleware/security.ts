@@ -212,7 +212,6 @@ export async function trackUserIP(req: Request, res: Response, next: NextFunctio
             .eq('wallet_address', walletAddress);
         } catch (err: any) {
           // Silently fail - IP tracking is not critical
-          console.error('Error tracking user IP:', err);
         }
       })();
     }
@@ -220,7 +219,6 @@ export async function trackUserIP(req: Request, res: Response, next: NextFunctio
     next();
   } catch (error: any) {
     // Silently fail - IP tracking is not critical
-    console.error('Exception in IP tracking:', error);
     next();
   }
 }
@@ -252,7 +250,6 @@ export async function checkIPBan(req: Request, res: Response, next: NextFunction
       .maybeSingle();
     
     if (error) {
-      console.error('Error checking IP ban:', error);
       // On error, block request (fail closed for security)
       return res.status(403).json({
         error: 'Access denied',
@@ -283,7 +280,6 @@ export async function checkIPBan(req: Request, res: Response, next: NextFunction
               .delete()
               .eq('ip_address', clientIP);
           } catch (err: any) {
-            console.error('Error cleaning up expired IP ban:', err);
           }
         })();
       }
@@ -292,7 +288,6 @@ export async function checkIPBan(req: Request, res: Response, next: NextFunction
     // IP is not banned or ban expired - allow request
     next();
   } catch (error: any) {
-    console.error('Exception in IP ban check:', error);
     // On exception, block request (fail closed for security)
     return res.status(403).json({
       error: 'Access denied',

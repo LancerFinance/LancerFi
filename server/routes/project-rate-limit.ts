@@ -93,7 +93,6 @@ router.post('/check-wallet-limit', async (req: Request, res: Response) => {
     }
     
     if (error) {
-      console.error('Error checking wallet limit:', error);
       // Fail open - allow if we can't check
       return res.json({ 
         allowed: true, 
@@ -132,7 +131,6 @@ router.post('/check-wallet-limit', async (req: Request, res: Response) => {
       reason: `Wallet has created ${projectCount}/2 projects in the last 24 hours`
     });
   } catch (error: any) {
-    console.error('Error in wallet limit check:', error);
     // Fail open - allow if there's an error
     return res.json({ 
       allowed: true, 

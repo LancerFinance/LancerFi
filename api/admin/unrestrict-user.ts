@@ -108,7 +108,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .single();
 
     if (updateError) {
-      console.error('Error removing user restrictions:', updateError);
       return res.status(500).json({ 
         error: 'Failed to remove user restrictions', 
         details: updateError.message,

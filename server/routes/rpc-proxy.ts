@@ -97,7 +97,6 @@ router.post('/blockhash', async (req, res) => {
     // All failed
     throw new Error('All RPC endpoints failed or timed out');
   } catch (error) {
-    console.error('Error getting blockhash:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get blockhash'
@@ -189,7 +188,6 @@ router.post('/account-balance', async (req, res) => {
     // All failed
     throw new Error('All RPC endpoints failed or timed out');
   } catch (error) {
-    console.error('Error getting account balance:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get account balance'
@@ -284,7 +282,6 @@ router.post('/token-balance', async (req, res) => {
       balance: 0
     });
   } catch (error) {
-    console.error('Error getting token balance:', error);
     // Return 0 balance on error (account might not exist)
     res.json({
       success: true,
@@ -365,7 +362,6 @@ router.post('/verify-transaction', async (req, res) => {
       error: 'Transaction not found'
     });
   } catch (error) {
-    console.error('Error verifying transaction:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to verify transaction'
@@ -437,7 +433,6 @@ router.post('/confirm-transaction', async (req, res) => {
     
     throw lastError || new Error('All RPC endpoints failed');
   } catch (error) {
-    console.error('Error confirming transaction:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to confirm transaction'
@@ -483,7 +478,6 @@ router.post('/send-transaction', async (req, res) => {
         });
       }
     } catch (error) {
-      console.error('Error decoding transaction:', error);
       return res.status(400).json({
         success: false,
         error: 'Invalid transaction data (must be base64 encoded)'
@@ -495,20 +489,11 @@ router.post('/send-transaction', async (req, res) => {
     
     for (const endpoint of RPC_ENDPOINTS) {
       try {
-        console.log(`🚀 Attempting to send transaction via MAINNET endpoint: ${endpoint}`);
-        
         const testConnection = new Connection(endpoint, {
           commitment: 'confirmed',
           confirmTransactionInitialTimeout: 60000,
           disableRetryOnRateLimit: false,
         });
-        
-        // Parse transaction to get blockhash info
-        const txToSimulate = Transaction.from(transactionBuffer);
-        const blockhashStr = txToSimulate.recentBlockhash?.toString() || 'MISSING';
-        console.log(`Transaction blockhash: ${blockhashStr.substring(0, 20)}...`);
-        console.log(`Transaction fee payer: ${txToSimulate.feePayer?.toString() || 'MISSING'}`);
-        console.log(`Transaction instructions count: ${txToSimulate.instructions.length}`);
         
         // NOTE: lastValidBlockHeight is NOT serialized in transactions, so it will be 0 after deserialization
         // We skip blockhash validation and simulation - the RPC will validate and reject if invalid

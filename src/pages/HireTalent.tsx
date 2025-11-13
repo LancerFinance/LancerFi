@@ -111,7 +111,6 @@ const HireTalent = () => {
           solPrice = 100; // Use fallback if price is invalid
         }
       } catch (error) {
-        console.error('Error fetching SOL price:', error);
         solPrice = 100; // Use fallback price
       }
 
@@ -140,7 +139,6 @@ const HireTalent = () => {
       setUsdEarnings(earningsMap);
       setFreelancers(freelancerList);
     } catch (error) {
-      console.error('Error loading freelancers:', error);
       toast({
         title: "Error",
         description: "Failed to load freelancers",

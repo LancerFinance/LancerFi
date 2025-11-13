@@ -76,7 +76,6 @@ const ProjectDetails = () => {
         description: `${fieldName} copied to clipboard`,
       });
     } catch (err) {
-      console.error('Failed to copy:', err);
       toast({
         title: "Copy failed",
         description: "Failed to copy to clipboard",
@@ -119,7 +118,6 @@ const ProjectDetails = () => {
                 const priceData = await getSolanaPrice();
                 setSolPrice(priceData.price_usd);
               } catch (error) {
-                console.error('Error loading SOL price:', error);
               }
             }
           } catch (error) {
@@ -205,7 +203,6 @@ const ProjectDetails = () => {
               setProposalCount(validProposals.length);
             } catch (filterError) {
               // If filtering fails, show all proposals count (fallback)
-              console.error('Error filtering proposals for count:', filterError);
               setProposalCount(proposals.length);
             }
           } else {
@@ -213,13 +210,11 @@ const ProjectDetails = () => {
             setProposalCount(proposals.length);
           }
         } catch (error) {
-          console.log('Error loading proposal count:', error);
           setProposalCount(0);
         }
       }
 
     } catch (error) {
-      console.error('Error loading project details:', error);
       toast({
         title: "Error",
         description: "Failed to load project details",
@@ -239,7 +234,6 @@ const ProjectDetails = () => {
       const submissions = await db.getWorkSubmissions(id);
       setWorkSubmissions(submissions || []);
     } catch (error) {
-      console.error('Error loading work submissions:', error);
     } finally {
       setLoadingSubmissions(false);
     }
@@ -331,7 +325,6 @@ const ProjectDetails = () => {
           freelancer.wallet_address
         );
       } catch (e) {
-        console.error('Payment release failed:', e);
         toast({
           title: "Payment Release Failed",
           description: e instanceof Error ? e.message : "Failed to send payment to freelancer. Please try again.",
@@ -369,7 +362,6 @@ const ProjectDetails = () => {
           currency
         );
       } catch (notificationError) {
-        console.error('Error sending notifications:', notificationError);
         // Don't fail the completion if notifications fail
       }
 
@@ -384,7 +376,6 @@ const ProjectDetails = () => {
       await loadProjectDetails();
       await loadWorkSubmissions();
     } catch (error) {
-      console.error('Error completing project:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to complete project",
@@ -463,7 +454,6 @@ const ProjectDetails = () => {
             content: `You have been removed from the project "${project.title}".`
           });
         } catch (notificationError) {
-          console.error('Error sending notification:', notificationError);
           // Don't fail the kick-off if notification fails
         }
       }
@@ -481,7 +471,6 @@ const ProjectDetails = () => {
       // Navigate back to project details page
       navigate(`/project/${id}`);
     } catch (error) {
-      console.error('Error kicking off freelancer:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to remove freelancer",

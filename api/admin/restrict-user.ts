@@ -146,7 +146,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .single();
 
     if (profileError) {
-      console.error('Error fetching user profile:', profileError);
       return res.status(500).json({ 
         error: 'Failed to fetch user profile', 
         details: profileError.message,
@@ -186,14 +185,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               .eq('id', profileId);
           }
         } catch (projectLookupError: any) {
-          console.error('Error looking up user IP from projects:', projectLookupError);
           // Continue without failing
         }
       }
       
       // If no IP found, return error BEFORE applying any restrictions
       if (!ipToBan) {
-        console.error('Cannot ban IP: No IP address found for user');
         return res.status(400).json({ 
           error: 'Cannot ban IP: No IP address found for user. The user has no recorded IP address in their profile or recent projects. Please manually enter an IP address to proceed with the IP ban.',
           suggestion: 'You can manually enter the IP address in the IP Address field, or the system will attempt to find it from the user\'s profile or recent projects.'
@@ -214,7 +211,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         
         if (ipBanError) {
-          console.error('Error banning IP:', ipBanError);
           return res.status(500).json({ 
             error: 'Failed to ban IP address', 
             details: ipBanError.message,
@@ -238,7 +234,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .single();
 
     if (updateError) {
-      console.error('Error updating user restrictions:', updateError);
       return res.status(500).json({ 
         error: 'Failed to update user restrictions', 
         details: updateError.message,
@@ -258,11 +253,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         
         if (historyError) {
-          console.error('Error recording mute history:', historyError);
           // Don't fail the request if history recording fails
         }
       } catch (historyError: any) {
-        console.error('Exception recording mute history:', historyError);
         // Don't fail the request if history recording fails
       }
     }

@@ -58,7 +58,7 @@ export async function getLatestBlockhashWithFallback(): Promise<{ blockhash: str
       }
     }
   } catch (error) {
-    console.warn('Backend RPC proxy failed, trying direct RPC:', error);
+    // Fallback to direct RPC
   }
   
   // Fallback to direct RPC (try endpoints in order)
@@ -74,7 +74,6 @@ export async function getLatestBlockhashWithFallback(): Promise<{ blockhash: str
       const result = await testConnection.getLatestBlockhash('confirmed');
       return result;
     } catch (error) {
-      console.warn(`RPC endpoint ${endpoint} failed:`, error);
       lastError = error instanceof Error ? error : new Error(String(error));
       // Continue to next endpoint
     }
@@ -107,15 +106,12 @@ export async function getAccountBalanceViaProxy(address: string): Promise<{ bala
         };
       }
       const errorMsg = data.error || 'Failed to get account balance';
-      console.error('Backend balance check failed:', errorMsg);
       throw new Error(errorMsg);
     }
     
     const errorText = await response.text();
-    console.error('Backend balance check HTTP error:', response.status, errorText);
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   } catch (error) {
-    console.warn('Backend balance check failed, trying direct RPC:', error);
     
     // Fallback to direct RPC (will likely fail with 403 on mainnet)
     try {
@@ -173,10 +169,8 @@ export async function sendRawTransactionViaProxy(serializedTransaction: Uint8Arr
     }
     
     const errorText = await response.text();
-    console.error('Backend proxy error response:', errorText);
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   } catch (error) {
-    console.warn('Backend RPC proxy failed, trying direct RPC:', error);
     
     // Fallback to direct RPC (will likely fail with 403 on mainnet, but try anyway)
     try {
@@ -224,7 +218,6 @@ export async function confirmTransactionViaProxy(
     const errorText = await response.text();
     throw new Error(`HTTP ${response.status}: ${errorText}`);
   } catch (error) {
-    console.error('Backend transaction confirmation failed:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to confirm transaction'
@@ -258,7 +251,6 @@ export async function verifyTransaction(signature: string): Promise<{ confirmed:
       };
     }
   } catch (error) {
-    console.warn('Backend transaction verification failed, trying direct RPC:', error);
   }
   
   // Fallback to direct RPC verification (will likely fail with 403 on mainnet)
@@ -278,11 +270,9 @@ export async function verifyTransaction(signature: string): Promise<{ confirmed:
     // If we get 403, it's an RPC access issue, not a transaction failure
     const errorMsg = error instanceof Error ? error.message : String(error);
     if (errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
-      console.warn('⚠️ RPC verification blocked (403) - transaction may still be processing');
       // Return unknown status - can't verify but transaction might be fine
       return { confirmed: false, success: undefined, error: 'RPC access blocked (403) - cannot verify' };
     }
-    console.error('Error verifying transaction:', error);
     return { confirmed: false, success: false, error: errorMsg };
   }
 }
@@ -644,7 +634,6 @@ export async function getUSDCBalance(walletAddress: PublicKey | string): Promise
         }
       }
     } catch (proxyError) {
-      console.warn('Backend USDC balance check failed, trying direct RPC:', proxyError);
     }
     
     // Fallback to direct RPC (may fail with 403)
@@ -652,12 +641,10 @@ export async function getUSDCBalance(walletAddress: PublicKey | string): Promise
       const accountInfo = await connection.getTokenAccountBalance(tokenAccount);
       return parseFloat(accountInfo.value.uiAmount?.toString() || '0');
     } catch (directError) {
-      console.warn('Direct RPC USDC balance check failed:', directError);
       // If account doesn't exist, return 0 (user has no USDC)
       return 0;
     }
   } catch (error) {
-    console.error('Error getting USDC balance:', error);
     return 0;
   }
 }

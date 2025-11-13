@@ -82,7 +82,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .maybeSingle();
 
     if (checkError && checkError.code !== 'PGRST116') {
-      console.error('Error checking profile:', checkError);
       return res.status(200).json({ 
         success: false, 
         message: 'IP tracking failed but request can continue',
@@ -98,7 +97,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('wallet_address', walletAddress);
 
       if (updateError) {
-        console.error('Error updating user IP:', updateError);
         return res.status(200).json({ 
           success: false, 
           message: 'IP tracking failed but request can continue',
@@ -121,7 +119,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
       if (insertError) {
-        console.error('Error creating profile with IP:', insertError);
         return res.status(200).json({ 
           success: false, 
           message: 'IP tracking failed but request can continue',
@@ -136,7 +133,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ip: clientIP
     });
   } catch (error: any) {
-    console.error('Exception in track-ip endpoint:', error);
     // Don't fail - IP tracking is not critical
     return res.status(200).json({ 
       success: false, 

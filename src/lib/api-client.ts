@@ -93,7 +93,6 @@ export async function releasePaymentToFreelancer(
 
     return data.transactionSignature;
   } catch (error) {
-    console.error('Error releasing payment:', error);
     throw error;
   }
 }
@@ -142,7 +141,6 @@ export async function checkWalletProjectLimit(walletAddress: string): Promise<{
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error checking wallet limit:', error);
     // Fail open - allow if there's an error
     return {
       allowed: true,
@@ -183,7 +181,6 @@ export async function checkIPProjectLimit(): Promise<{
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error checking IP limit:', error);
     // Fail open - allow if there's an error
     return {
       allowed: true,

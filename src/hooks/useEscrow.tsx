@@ -87,7 +87,6 @@ export const useEscrow = (): UseEscrowReturn => {
             clientWallet.toString()
           );
         } catch (x402Error: any) {
-          console.error('x402 Payment challenge failed');
           setIsLoading(false);
           throw new Error(`x402 payment request failed: ${x402Error.message || 'Unknown error'}. Please try again or use a different payment method.`);
         }
@@ -102,7 +101,6 @@ export const useEscrow = (): UseEscrowReturn => {
         try {
           transactionSignature = await processX402Payment(paymentChallenge, ph);
         } catch (x402PaymentError: any) {
-          console.error('x402 Payment processing failed');
           setIsLoading(false);
           throw new Error(`x402 payment processing failed: ${x402PaymentError.message || 'Unknown error'}. Please try again or use a different payment method.`);
         }
@@ -147,13 +145,6 @@ export const useEscrow = (): UseEscrowReturn => {
         }
 
         if (!verification.success) {
-          // If verification fails but transaction was sent, log the error for debugging
-          console.error('x402 payment verification failed:', {
-            transactionSignature,
-            error: verification.error,
-            projectId,
-            amount: parseFloat(paymentChallenge.amount)
-          });
           throw new Error(verification.error || 'Payment verification failed after multiple attempts');
         }
 
@@ -200,7 +191,6 @@ export const useEscrow = (): UseEscrowReturn => {
       // CRITICAL SAFEGUARD: If we reach here and paymentCurrency is X402, something went wrong
       // This should NEVER happen - the x402 block should always return or throw
       if (String(paymentCurrency).toUpperCase() === 'X402') {
-        console.error('x402 payment flow did not return or throw');
         setIsLoading(false);
         throw new Error('x402 payment flow failed unexpectedly. The payment flow did not complete properly. Please try again or use a different payment method.');
       }
@@ -260,7 +250,6 @@ export const useEscrow = (): UseEscrowReturn => {
           signature = await sendRawTransactionViaProxy(serializedTransaction);
           
         } catch (phantomError: any) {
-          console.error('Phantom transaction error');
           // Check for specific Phantom errors
           if (phantomError?.code === 4001 || phantomError?.message?.includes('User rejected')) {
             throw new Error('Transaction was rejected by user');
@@ -302,7 +291,6 @@ export const useEscrow = (): UseEscrowReturn => {
         }
         
       } catch (error: any) {
-        console.error('Error with transaction');
         // If user rejected, let them know
         if (error?.message?.includes('User rejected') || error?.code === 4001) {
           throw new Error('Transaction was rejected by user');
@@ -332,11 +320,9 @@ export const useEscrow = (): UseEscrowReturn => {
 
       return escrow.id;
     } catch (error: any) {
-      console.error('Error creating escrow:', error);
       
       // If this was an x402 payment, make sure we don't fall through to SOL
       if (String(paymentCurrency).toUpperCase() === 'X402') {
-        console.error('x402 payment failed');
         toast({
           title: "x402 Payment Failed",
           description: error?.message || "x402 payment failed. Please try again or use a different payment method.",
@@ -441,7 +427,6 @@ export const useEscrow = (): UseEscrowReturn => {
 
       return true;
     } catch (error) {
-      console.error('Error funding escrow:', error);
       toast({
         title: "Funding Failed",
         description: "Failed to fund escrow. Please try again.",
@@ -546,7 +531,6 @@ export const useEscrow = (): UseEscrowReturn => {
 
       return true;
     } catch (error) {
-      console.error('Error releasing payment:', error);
       toast({
         title: "Release Failed",
         description: "Failed to release payment. Please try again.",
@@ -628,7 +612,6 @@ export const useEscrow = (): UseEscrowReturn => {
 
       return true;
     } catch (error) {
-      console.error('Error releasing payment to freelancer:', error);
       toast({
         title: "Payment Release Failed",
         description: error instanceof Error ? error.message : "Failed to release payment. Please try again.",

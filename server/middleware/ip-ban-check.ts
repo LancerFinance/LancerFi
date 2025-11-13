@@ -57,7 +57,6 @@ export async function checkIPBanStatus(clientIP: string): Promise<{
       .maybeSingle();
     
     if (error) {
-      console.error('Error checking IP ban:', error);
       return null; // Fail open
     }
     
@@ -82,7 +81,6 @@ export async function checkIPBanStatus(clientIP: string): Promise<{
               .delete()
               .eq('ip_address', clientIP);
           } catch (err: any) {
-            console.error('Error cleaning up expired IP ban:', err);
           }
         })();
       }
@@ -90,7 +88,6 @@ export async function checkIPBanStatus(clientIP: string): Promise<{
     
     return null; // Not banned
   } catch (error: any) {
-    console.error('Exception in IP ban check:', error);
     return null; // Fail open
   }
 }
