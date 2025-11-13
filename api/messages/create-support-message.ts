@@ -84,37 +84,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('sender_id', walletAddress)
       .eq('recipient_id', 'admin@lancerfi.app')
       .gte('created_at', oneMinuteAgo.toISOString())
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: true }); // Get oldest first
     
     if (messagesError) {
       // Fail open - allow message if we can't check rate limit
       // Don't block legitimate users due to database errors
     } else {
       const messageCount = recentMessages?.length || 0;
-      // Only block if they've sent 3+ messages in the last minute
-      // This prevents rapid spam but allows normal usage
+      // Block if they've sent 3+ messages in the last minute
       if (messageCount >= 3) {
-        // Find the oldest message in the last minute
+        // Calculate time until the oldest message expires (1 minute after it was sent)
         if (recentMessages && recentMessages.length > 0) {
-          // Sort by created_at ascending to get oldest first
-          const sortedMessages = [...recentMessages].sort((a, b) => 
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          );
-          const oldestMessage = sortedMessages[0];
+          const oldestMessage = recentMessages[0]; // Already sorted ascending
           const oldestMessageTime = new Date(oldestMessage.created_at);
-          const secondsSinceOldest = (now.getTime() - oldestMessageTime.getTime()) / 1000;
-          const remainingSeconds = Math.max(1, Math.ceil(60 - secondsSinceOldest));
+          const millisecondsSinceOldest = now.getTime() - oldestMessageTime.getTime();
+          const remainingMilliseconds = (60 * 1000) - millisecondsSinceOldest;
+          const remainingSeconds = Math.max(1, Math.ceil(remainingMilliseconds / 1000));
           
-          // Only block if we're still within the 1-minute window
-          if (remainingSeconds > 0) {
-            return res.status(429).json({
-              error: `Please wait ${remainingSeconds} second${remainingSeconds > 1 ? 's' : ''} before sending another message.`,
-              success: false,
-              count: messageCount,
-              limit: 3,
-              remainingSeconds
-            });
-          }
+          // Always block if we have 3+ messages in the last minute
+          return res.status(429).json({
+            error: `Rate limit exceeded. You can send 3 messages per minute. Please wait ${remainingSeconds} second${remainingSeconds > 1 ? 's' : ''} before sending another message.`,
+            success: false,
+            count: messageCount,
+            limit: 3,
+            remainingSeconds
+          });
+        } else {
+          // Fallback: block if count is 3+ even if we can't calculate time
+          return res.status(429).json({
+            error: `Rate limit exceeded. You can send 3 messages per minute. Please wait before sending another message.`,
+            success: false,
+            count: messageCount,
+            limit: 3
+          });
         }
       }
     }
