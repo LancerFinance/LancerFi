@@ -464,6 +464,19 @@ export const db = {
     return data;
   },
 
+  async markAdminMessageAsRead(messageId: string) {
+    const { data, error } = await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('id', messageId)
+      .eq('recipient_id', 'admin@lancerfi.app')
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
   // Proposals
   async getProposals(projectId: string) {
     const { data, error } = await supabase

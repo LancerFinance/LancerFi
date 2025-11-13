@@ -20,6 +20,7 @@ const Header = () => {
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
   const [dashboardNotificationCount, setDashboardNotificationCount] = useState(0);
+  const [unreadSupportCount, setUnreadSupportCount] = useState(0);
   const [restrictionStatus, setRestrictionStatus] = useState<{
     isRestricted: boolean;
     restrictionType: 'mute' | 'ban_wallet' | 'ban_ip' | null;
@@ -39,15 +40,26 @@ const Header = () => {
       checkUnreadMessages();
       checkDashboardNotifications();
       checkRestrictionStatus();
+      if (isAdminWallet) {
+        checkUnreadSupportMessages();
+      }
       // Check for new messages and notifications every 10 seconds
       const interval = setInterval(() => {
         checkUnreadMessages();
         checkDashboardNotifications();
         checkRestrictionStatus();
+        if (isAdminWallet) {
+          checkUnreadSupportMessages();
+        }
       }, 10000);
 
       // Listen for message read events to update count immediately
-      const handleMessageRead = () => checkUnreadMessages();
+      const handleMessageRead = () => {
+        checkUnreadMessages();
+        if (isAdminWallet) {
+          checkUnreadSupportMessages();
+        }
+      };
       window.addEventListener('messageRead', handleMessageRead);
       return () => {
         clearInterval(interval);
@@ -56,9 +68,10 @@ const Header = () => {
     } else {
       setUnreadCount(0);
       setDashboardNotificationCount(0);
+      setUnreadSupportCount(0);
       setRestrictionStatus(null);
     }
-  }, [isConnected, connectedAddress]);
+  }, [isConnected, connectedAddress, isAdminWallet]);
   
   const checkRestrictionStatus = async () => {
     if (!connectedAddress) {
@@ -91,7 +104,20 @@ const Header = () => {
       ]);
       setDashboardNotificationCount(proposalsCount + submissionsCount);
     } catch (error) {
-      console.error('Error checking dashboard notifications:', error);
+      // Silently fail
+    }
+  };
+  
+  const checkUnreadSupportMessages = async () => {
+    if (!connectedAddress || !isAdminWallet) return;
+    try {
+      const allMessages = await db.getAllMessages();
+      const supportMessages = (allMessages || []).filter(
+        msg => msg.recipient_id === 'admin@lancerfi.app' && !msg.is_read
+      );
+      setUnreadSupportCount(supportMessages.length);
+    } catch (error) {
+      // Silently fail
     }
   };
 
@@ -217,12 +243,17 @@ const Header = () => {
             {isAdminWallet && (
               <Link
                 to="/error-message"
-                className="text-xs sm:text-sm font-medium text-foreground bg-gradient-to-b from-muted to-muted/80 hover:from-muted/90 hover:to-muted/70 border-2 border-border rounded-full px-3 py-1.5 shadow-lg hover:shadow-xl active:shadow-inner active:translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
+                className="text-xs sm:text-sm font-medium text-foreground bg-gradient-to-b from-muted to-muted/80 hover:from-muted/90 hover:to-muted/70 border-2 border-border rounded-full px-3 py-1.5 shadow-lg hover:shadow-xl active:shadow-inner active:translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer relative inline-flex items-center"
                 style={{
                   boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)'
                 }}
               >
                 Dashboard
+                {unreadSupportCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-6 h-6 bg-destructive rounded-full border-2 border-background flex items-center justify-center text-white text-xs font-bold">
+                    {unreadSupportCount > 9 ? '9+' : unreadSupportCount}
+                  </span>
+                )}
               </Link>
             )}
           </div>

@@ -311,7 +311,23 @@ const AdminMessages = ({ onSupportCountChange }: AdminMessagesProps) => {
                 className={`cursor-pointer hover:bg-muted/50 ${!message.is_read ? 'border-l-4 border-l-primary' : ''} ${
                   isFromAdmin ? 'border-2 border-amber-400/50 bg-amber-50/30 dark:bg-amber-950/20' : ''
                 }`}
-                onClick={() => setSelectedMessage(message)}
+                onClick={async () => {
+                  setSelectedMessage(message);
+                  // Mark support messages as read when clicked
+                  if (isToAdmin && !message.is_read) {
+                    try {
+                      await db.markAdminMessageAsRead(message.id);
+                      // Update local state
+                      setMessages(prev => prev.map(msg => 
+                        msg.id === message.id ? { ...msg, is_read: true } : msg
+                      ));
+                      // Trigger notification update
+                      window.dispatchEvent(new CustomEvent('messageRead'));
+                    } catch (error) {
+                      // Silently fail
+                    }
+                  }
+                }}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">
