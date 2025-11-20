@@ -299,12 +299,22 @@ export const db = {
 
   async deleteProject(id: string) {
     // Delete project (cascades to escrows, milestones, proposals, etc. due to ON DELETE CASCADE)
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('projects')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select();
     
-    if (error) throw error;
+    if (error) {
+      console.error('Delete project error:', error);
+      throw new Error(`Failed to delete project: ${error.message || 'Unknown error'}`);
+    }
+    
+    // Check if any rows were actually deleted
+    if (!data || data.length === 0) {
+      throw new Error('Project not found or could not be deleted. It may have already been deleted or you may not have permission.');
+    }
+    
     return { success: true };
   },
 

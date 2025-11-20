@@ -193,16 +193,21 @@ const AdminProjects = () => {
                       onClick={async () => {
                         if (confirm(`Are you sure you want to DELETE this project? This action cannot be undone and will delete all associated escrows, proposals, and milestones.`)) {
                           try {
-                            await db.deleteProject(project.id);
-                            toast({
-                              title: "Success",
-                              description: "Project deleted successfully",
-                            });
-                            loadProjects();
+                            const result = await db.deleteProject(project.id);
+                            if (result?.success) {
+                              toast({
+                                title: "Success",
+                                description: "Project deleted successfully",
+                              });
+                              loadProjects();
+                            } else {
+                              throw new Error("Delete operation returned no success confirmation");
+                            }
                           } catch (error: any) {
+                            console.error('Delete project error:', error);
                             toast({
                               title: "Error",
-                              description: error.message || "Failed to delete project",
+                              description: error.message || "Failed to delete project. Please check console for details.",
                               variant: "destructive"
                             });
                           }
