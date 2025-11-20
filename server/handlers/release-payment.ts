@@ -99,17 +99,26 @@ export async function releasePaymentHandler(
             .eq('id', project.freelancer_id)
             .single();
           
+          if (!freelancerProfile) {
+            return res.status(400).json({
+              error: 'Freelancer profile not found'
+            });
+          }
+          
+          // Verify the Solana address matches for authorization (case-insensitive)
+          const profileSolanaAddress = freelancerProfile.wallet_address?.toLowerCase().trim();
+          const providedSolanaAddress = freelancerWallet.toLowerCase().trim();
+          
+          if (profileSolanaAddress !== providedSolanaAddress) {
+            return res.status(400).json({
+              error: 'Freelancer wallet address does not match project freelancer'
+            });
+          }
+          
           // Check if profile has EVM address stored
           if (freelancerProfile?.evm_address && freelancerProfile.evm_address.startsWith('0x')) {
             freelancerEVMAddress = freelancerProfile.evm_address;
           } else {
-            // Verify the Solana address matches for authorization
-            if (freelancerProfile?.wallet_address !== freelancerWallet) {
-              return res.status(400).json({
-                error: 'Freelancer wallet address does not match project freelancer'
-              });
-            }
-            
             // No EVM address found - return helpful error
             return res.status(400).json({
               error: 'For X402 payments, freelancer must provide their EVM (Base network) wallet address. The freelancer\'s EVM address (0x...) is required to receive payment on Base network. Please contact the freelancer to provide their EVM address.'
