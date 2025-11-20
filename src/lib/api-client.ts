@@ -10,9 +10,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ||
 interface ReleasePaymentRequest {
   escrowId: string;
   freelancerWallet: string;
-  walletAddress: string;
+  walletAddress: string; // Solana address for authorization
   signature: string;
   message: string;
+  isX402?: boolean;
+  evmAddress?: string; // EVM address for X402 signature verification
 }
 
 interface ReleasePaymentResponse {
@@ -37,9 +39,10 @@ export function generateChallenge(): string {
 export async function releasePaymentToFreelancer(
   escrowId: string,
   freelancerWallet: string,
-  walletAddress: string,
+  walletAddress: string, // Solana address for authorization
   signMessage: (message: string) => Promise<{ signature: Uint8Array | string }>,
-  isX402?: boolean
+  isX402?: boolean,
+  evmAddress?: string // EVM address for X402 signature verification
 ): Promise<string> {
   try {
     // Generate challenge message
@@ -83,10 +86,11 @@ export async function releasePaymentToFreelancer(
       body: JSON.stringify({
         escrowId,
         freelancerWallet,
-        walletAddress,
+        walletAddress, // Solana address for project authorization
         signature: signatureBase64,
         message,
-        isX402: isX402 || false
+        isX402: isX402 || false,
+        evmAddress: evmAddress || undefined // EVM address for X402 signature verification
       }),
     });
 

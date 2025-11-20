@@ -18,7 +18,7 @@ export async function verifyWalletSignature(
   next: NextFunction
 ) {
   try {
-    const { walletAddress, signature, message, isX402 } = req.body;
+    const { walletAddress, signature, message, isX402, evmAddress } = req.body;
 
     if (!walletAddress || !signature || !message) {
       return res.status(400).json({
@@ -34,6 +34,17 @@ export async function verifyWalletSignature(
       try {
         const { ethers } = await import('ethers');
         
+        // For X402, we need the EVM address to verify the signature
+        // walletAddress is the Solana address (for project authorization)
+        // evmAddress is the EVM address (for signature verification)
+        const addressToVerify = evmAddress || walletAddress;
+        
+        if (!addressToVerify || !addressToVerify.startsWith('0x') || addressToVerify.length !== 42) {
+          return res.status(400).json({
+            error: 'Missing or invalid EVM address for X402 payment signature verification'
+          });
+        }
+        
         // Recover the signer address from the signature
         const messageToVerify = message;
         // Signature is base64 encoded, convert back to hex
@@ -44,16 +55,17 @@ export async function verifyWalletSignature(
         // Recover the address that signed the message
         const recoveredAddress = ethers.verifyMessage(messageToVerify, fullSignature);
         
-        // Compare addresses (case-insensitive)
-        if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+        // Compare recovered EVM address with provided EVM address (case-insensitive)
+        if (recoveredAddress.toLowerCase() !== addressToVerify.toLowerCase()) {
           return res.status(401).json({
             error: 'Invalid EVM wallet signature. Authentication failed.'
           });
         }
         
         // Mark as X402 payment for handler
+        // Store Solana address for project authorization (walletAddress)
         req.isX402Payment = true;
-        req.walletAddress = walletAddress;
+        req.walletAddress = walletAddress; // Solana address for project authorization
         next();
         return;
       } catch (evmError: any) {

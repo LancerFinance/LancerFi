@@ -714,14 +714,17 @@ export const useEscrow = (): UseEscrowReturn => {
           return { signature: evmSignature };
         };
         
-        // IMPORTANT: Use Solana address for authorization (project.client_id is Solana address)
-        // But pass isX402 flag so backend knows to verify EVM signature
+        // IMPORTANT: For X402, we need to:
+        // 1. Verify EVM signature against EVM address
+        // 2. Authorize using Solana address (project.client_id is Solana address)
+        // So we pass both addresses - evmAddress for signature verification, address for authorization
         signature = await releasePaymentAPI(
           escrowId,
           freelancerWallet,
-          address, // Use Solana address for authorization
+          address, // Solana address for project authorization
           evmSignMessage,
-          true // isX402 = true (tells backend to verify EVM signature)
+          true, // isX402 = true
+          evmAddress // EVM address for signature verification
         );
       } else {
         // Use Solana signature for SOLANA/USDC payments
