@@ -306,12 +306,15 @@ const ProjectDashboard = () => {
       }, 0)
   };
 
+  // Filter out completed projects for working stats (they should only appear in Completed tab)
+  const activeWorkingProjects = workingProjects.filter(p => p.status !== 'completed');
+  
   const workingStats = {
-    total: workingProjects.length,
-    inProgress: workingProjects.filter(p => p.status === 'in_progress').length,
-    completed: workingProjects.filter(p => p.status === 'completed').length,
+    total: activeWorkingProjects.length,
+    inProgress: activeWorkingProjects.filter(p => p.status === 'in_progress').length,
+    completed: 0, // Completed projects are not shown in this tab
     totalEarned: Object.entries(escrows)
-      .filter(([projectId]) => workingProjects.some(p => p.id === projectId))
+      .filter(([projectId]) => activeWorkingProjects.some(p => p.id === projectId))
       .filter(([_, escrow]) => escrow.status === 'released')
       .reduce((sum, [_, escrow]) => {
         // Convert SOL to USD if payment currency is SOLANA
