@@ -50,9 +50,10 @@ export async function releasePaymentHandler(
     let escrowError: any = null;
     
     // First try: Look up by escrow ID
+    // Note: payment_currency is in escrows table, not projects table
     const { data: escrowById, error: errorById } = await supabaseClient
       .from('escrows')
-      .select('*, projects(client_id, status, freelancer_id, payment_currency)')
+      .select('*, projects(client_id, status, freelancer_id)')
       .eq('id', escrowId)
       .maybeSingle();
     
@@ -71,7 +72,7 @@ export async function releasePaymentHandler(
       if (project) {
         const { data: escrowByProject, error: errorByProject } = await supabaseClient
           .from('escrows')
-          .select('*, projects(client_id, status, freelancer_id, payment_currency)')
+          .select('*, projects(client_id, status, freelancer_id)')
           .eq('project_id', escrowId)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -184,11 +185,11 @@ export async function releasePaymentHandler(
         }
         
         // Verify Solana address matches for authorization
-        if (project.freelancer_id) {
+    if (project.freelancer_id) {
           const { data: freelancerProfile, error: profileError } = await supabaseClient
-            .from('profiles')
-            .select('wallet_address')
-            .eq('id', project.freelancer_id)
+        .from('profiles')
+        .select('wallet_address')
+        .eq('id', project.freelancer_id)
             .maybeSingle();
           
           if (profileError) {
@@ -210,12 +211,12 @@ export async function releasePaymentHandler(
           const providedSolanaAddress = freelancerWallet.toLowerCase().trim();
           
           if (profileSolanaAddress !== providedSolanaAddress) {
-            return res.status(400).json({
-              error: 'Freelancer wallet address does not match project freelancer'
-            });
-          }
-        }
-        
+        return res.status(400).json({
+          error: 'Freelancer wallet address does not match project freelancer'
+        });
+      }
+    }
+
         // No EVM address found - return error with helpful message
         return res.status(400).json({
           error: 'Freelancer EVM address not found. The freelancer needs to view this project page or submit work while connected to their Base network wallet to automatically capture their EVM address. Please ask the freelancer to view the project page with their Base wallet connected.'
