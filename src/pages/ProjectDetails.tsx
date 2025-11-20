@@ -835,7 +835,7 @@ const ProjectDetails = () => {
                             {freelancer.full_name || freelancer.username}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {freelancer.hourly_rate ? `$${freelancer.hourly_rate}/hr` : 'Rate not set'}
+                            {freelancer.hourly_rate ? `$${freelancer.hourly_rate}/hr` : project ? `Fixed price: ${formatUSDC(project.budget_usdc)}` : 'Rate not set'}
                           </div>
                         </div>
                       </div>
