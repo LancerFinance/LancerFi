@@ -79,6 +79,15 @@ export async function releasePaymentToFreelancer(
     }
     
     // Call backend API
+    console.log('🔍 Calling release payment API:', {
+      url: `${API_BASE_URL}/api/payment/release`,
+      escrowId,
+      freelancerWallet,
+      isX402,
+      hasEVMAddress: !!evmAddress,
+      hasFreelancerEVMAddress: !!freelancerEVMAddress
+    });
+    
     const response = await fetch(`${API_BASE_URL}/api/payment/release`, {
       method: 'POST',
       headers: {
@@ -95,6 +104,8 @@ export async function releasePaymentToFreelancer(
         freelancerEVMAddress: freelancerEVMAddress || undefined // Freelancer's EVM address for X402 payment release
       }),
     });
+    
+    console.log('🔍 API Response status:', response.status, response.statusText);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));

@@ -25,6 +25,15 @@ export async function releasePaymentHandler(
     const { escrowId, freelancerWallet, freelancerEVMAddress } = req.body;
     const walletAddress = req.walletAddress;
 
+    console.log('🔍 Release payment request:', {
+      escrowId,
+      freelancerWallet,
+      freelancerEVMAddress,
+      walletAddress,
+      hasEscrowId: !!escrowId,
+      hasFreelancerWallet: !!freelancerWallet
+    });
+
     if (!walletAddress) {
       return res.status(401).json({ error: 'Wallet address not authenticated' });
     }

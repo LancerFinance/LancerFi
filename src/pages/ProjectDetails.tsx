@@ -476,6 +476,13 @@ const ProjectDetails = () => {
           ? escrow.freelancer_wallet 
           : undefined;
         
+        console.log('🔍 Releasing payment:', {
+          escrowId: escrow.id,
+          freelancerWallet: freelancer.wallet_address,
+          evmAddress: evmAddress,
+          paymentCurrency: escrow.payment_currency
+        });
+        
         paymentReleased = await releasePaymentToFreelancer(
           escrow.id,
           freelancer.wallet_address,
