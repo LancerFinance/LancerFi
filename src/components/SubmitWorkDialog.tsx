@@ -253,11 +253,16 @@ const SubmitWorkDialog = ({
                 
                 // Store EVM address in escrow
                 await db.updateEscrow(escrow.id, { freelancer_wallet: evmAddress });
+                console.log(`✅ Captured freelancer EVM address for X402 project: ${evmAddress}`);
+              } else {
+                console.warn('⚠️ No EVM provider found when freelancer submitted work for X402 project');
               }
+            } else if (escrow && escrow.freelancer_wallet?.startsWith('0x')) {
+              console.log(`✅ Freelancer EVM address already stored: ${escrow.freelancer_wallet}`);
             }
           } catch (evmError) {
-            // Silently fail - freelancer might not have EVM wallet connected
-            console.log('Could not capture freelancer EVM address:', evmError);
+            // Log error but don't fail work submission
+            console.error('❌ Could not capture freelancer EVM address:', evmError);
           }
         }
         
