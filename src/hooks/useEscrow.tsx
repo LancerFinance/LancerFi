@@ -5,7 +5,7 @@ import { createEscrowAccount, fundEscrowWithCurrency, releaseEscrowPayment, conn
 import { db } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { releasePaymentToFreelancer as releasePaymentAPI } from '@/lib/api-client';
-import { requestX402Payment, processX402Payment, verifyX402Payment, X402PaymentChallenge } from '@/lib/x402-payment';
+import { requestX402Payment, processX402Payment, verifyX402Payment, X402PaymentChallenge } from '@/lib/x402-payment-base';
 import { useRateLimit } from '@/hooks/useRateLimit';
 
 interface UseEscrowReturn {
