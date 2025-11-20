@@ -242,12 +242,16 @@ export async function verifyX402Payment(
     
     console.log('x402 verification result:', {
       verified: result.verified,
+      success: result.success,
       error: result.error,
-      transactionSignature: transactionSignature.substring(0, 20) + '...'
+      transactionSignature: transactionSignature.substring(0, 20) + '...',
+      fullResult: result
     });
     
+    // Backend returns { success: true, verified: true } on success
+    // Check both success and verified fields
     return {
-      success: result.verified === true,
+      success: result.success === true && result.verified === true,
       error: result.error
     };
   } catch (error: any) {
