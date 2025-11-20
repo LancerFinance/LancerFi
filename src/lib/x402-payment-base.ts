@@ -154,7 +154,9 @@ export async function processX402Payment(
   const usdcContract = new ethers.Contract(BASE_USDC_ADDRESS, ERC20_ABI, signer);
 
   // Get USDC decimals (should be 6)
-  const decimals = await usdcContract.decimals();
+  // ethers.js v6 returns BigInt, so we need to convert to number
+  const decimalsBigInt = await usdcContract.decimals();
+  const decimals = Number(decimalsBigInt);
   
   // Convert amount to wei (USDC has 6 decimals on Base)
   const amount = parseFloat(paymentChallenge.amount);
@@ -163,7 +165,9 @@ export async function processX402Payment(
   // Check balance
   const balance = await usdcContract.balanceOf(clientAddress);
   if (balance < amountInWei) {
-    throw new Error(`Insufficient USDC balance. Required: ${amount} USDC, Available: ${ethers.formatUnits(balance, decimals)} USDC`);
+    // Convert balance BigInt to number for display
+    const balanceNumber = Number(ethers.formatUnits(balance, decimals));
+    throw new Error(`Insufficient USDC balance. Required: ${amount} USDC, Available: ${balanceNumber} USDC`);
   }
 
   // Create transfer transaction
