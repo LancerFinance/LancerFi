@@ -60,6 +60,7 @@ export interface Project {
   started_at?: string;
   completed_at?: string;
   project_images?: string[];
+  is_hidden?: boolean;
   client?: Profile;
   freelancer?: Profile;
 }
@@ -174,7 +175,7 @@ export const db = {
     const { data, error } = await query;
     if (error) throw error;
     
-    // Filter out projects from muted/banned users
+    // Filter out hidden projects and projects from muted/banned users
     if (data && data.length > 0) {
       const now = new Date();
       
@@ -195,8 +196,11 @@ export const db = {
         });
       }
       
-      // Filter projects based on profile restrictions
+      // Filter projects based on hidden status and profile restrictions
       return data.filter((project: any) => {
+        // Filter out hidden projects
+        if (project.is_hidden === true) return false;
+        
         if (!project.client_id) return true; // No client = allow
         
         const profile = profileMap.get(project.client_id);
@@ -267,6 +271,41 @@ export const db = {
     
     if (error) throw error;
     return data;
+  },
+
+  async hideProject(id: string) {
+    const { data, error } = await supabase
+      .from('projects')
+      .update({ is_hidden: true })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async unhideProject(id: string) {
+    const { data, error } = await supabase
+      .from('projects')
+      .update({ is_hidden: false })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteProject(id: string) {
+    // Delete project (cascades to escrows, milestones, proposals, etc. due to ON DELETE CASCADE)
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return { success: true };
   },
 
   async updateEscrow(id: string, updates: Partial<Escrow>) {

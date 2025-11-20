@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
-import { Search, Edit, Briefcase } from "lucide-react";
+import { Search, Edit, Briefcase, EyeOff, Trash2 } from "lucide-react";
 import { db, Project } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -145,14 +145,74 @@ const AdminProjects = () => {
                       Created: {format(new Date(project.created_at), 'PPp')}
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/project/${project.id}/edit`)}
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/project/${project.id}/edit`)}
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        if (confirm(`Are you sure you want to ${project.is_hidden ? 'unhide' : 'hide'} this project?`)) {
+                          try {
+                            if (project.is_hidden) {
+                              await db.unhideProject(project.id);
+                              toast({
+                                title: "Success",
+                                description: "Project unhidden successfully",
+                              });
+                            } else {
+                              await db.hideProject(project.id);
+                              toast({
+                                title: "Success",
+                                description: "Project hidden successfully",
+                              });
+                            }
+                            loadProjects();
+                          } catch (error: any) {
+                            toast({
+                              title: "Error",
+                              description: error.message || "Failed to update project",
+                              variant: "destructive"
+                            });
+                          }
+                        }
+                      }}
+                    >
+                      <EyeOff className="w-4 h-4 mr-2" />
+                      {project.is_hidden ? 'Unhide' : 'Hide'}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={async () => {
+                        if (confirm(`Are you sure you want to DELETE this project? This action cannot be undone and will delete all associated escrows, proposals, and milestones.`)) {
+                          try {
+                            await db.deleteProject(project.id);
+                            toast({
+                              title: "Success",
+                              description: "Project deleted successfully",
+                            });
+                            loadProjects();
+                          } catch (error: any) {
+                            toast({
+                              title: "Error",
+                              description: error.message || "Failed to delete project",
+                              variant: "destructive"
+                            });
+                          }
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

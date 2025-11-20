@@ -70,6 +70,7 @@ const BrowseServices = () => {
       setLoading(true);
       // Only get projects that have successfully funded escrows
       // This ensures we only show projects where payment was actually completed
+      // Also exclude hidden projects
       const { data: projects, error } = await supabase
         .from('projects')
         .select(`
@@ -83,6 +84,7 @@ const BrowseServices = () => {
         .neq('status', 'pending') // Exclude pending projects
         .eq('escrows.status', 'funded')
         .is('freelancer_id', null)
+        .or('is_hidden.is.null,is_hidden.eq.false') // Exclude hidden projects
         .order('created_at', { ascending: false });
 
       if (error) {
