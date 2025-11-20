@@ -84,8 +84,10 @@ const BrowseServices = () => {
         .neq('status', 'pending') // Exclude pending projects
         .eq('escrows.status', 'funded')
         .is('freelancer_id', null)
-        .or('is_hidden.is.null,is_hidden.eq.false') // Exclude hidden projects
         .order('created_at', { ascending: false });
+      
+      // Filter out hidden projects in JavaScript (Supabase .or() syntax is complex)
+      const visibleProjects = (projects || []).filter((p: any) => !p.is_hidden);
 
       if (error) {
         // If join fails, fallback to checking escrows separately
@@ -93,6 +95,7 @@ const BrowseServices = () => {
         const projectsWithEscrows = await Promise.all(
           allProjects.map(async (project) => {
             if (project.freelancer_id) return null; // Skip projects with freelancers
+            if (project.is_hidden) return null; // Skip hidden projects
             const escrow = await db.getEscrow(project.id);
             return escrow && escrow.status === 'funded' ? project : null;
           })
@@ -100,7 +103,7 @@ const BrowseServices = () => {
         const validProjects = projectsWithEscrows.filter(p => p !== null);
         setServices(validProjects as Service[]);
       } else {
-        setServices((projects || []) as Service[]);
+        setServices(visibleProjects as Service[]);
       }
     } catch (error) {
       console.error('Error loading services:', error);
