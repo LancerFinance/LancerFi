@@ -13,6 +13,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { db, supabase } from "@/lib/supabase";
 import { formatUSDC, formatSOL, PaymentCurrency, getUSDCBalance, getAccountBalanceViaProxy } from "@/lib/solana";
+import { getBaseUSDCBalanceFromWallet } from "@/lib/base-usdc-balance";
 import { PublicKey } from "@solana/web3.js";
 import { getSolanaPrice, convertUSDToSOL } from "@/lib/solana-price";
 import { useToast } from "@/hooks/use-toast";
@@ -352,10 +353,16 @@ const PostProject = () => {
       const transactionFeeBuffer = 0.01; // Buffer for transaction fees
       
       // Run ALL balance and price checks in parallel for maximum speed
+      // For x402, check Base USDC; for USDC, check Solana USDC
+      const w: any = window as any;
+      const ph = w.solana;
+      
       const balanceChecks = [
         getAccountBalanceViaProxy(address),
         paymentCurrency === 'SOLANA' ? getSolanaPrice() : Promise.resolve(null),
-        (paymentCurrency === 'X402' || paymentCurrency === 'USDC') ? getUSDCBalance(walletAddress) : Promise.resolve(null)
+        paymentCurrency === 'X402' 
+          ? (ph ? getBaseUSDCBalanceFromWallet(ph).catch(() => 0) : Promise.resolve(0))
+          : (paymentCurrency === 'USDC' ? getUSDCBalance(walletAddress) : Promise.resolve(null))
       ];
       
       const [solBalanceData, solPriceData, usdcBalance] = await Promise.all(balanceChecks);
