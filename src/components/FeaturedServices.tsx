@@ -43,7 +43,7 @@ const FeaturedServices = () => {
         'c40fcb19-770c-40b9-b4a1-5f1a9e3a2cf4'  // Crypto DApp
       ];
       
-      // Get the featured services by ID first
+      // Get only the 3 featured services by ID
       const featuredById = projects.filter(project => 
         featuredServiceIds.includes(project.id)
       );
@@ -53,19 +53,8 @@ const FeaturedServices = () => {
         .map(id => featuredById.find(p => p.id === id))
         .filter(Boolean) as Service[];
       
-      // Get additional services (top services with freelancers assigned, excluding already featured ones)
-      const additionalServices = projects
-        .filter(project => 
-          project.freelancer_id && 
-          project.status !== 'completed' &&
-          !featuredServiceIds.includes(project.id)
-        )
-        .slice(0, 4); // Get up to 4 more to fill out to 6 total
-      
-      // Combine featured services with additional services
-      const allFeaturedServices = [...sortedFeatured, ...additionalServices].slice(0, 6);
-
-      setServices(allFeaturedServices as Service[]);
+      // Only show the 3 specified featured services, nothing else
+      setServices(sortedFeatured as Service[]);
     } catch (error) {
       // Error loading services
     } finally {
