@@ -42,7 +42,8 @@ export async function releasePaymentToFreelancer(
   walletAddress: string, // Solana address for authorization
   signMessage: (message: string) => Promise<{ signature: Uint8Array | string }>,
   isX402?: boolean,
-  evmAddress?: string // EVM address for X402 signature verification
+  evmAddress?: string, // EVM address for X402 signature verification
+  freelancerEVMAddress?: string // Freelancer's EVM address for X402 payment release
 ): Promise<string> {
   try {
     // Generate challenge message
@@ -90,7 +91,8 @@ export async function releasePaymentToFreelancer(
         signature: signatureBase64,
         message,
         isX402: isX402 || false,
-        evmAddress: evmAddress || undefined // EVM address for X402 signature verification
+        evmAddress: evmAddress || undefined, // EVM address for X402 signature verification
+        freelancerEVMAddress: freelancerEVMAddress || undefined // Freelancer's EVM address for X402 payment release
       }),
     });
 

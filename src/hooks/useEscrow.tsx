@@ -12,7 +12,7 @@ interface UseEscrowReturn {
   createProjectEscrow: (projectId: string, amount: number, paymentCurrency: PaymentCurrency) => Promise<string | null>;
   fundEscrow: (escrowId: string, amount: number, paymentCurrency: PaymentCurrency) => Promise<boolean>;
   releasePayment: (escrowId: string, milestoneId: string) => Promise<boolean>;
-  releasePaymentToFreelancer: (escrowId: string, freelancerWallet: string) => Promise<boolean>;
+  releasePaymentToFreelancer: (escrowId: string, freelancerWallet: string, freelancerEVMAddress?: string) => Promise<boolean>;
   isLoading: boolean;
 }
 
@@ -605,7 +605,8 @@ export const useEscrow = (): UseEscrowReturn => {
 
   const releasePaymentToFreelancer = useCallback(async (
     escrowId: string,
-    freelancerWallet: string
+    freelancerWallet: string,
+    freelancerEVMAddress?: string
   ): Promise<boolean> => {
     // Rate limiting check
     if (!canReleasePayment()) {
@@ -724,7 +725,8 @@ export const useEscrow = (): UseEscrowReturn => {
           address, // Solana address for project authorization
           evmSignMessage,
           true, // isX402 = true
-          evmAddress // EVM address for signature verification
+          evmAddress, // EVM address for signature verification
+          freelancerEVMAddress // Freelancer's EVM address for payment release
         );
       } else {
         // Use Solana signature for SOLANA/USDC payments

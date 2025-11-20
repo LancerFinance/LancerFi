@@ -65,6 +65,8 @@ const ProjectDetails = () => {
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [kickingOffFreelancer, setKickingOffFreelancer] = useState(false);
   const [showKickOffDialog, setShowKickOffDialog] = useState(false);
+  const [showEVMDialog, setShowEVMDialog] = useState(false);
+  const [freelancerEVMAddress, setFreelancerEVMAddress] = useState('');
   const { canProceed: canComplete } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'completing a project' });
   const { canProceed: canKickOff } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'kicking off a freelancer' });
   
@@ -315,6 +317,14 @@ const ProjectDetails = () => {
           variant: "destructive"
         });
         return;
+      }
+
+      // For X402 payments, check if we need EVM address
+      if (escrow.payment_currency === 'X402' && !freelancer.wallet_address.startsWith('0x')) {
+        // Show dialog to get EVM address
+        setShowEVMDialog(true);
+        setCompleting(false);
+        return; // Will continue after dialog is submitted
       }
 
       // Release payment to freelancer first (this sends actual funds)
@@ -1015,6 +1025,118 @@ const ProjectDetails = () => {
               </AlertDialog>
             );
           })()}
+
+          {/* EVM Address Dialog for X402 Payments */}
+          <AlertDialog open={showEVMDialog} onOpenChange={setShowEVMDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Freelancer EVM Address Required</AlertDialogTitle>
+                <AlertDialogDescription>
+                  For X402 payments on Base network, the freelancer's EVM wallet address (0x...) is required to receive payment.
+                  Please enter the freelancer's Base network wallet address below.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="space-y-4 py-4">
+                <div>
+                  <Label htmlFor="evmAddress">Freelancer EVM Address (Base Network)</Label>
+                  <Input
+                    id="evmAddress"
+                    value={freelancerEVMAddress}
+                    onChange={(e) => setFreelancerEVMAddress(e.target.value)}
+                    placeholder="0x..."
+                    className="font-mono"
+                  />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    This should be the freelancer's Base network wallet address (starts with 0x)
+                  </p>
+                </div>
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setFreelancerEVMAddress('')}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    if (!freelancerEVMAddress || !freelancerEVMAddress.startsWith('0x') || freelancerEVMAddress.length !== 42) {
+                      toast({
+                        title: "Invalid EVM Address",
+                        description: "Please enter a valid EVM address (0x followed by 40 hex characters)",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+
+                    setShowEVMDialog(false);
+                    setCompleting(true);
+                    
+                    try {
+                      const paymentReleased = await releasePaymentToFreelancer(
+                        escrow!.id,
+                        freelancer!.wallet_address,
+                        freelancerEVMAddress
+                      );
+
+                      if (!paymentReleased) {
+                        toast({
+                          title: "Payment Release Failed",
+                          description: "Payment was not released. Project status was not updated.",
+                          variant: "destructive"
+                        });
+                        setCompleting(false);
+                        return;
+                      }
+
+                      // Update project status to completed
+                      await db.updateProject(id!, { status: 'completed', completed_at: new Date().toISOString() });
+                      
+                      // Send notifications
+                      try {
+                        const amount = escrow!.amount_usdc;
+                        const currency = escrow!.payment_currency || 'SOLANA';
+                        await db.sendProjectCompletionNotification(
+                          id!,
+                          project!.client_id,
+                          freelancer?.wallet_address || null,
+                          project!.title,
+                          amount,
+                          currency
+                        );
+                      } catch (notificationError) {
+                        // Don't fail if notifications fail
+                      }
+                      
+                      toast({
+                        title: "Project Completed!",
+                        description: "Payment has been released and the project has been marked as completed.",
+                      });
+                      
+                      // Refresh project data
+                      await loadProjectDetails();
+                      await loadWorkSubmissions();
+                    } catch (e) {
+                      toast({
+                        title: "Payment Release Failed",
+                        description: e instanceof Error ? e.message : "Failed to send payment to freelancer. Please try again.",
+                        variant: "destructive"
+                      });
+                    } finally {
+                      setCompleting(false);
+                      setFreelancerEVMAddress('');
+                    }
+                  }}
+                  disabled={completing}
+                >
+                  {completing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Release Payment"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
                       {project.status === 'active' && isProjectOwner && !project.freelancer_id && (
                         <Link to={`/project/${project.id}/edit`} className="block">
                           <Button variant="outline" size="sm" className="w-full">
