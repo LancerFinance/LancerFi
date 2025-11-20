@@ -72,8 +72,29 @@ export const useEscrow = (): UseEscrowReturn => {
       const isX402 = paymentCurrency === 'X402' || String(paymentCurrency).toUpperCase() === 'X402';
       
       if (isX402) {
+        // For x402 (Base USDC), we need the EVM address, not Solana address
+        // Get Ethereum provider and connected address
+        const w: any = window as any;
+        let ethereumProvider = w.ethereum;
+        
+        if (ph?.isPhantom && (ph as any).ethereum) {
+          ethereumProvider = (ph as any).ethereum;
+        } else if (!ethereumProvider && ph?.ethereum) {
+          ethereumProvider = ph.ethereum;
+        }
+        
+        if (!ethereumProvider) {
+          setIsLoading(false);
+          throw new Error('Ethereum provider not found. Please ensure your wallet (Phantom) supports Base network and has EVM capabilities enabled.');
+        }
+        
+        // Get EVM address from connected wallet
+        const { ethers } = await import('ethers');
+        const provider = new ethers.BrowserProvider(ethereumProvider);
+        const signer = await provider.getSigner();
+        const evmAddress = await signer.getAddress();
 
-        // Step 1: Request payment challenge from backend (HTTP 402)
+        // Step 1: Request payment challenge from backend (HTTP 402) using EVM address
         toast({
           title: "Requesting payment...",
           description: "Please wait while we prepare your payment.",
@@ -84,7 +105,7 @@ export const useEscrow = (): UseEscrowReturn => {
           paymentChallenge = await requestX402Payment(
             projectId,
             finalAmount,
-            clientWallet.toString()
+            evmAddress // Use EVM address for Base network
           );
         } catch (x402Error: any) {
           setIsLoading(false);
@@ -126,7 +147,7 @@ export const useEscrow = (): UseEscrowReturn => {
           verification = await verifyX402Payment(
             projectId,
             transactionSignature,
-            clientWallet.toString(),
+            evmAddress, // Use EVM address for verification
             parseFloat(paymentChallenge.amount)
           );
           

@@ -8,6 +8,14 @@ const BASE_CHAIN_ID = 8453; // Base mainnet
 const BASE_USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base USDC
 const BASE_RPC_URL = 'https://mainnet.base.org';
 
+// Base platform wallet address for x402 payments
+// This is a fresh new wallet created specifically for Base USDC
+export const BASE_PLATFORM_WALLET_ADDRESS = '0xdbbE0aDAD2931779270e4E2588b772e7b38453ba';
+
+export function getBasePlatformWalletAddress(): string {
+  return BASE_PLATFORM_WALLET_ADDRESS;
+}
+
 // ERC20 ABI for USDC transfer
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) external returns (bool)',
@@ -250,4 +258,3 @@ export async function verifyX402Payment(
     };
   }
 }
-
