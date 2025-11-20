@@ -11,6 +11,7 @@ import { ArrowLeft, Wallet, Shield, Loader2, Upload, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useWallet } from "@/hooks/useWallet";
+import { useProfile } from "@/hooks/useProfile";
 import { db, supabase } from "@/lib/supabase";
 import { formatUSDC, formatSOL, PaymentCurrency, getUSDCBalance, getAccountBalanceViaProxy } from "@/lib/solana";
 import { getBaseUSDCBalanceFromWallet } from "@/lib/base-usdc-balance";
@@ -30,6 +31,7 @@ import { validateImageFile } from "@/lib/file-security";
 const PostProject = () => {
   const navigate = useNavigate();
   const { isConnected, address } = useWallet();
+  const { profile } = useProfile();
   const { toast } = useToast();
   const { createProjectEscrow, isLoading: escrowLoading } = useEscrow();
   const [searchParams] = useSearchParams();
@@ -251,6 +253,17 @@ const PostProject = () => {
         description: "Please connect your wallet to post a project",
         variant: "destructive",
       });
+      return;
+    }
+
+    // Check if user has a profile with required fields
+    if (!profile || (!profile.full_name && !profile.username)) {
+      toast({
+        title: "Profile Required",
+        description: "Please create a profile with your name before posting a project",
+        variant: "destructive",
+      });
+      navigate('/create-profile');
       return;
     }
 

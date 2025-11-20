@@ -751,7 +751,8 @@ const ProjectDetails = () => {
                         </div>
                         {(() => {
                           const paymentCurrency = escrow.payment_currency || 'SOLANA';
-                          const isBaseNetwork = paymentCurrency === 'X402' || paymentCurrency === 'USDC';
+                          // X402 is on Base network, USDC and SOLANA are on Solana network
+                          const isBaseNetwork = paymentCurrency === 'X402';
                           const explorerUrl = isBaseNetwork
                             ? `https://basescan.org/tx/${escrow.transaction_signature}`
                             : `https://solscan.io/tx/${escrow.transaction_signature}${import.meta.env.MODE === 'production' ? '?cluster=mainnet-beta' : '?cluster=devnet'}`;
