@@ -256,6 +256,11 @@ const ProjectDashboard = () => {
   });
 
   const filteredWorkingProjects = workingProjects.filter(project => {
+    // Exclude completed projects from "Working On" tab
+    if (project.status === 'completed') {
+      return false;
+    }
+    
     const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          project.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter;

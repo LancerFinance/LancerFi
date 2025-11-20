@@ -740,7 +740,7 @@ export const useEscrow = (): UseEscrowReturn => {
 
       toast({
         title: "Payment Released",
-        description: paymentCurrency === 'USDC' 
+        description: paymentCurrency === 'USDC' || paymentCurrency === 'X402'
           ? `Successfully sent ${formatUSDC(amountToSend)} to freelancer`
           : `Successfully sent ${formatSOL(amountToSend)} to freelancer`,
       });
