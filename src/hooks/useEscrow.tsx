@@ -170,18 +170,20 @@ export const useEscrow = (): UseEscrowReturn => {
         }
 
         // Step 4: Create escrow record in database (payment already made to platform wallet)
-        // For x402, the escrow is the platform wallet, and payment is already there
-        // Set escrow_account to platform wallet address so release payment can find it
-        const { PLATFORM_WALLET } = await import('@/lib/solana');
+        // For x402, the escrow is the Base platform wallet, and payment is already there
+        // Store both Solana address (for user identification) and EVM address (for Base payment)
+        const { getBasePlatformWalletAddress } = await import('@/lib/x402-payment-base');
+        const basePlatformWallet = getBasePlatformWalletAddress();
+        
         const escrowData = {
           project_id: projectId,
-          client_wallet: clientWallet.toString(),
+          client_wallet: clientWallet.toString(), // Store Solana address for user identification
           amount_usdc: finalAmount, // x402 uses USDC
           platform_fee: platformFee,
           total_locked: totalLocked,
           transaction_signature: transactionSignature,
-          payment_currency: 'USDC', // x402 uses USDC
-          escrow_account: PLATFORM_WALLET.toString(), // Platform wallet is the escrow for x402
+          payment_currency: 'X402', // Mark as x402 payment
+          escrow_account: basePlatformWallet, // Base platform wallet is the escrow for x402
           status: 'funded' as const,
           funded_at: new Date().toISOString(),
         };
