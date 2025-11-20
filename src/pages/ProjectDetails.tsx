@@ -749,14 +749,25 @@ const ProjectDetails = () => {
                         >
                           {escrow.transaction_signature}
                         </div>
-                        <a 
-                          href={`https://solscan.io/tx/${escrow.transaction_signature}${import.meta.env.MODE === 'production' ? '?cluster=mainnet-beta' : '?cluster=devnet'}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-web3-primary hover:underline mt-1 inline-block"
-                        >
-                          View on Solscan →
-                        </a>
+                        {(() => {
+                          const paymentCurrency = escrow.payment_currency || 'SOLANA';
+                          const isBaseNetwork = paymentCurrency === 'X402' || paymentCurrency === 'USDC';
+                          const explorerUrl = isBaseNetwork
+                            ? `https://basescan.org/tx/${escrow.transaction_signature}`
+                            : `https://solscan.io/tx/${escrow.transaction_signature}${import.meta.env.MODE === 'production' ? '?cluster=mainnet-beta' : '?cluster=devnet'}`;
+                          const explorerName = isBaseNetwork ? 'Basescan' : 'Solscan';
+                          
+                          return (
+                            <a 
+                              href={explorerUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-web3-primary hover:underline mt-1 inline-block"
+                            >
+                              View on {explorerName} →
+                            </a>
+                          );
+                        })()}
                       </div>
                     )}
                   </CardContent>
