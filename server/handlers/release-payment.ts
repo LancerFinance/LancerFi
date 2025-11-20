@@ -93,15 +93,23 @@ export async function releasePaymentHandler(
         
         // Try to get freelancer profile to check for EVM address
         if (project.freelancer_id) {
-          const { data: freelancerProfile } = await supabaseClient
+          const { data: freelancerProfile, error: profileError } = await supabaseClient
             .from('profiles')
             .select('wallet_address, evm_address')
             .eq('id', project.freelancer_id)
-            .single();
+            .maybeSingle();
+          
+          if (profileError) {
+            console.error('Error fetching freelancer profile:', profileError);
+            return res.status(500).json({
+              error: `Database error while fetching freelancer profile: ${profileError.message}`
+            });
+          }
           
           if (!freelancerProfile) {
+            console.error(`Freelancer profile not found for freelancer_id: ${project.freelancer_id}`);
             return res.status(400).json({
-              error: 'Freelancer profile not found. The freelancer must have a profile in the system. Please contact the freelancer to ensure their profile is set up correctly.'
+              error: `Freelancer profile not found (ID: ${project.freelancer_id}). The freelancer must have a profile in the system. Please contact the freelancer to ensure their profile is set up correctly.`
             });
           }
           
@@ -132,11 +140,25 @@ export async function releasePaymentHandler(
       } else {
         // Freelancer wallet is already EVM format - verify it matches project freelancer
         if (project.freelancer_id) {
-          const { data: freelancerProfile } = await supabaseClient
+          const { data: freelancerProfile, error: profileError } = await supabaseClient
             .from('profiles')
             .select('wallet_address, evm_address')
             .eq('id', project.freelancer_id)
-            .single();
+            .maybeSingle();
+          
+          if (profileError) {
+            console.error('Error fetching freelancer profile:', profileError);
+            return res.status(500).json({
+              error: `Database error while fetching freelancer profile: ${profileError.message}`
+            });
+          }
+          
+          if (!freelancerProfile) {
+            console.error(`Freelancer profile not found for freelancer_id: ${project.freelancer_id}`);
+            return res.status(400).json({
+              error: `Freelancer profile not found (ID: ${project.freelancer_id}). The freelancer must have a profile in the system.`
+            });
+          }
           
           // For X402, check if EVM address matches (either in evm_address field or wallet_address if it's EVM)
           const profileEVMAddress = freelancerProfile?.evm_address || 
