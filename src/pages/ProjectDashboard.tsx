@@ -401,7 +401,7 @@ const ProjectDashboard = () => {
                 <Wrench className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                 <span className="hidden sm:inline">Working On</span>
                 <span className="sm:hidden">Working</span>
-                <span className="ml-0.5">({workingProjects.length})</span>
+                <span className="ml-0.5">({activeWorkingProjects.length})</span>
               </TabsTrigger>
               <TabsTrigger value="completed" className="flex items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs md:text-sm px-2 sm:px-4 py-2 flex-1 sm:flex-initial whitespace-nowrap">
                 <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
