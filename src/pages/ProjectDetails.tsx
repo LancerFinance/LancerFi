@@ -127,25 +127,13 @@ const ProjectDetails = () => {
             
             // For X402 projects, automatically capture freelancer's EVM address if they're viewing
             // Phantom connects to Solana by default, but we need to access Base (EVM) separately
-            console.log('🔍 Checking X402 EVM address capture:', {
-              hasEscrow: !!escrowData,
-              paymentCurrency: escrowData?.payment_currency,
-              hasFreelancerId: !!projectData.freelancer_id,
-              currentAddress: address,
-              freelancerWallet: freelancerData?.wallet_address,
-              escrowFreelancerWallet: escrowData?.freelancer_wallet
-            });
-            
             const isFreelancerViewing = address && projectData.freelancer_id && freelancerData?.wallet_address === address;
-            console.log('🔍 Is freelancer viewing?', isFreelancerViewing);
             
             if (escrowData && escrowData.payment_currency === 'X402' && 
                 projectData.freelancer_id && 
                 isFreelancerViewing && 
                 address &&
                 (!escrowData.freelancer_wallet || !escrowData.freelancer_wallet.startsWith('0x'))) {
-              console.log('✅ Conditions met! Attempting to capture Base wallet address...');
-              
               // Show a toast first to inform the user
               toast({
                 title: "Base Wallet Connection Needed",
@@ -154,32 +142,22 @@ const ProjectDetails = () => {
               });
               
               try {
-                console.log('🔍 Getting Ethereum provider...');
                 // Get Ethereum provider from Phantom (Phantom supports both Solana and EVM)
                 const w: any = window as any;
                 let ethereumProvider = w.ethereum;
                 const ph = w.solana;
-                
-                console.log('🔍 Provider check:', {
-                  hasWindowEthereum: !!w.ethereum,
-                  hasPhantom: !!ph?.isPhantom,
-                  hasPhantomEthereum: !!(ph as any)?.ethereum
-                });
                 
                 // Phantom exposes EVM provider via window.solana.ethereum or window.ethereum
                 if (ph?.isPhantom) {
                   // Try Phantom's ethereum provider first
                   if ((ph as any).ethereum) {
                     ethereumProvider = (ph as any).ethereum;
-                    console.log('✅ Using Phantom ethereum provider');
                   } else if (w.ethereum) {
                     ethereumProvider = w.ethereum;
-                    console.log('✅ Using window.ethereum');
                   }
                 }
                 
                 if (!ethereumProvider) {
-                  console.error('❌ No Ethereum provider found');
                   toast({
                     title: "Base Wallet Not Available",
                     description: "Please enable EVM support in Phantom settings to receive X402 payments.",
@@ -188,22 +166,18 @@ const ProjectDetails = () => {
                   return;
                 }
                 
-                console.log('✅ Ethereum provider found, creating BrowserProvider...');
                 const { ethers } = await import('ethers');
                 const provider = new ethers.BrowserProvider(ethereumProvider);
                 
                 // ACTIVELY REQUEST Base wallet accounts - this will show Phantom popup
                 // This is separate from Solana connection - Phantom handles both networks
-                console.log('🔍 Requesting Base wallet accounts (this should show Phantom popup)...');
                 let accounts: string[] = [];
                 try {
                   accounts = await provider.send('eth_requestAccounts', []);
-                  console.log('✅ Accounts received:', accounts);
                   if (!accounts || accounts.length === 0) {
                     throw new Error('No accounts returned');
                   }
                 } catch (requestError: any) {
-                  console.error('❌ User rejected or failed Base wallet connection:', requestError);
                   toast({
                     title: "Base Wallet Connection Required",
                     description: "Please approve the Base wallet connection to receive X402 payments. Your Base address will be saved automatically.",
@@ -229,7 +203,6 @@ const ProjectDetails = () => {
                     await provider.send('wallet_switchEthereumChain', [{ chainId: `0x${BASE_CHAIN_ID.toString(16)}` }]);
                   } else if (switchError.code !== 4902) {
                     // User rejected network switch
-                    console.warn('User rejected Base network switch:', switchError);
                     return;
                   }
                 }
@@ -243,7 +216,6 @@ const ProjectDetails = () => {
                 
                 // Store EVM address in escrow
                 await db.updateEscrow(escrowData.id, { freelancer_wallet: evmAddress });
-                console.log(`✅ Captured freelancer EVM address: ${evmAddress}`);
                 
                 toast({
                   title: "Base Address Saved!",
@@ -475,13 +447,6 @@ const ProjectDetails = () => {
         const evmAddress = (escrow.payment_currency === 'X402' && escrow.freelancer_wallet?.startsWith('0x')) 
           ? escrow.freelancer_wallet 
           : undefined;
-        
-        console.log('🔍 Releasing payment:', {
-          escrowId: escrow.id,
-          freelancerWallet: freelancer.wallet_address,
-          evmAddress: evmAddress,
-          paymentCurrency: escrow.payment_currency
-        });
         
         paymentReleased = await releasePaymentToFreelancer(
           escrow.id,
