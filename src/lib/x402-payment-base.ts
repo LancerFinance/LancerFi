@@ -167,7 +167,7 @@ export async function processX402Payment(
   if (balance < amountInWei) {
     // Convert balance BigInt to number for display
     const balanceNumber = Number(ethers.formatUnits(balance, decimals));
-    throw new Error(`Insufficient USDC balance. Required: ${amount} USDC, Available: ${balanceNumber} USDC`);
+    throw new Error(`Insufficient USDC Base (x402) balance. Required: ${amount} USDC Base, Available: ${balanceNumber} USDC Base`);
   }
 
   // Create transfer transaction
@@ -190,7 +190,7 @@ export async function processX402Payment(
       throw new Error('Transaction was cancelled by user');
     }
     if (error.message?.includes('insufficient funds') || error.message?.includes('not enough')) {
-      throw new Error('Insufficient USDC or ETH for transaction fees. Please ensure you have enough USDC and ETH in your wallet.');
+      throw new Error('Insufficient USDC Base (x402) or ETH for transaction fees. Please ensure you have enough USDC Base and ETH in your wallet.');
     }
     
     throw new Error(`Transaction failed: ${error.message || 'Unknown error'}`);

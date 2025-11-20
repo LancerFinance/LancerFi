@@ -406,9 +406,10 @@ const PostProject = () => {
       if (paymentCurrency === 'X402' || paymentCurrency === 'USDC') {
         if (usdcBalance !== null && usdcBalance < totalRequired) {
           setIsCheckingBalance(false);
+          const currencyName = paymentCurrency === 'X402' ? 'USDC Base (x402)' : 'USDC';
           toast({
-            title: "Insufficient USDC",
-            description: `You need at least ${formatUSDC(totalRequired)} USDC to post this project (${formatUSDC(budgetAmount)} + ${formatUSDC(platformFee)} platform fee). You currently have ${formatUSDC(usdcBalance)} USDC. Please add more USDC to your wallet.`,
+            title: `Insufficient ${currencyName}`,
+            description: `You need at least ${formatUSDC(totalRequired)} ${currencyName} to post this project (${formatUSDC(budgetAmount)} + ${formatUSDC(platformFee)} platform fee). You currently have ${formatUSDC(usdcBalance)} ${currencyName}. Please add more ${currencyName} to your wallet.`,
             variant: "destructive",
           });
           return;
