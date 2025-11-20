@@ -27,7 +27,9 @@ const HireTalent = () => {
     try {
       // Use getPublicProfiles to exclude muted/banned users
       const profiles = await db.getPublicProfiles();
-      const filteredProfiles = (profiles || []).filter(p => p.skills && p.skills.length > 0)
+      // Show all profiles that have at least a wallet_address (skills are optional)
+      const filteredProfiles = (profiles || [])
+        .filter(p => p.wallet_address) // Only require wallet_address
         .sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
       const freelancerList = filteredProfiles;
