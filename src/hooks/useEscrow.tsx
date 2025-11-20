@@ -110,23 +110,40 @@ export const useEscrow = (): UseEscrowReturn => {
           status: 'pending' as const, // Start as pending, update to funded after payment
         };
         
+        console.log('Creating x402 escrow with data:', {
+          projectId,
+          client_wallet: solAddress,
+          amount_usdc: finalAmount,
+          platform_fee: platformFee,
+          total_locked: totalLocked,
+          payment_currency: 'X402',
+          escrow_account: basePlatformWallet,
+          status: 'pending'
+        });
+        
         let escrow;
         try {
           escrow = await db.createEscrow(pendingEscrowData);
+          console.log('Escrow created successfully:', escrow);
           if (!escrow) {
             throw new Error('Failed to create escrow record - no data returned');
           }
         } catch (escrowCreateError: any) {
-          console.error('Escrow creation error details:', {
+          console.error('❌ ESCROW CREATION FAILED - Full error details:', {
             error: escrowCreateError,
-            message: escrowCreateError.message,
-            details: escrowCreateError.details,
-            hint: escrowCreateError.hint,
-            code: escrowCreateError.code,
-            escrowData: pendingEscrowData
+            errorString: String(escrowCreateError),
+            errorJSON: JSON.stringify(escrowCreateError, Object.getOwnPropertyNames(escrowCreateError)),
+            message: escrowCreateError?.message,
+            details: escrowCreateError?.details,
+            hint: escrowCreateError?.hint,
+            code: escrowCreateError?.code,
+            name: escrowCreateError?.name,
+            stack: escrowCreateError?.stack,
+            escrowData: pendingEscrowData,
+            escrowDataString: JSON.stringify(pendingEscrowData, null, 2)
           });
           setIsLoading(false);
-          throw new Error(`Failed to create escrow record: ${escrowCreateError.message || escrowCreateError.details || 'Unknown error'}`);
+          throw new Error(`Failed to create escrow record: ${escrowCreateError?.message || escrowCreateError?.details || escrowCreateError?.hint || 'Unknown error'}`);
         }
 
         // Step 1: Request payment challenge from backend (HTTP 402) using EVM address
