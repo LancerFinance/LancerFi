@@ -101,7 +101,7 @@ export async function releasePaymentHandler(
           
           if (!freelancerProfile) {
             return res.status(400).json({
-              error: 'Freelancer profile not found'
+              error: 'Freelancer profile not found. The freelancer must have a profile in the system. Please contact the freelancer to ensure their profile is set up correctly.'
             });
           }
           
