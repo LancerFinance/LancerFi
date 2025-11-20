@@ -838,23 +838,31 @@ const ProjectDetails = () => {
                         <Avatar>
                           <AvatarImage src="" />
                           <AvatarFallback>
-                            {freelancer.full_name?.split(' ').map(n => n[0]).join('') || 'FL'}
+                            {freelancer.full_name?.split(' ').map(n => n[0]).join('') || 'A'}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="font-medium">
-                            {freelancer.full_name || freelancer.username}
+                            {freelancer.full_name || freelancer.username || 'Anonymous'}
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {freelancer.hourly_rate ? `$${freelancer.hourly_rate}/hr` : project ? `Fixed price: ${formatUSDC(project.budget_usdc)}` : 'Rate not set'}
-                          </div>
+                          {freelancer.full_name || freelancer.username ? (
+                            <div className="text-sm text-muted-foreground">
+                              {freelancer.hourly_rate ? `$${freelancer.hourly_rate}/hr` : project ? `Fixed price: ${formatUSDC(project.budget_usdc)}` : 'Rate not set'}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-muted-foreground">
+                              Profile not set up
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <Link to={`/freelancer/${freelancer.id}`} className="block mt-4">
-                        <Button variant="outline" size="sm" className="w-full">
-                          View Profile
-                        </Button>
-                      </Link>
+                      {(freelancer.full_name || freelancer.username) && (
+                        <Link to={`/freelancer/${freelancer.id}`} className="block mt-4">
+                          <Button variant="outline" size="sm" className="w-full">
+                            View Profile
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

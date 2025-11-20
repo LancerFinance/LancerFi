@@ -206,6 +206,17 @@ const SubmitProposal = () => {
       return;
     }
 
+    // Validate profile has required fields
+    if (!profile.full_name && !profile.username) {
+      toast({
+        title: "Profile Incomplete",
+        description: "Please complete your freelancer profile (name and username required) before submitting proposals",
+        variant: "destructive",
+      });
+      navigate('/create-profile');
+      return;
+    }
+
     if (!validateForm()) {
       toast({
         title: "Validation Error",
