@@ -244,6 +244,22 @@ const ViewProposals = () => {
         budget_usdc: proposal.proposed_budget // Update budget to accepted proposal amount
       });
 
+      // For X402 projects, try to get freelancer's EVM address from escrow transaction
+      // The escrow was funded by the client, but we can check if there's a way to get freelancer's address
+      // Actually, we can't get it here since the freelancer isn't connected
+      // Instead, we'll capture it when they submit work or view the project
+      // But let's also check if escrow exists and try to get it from the transaction
+      try {
+        const escrow = await db.getEscrow(id);
+        if (escrow && escrow.payment_currency === 'X402' && escrow.transaction_signature) {
+          // Try to extract freelancer EVM address from transaction logs
+          // Actually, the transaction is from client to platform, not freelancer
+          // So we can't get it from here - we'll need to capture it when freelancer interacts
+        }
+      } catch (escrowError) {
+        // Escrow might not exist yet
+      }
+
       // Send notification message to freelancer
       try {
         if (proposal.freelancer?.wallet_address && project && address) {

@@ -358,20 +358,9 @@ const ProjectDetails = () => {
         return;
       }
 
-      // For X402 payments, check if we need EVM address
-      // First check if it's already stored in escrow (captured automatically)
-      if (escrow.payment_currency === 'X402' && !freelancer.wallet_address.startsWith('0x')) {
-        // Check if EVM address is stored in escrow
-        if (escrow.freelancer_wallet && escrow.freelancer_wallet.startsWith('0x') && escrow.freelancer_wallet.length === 42) {
-          // EVM address is already stored - use it automatically
-          // Continue with payment release
-        } else {
-          // EVM address not stored - show dialog to get it
-          setShowEVMDialog(true);
-          setCompleting(false);
-          return; // Will continue after dialog is submitted
-        }
-      }
+      // For X402 payments, the backend will automatically use the stored EVM address
+      // from escrow.freelancer_wallet if it exists (captured when freelancer views/submits work)
+      // No need to check here - just proceed with payment release
 
       // Release payment to freelancer first (this sends actual funds)
       let paymentReleased = false;
