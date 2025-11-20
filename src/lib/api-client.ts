@@ -38,7 +38,8 @@ export async function releasePaymentToFreelancer(
   escrowId: string,
   freelancerWallet: string,
   walletAddress: string,
-  signMessage: (message: string) => Promise<{ signature: Uint8Array }>
+  signMessage: (message: string) => Promise<{ signature: Uint8Array | string }>,
+  isX402?: boolean
 ): Promise<string> {
   try {
     // Generate challenge message
@@ -46,7 +47,7 @@ export async function releasePaymentToFreelancer(
     
     // Sign message with wallet
     // If user cancels, this will throw/reject and we catch it below
-    let signature: Uint8Array;
+    let signature: Uint8Array | string;
     try {
       const result = await signMessage(message);
       signature = result.signature;
@@ -62,8 +63,16 @@ export async function releasePaymentToFreelancer(
       throw signError; // Re-throw other errors
     }
     
-    // Convert signature to base64 for transmission
-    const signatureBase64 = Buffer.from(signature).toString('base64');
+    // For EVM signatures (X402), signature is already a hex string
+    // For Solana signatures, convert Uint8Array to base64
+    let signatureBase64: string;
+    if (typeof signature === 'string') {
+      // EVM signature (hex string) - convert to base64 for transmission
+      signatureBase64 = Buffer.from(signature.startsWith('0x') ? signature.slice(2) : signature, 'hex').toString('base64');
+    } else {
+      // Solana signature (Uint8Array) - convert to base64
+      signatureBase64 = Buffer.from(signature).toString('base64');
+    }
     
     // Call backend API
     const response = await fetch(`${API_BASE_URL}/api/payment/release`, {
@@ -76,7 +85,8 @@ export async function releasePaymentToFreelancer(
         freelancerWallet,
         walletAddress,
         signature: signatureBase64,
-        message
+        message,
+        isX402: isX402 || false
       }),
     });
 

@@ -705,22 +705,21 @@ export const useEscrow = (): UseEscrowReturn => {
         const evmAddress = await signer.getAddress();
         
         // Create EVM signer function that will be called by releasePaymentAPI
-        const evmSignMessage = async (message: string): Promise<{ signature: Uint8Array }> => {
+        const evmSignMessage = async (message: string): Promise<{ signature: string }> => {
           // Sign message with EVM (this will show Base network in the popup)
-          const evmSignature = await signer.signMessage(message);
           // ethers.js signMessage returns a hex string (0x...)
-          // Convert hex string to Uint8Array for compatibility with API
-          const hexString = evmSignature.startsWith('0x') ? evmSignature.slice(2) : evmSignature;
-          const signatureBytes = new Uint8Array(hexString.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-          return { signature: signatureBytes };
+          const evmSignature = await signer.signMessage(message);
+          // Return as string (hex format) - API client will handle conversion
+          return { signature: evmSignature };
         };
         
-        // Call backend API with EVM signature
+        // Call backend API with EVM signature and isX402 flag
         signature = await releasePaymentAPI(
           escrowId,
           freelancerWallet,
           evmAddress,
-          evmSignMessage
+          evmSignMessage,
+          true // isX402 = true
         );
       } else {
         // Use Solana signature for SOLANA/USDC payments

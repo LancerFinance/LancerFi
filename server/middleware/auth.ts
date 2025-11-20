@@ -4,11 +4,13 @@ import nacl from 'tweetnacl';
 
 interface AuthenticatedRequest extends Request {
   walletAddress?: string;
+  isX402Payment?: boolean;
 }
 
 /**
  * Verify wallet signature authentication
  * Client must sign a message with their wallet to prove ownership
+ * Supports both Solana (nacl) and EVM (ethers) signatures
  */
 export async function verifyWalletSignature(
   req: AuthenticatedRequest,
@@ -16,7 +18,7 @@ export async function verifyWalletSignature(
   next: NextFunction
 ) {
   try {
-    const { walletAddress, signature, message } = req.body;
+    const { walletAddress, signature, message, isX402 } = req.body;
 
     if (!walletAddress || !signature || !message) {
       return res.status(400).json({
@@ -24,6 +26,45 @@ export async function verifyWalletSignature(
       });
     }
 
+    // Check if this is an X402 payment (EVM signature) or Solana payment
+    const isEVM = isX402 === true || (walletAddress && walletAddress.startsWith('0x') && walletAddress.length === 42);
+    
+    if (isEVM) {
+      // Verify EVM signature (Base network for X402)
+      try {
+        const { ethers } = await import('ethers');
+        
+        // Recover the signer address from the signature
+        const messageToVerify = message;
+        // Signature is base64 encoded, convert back to hex
+        const signatureBuffer = Buffer.from(signature, 'base64');
+        const signatureHex = signatureBuffer.toString('hex');
+        const fullSignature = '0x' + signatureHex;
+        
+        // Recover the address that signed the message
+        const recoveredAddress = ethers.verifyMessage(messageToVerify, fullSignature);
+        
+        // Compare addresses (case-insensitive)
+        if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+          return res.status(401).json({
+            error: 'Invalid EVM wallet signature. Authentication failed.'
+          });
+        }
+        
+        // Mark as X402 payment for handler
+        req.isX402Payment = true;
+        req.walletAddress = walletAddress;
+        next();
+        return;
+      } catch (evmError: any) {
+        console.error('EVM signature verification failed:', evmError.message);
+        return res.status(401).json({
+          error: 'EVM signature verification failed. Authentication failed.'
+        });
+      }
+    }
+
+    // Solana signature verification (original code)
     // CRITICAL: The message must match EXACTLY what Phantom signed
     // Phantom signs the message with newlines, so we need to preserve them
     // If the message doesn't have newlines but should (based on the challenge format),
@@ -64,6 +105,7 @@ export async function verifyWalletSignature(
 
     // Attach wallet address to request for use in handlers
     req.walletAddress = walletAddress;
+    req.isX402Payment = false;
     next();
   } catch (error) {
     return res.status(401).json({
