@@ -199,7 +199,15 @@ export const useEscrow = (): UseEscrowReturn => {
 
         } catch (escrowCreateError: any) {
           // Handle escrow creation error
-          throw new Error(`Failed to create escrow record: ${escrowCreateError.message || 'Unknown error'}`);
+          console.error('Escrow creation error details:', {
+            error: escrowCreateError,
+            message: escrowCreateError.message,
+            details: escrowCreateError.details,
+            hint: escrowCreateError.hint,
+            code: escrowCreateError.code,
+            escrowData: escrowData
+          });
+          throw new Error(`Failed to create escrow record: ${escrowCreateError.message || escrowCreateError.details || 'Unknown error'}`);
         }
 
         toast({
