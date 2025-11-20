@@ -24,12 +24,13 @@ router.post('/payment-required', async (req, res) => {
 
     // x402 Payment Required response
     // According to x402 protocol, we respond with HTTP 402 and payment details
+    // Using Base network with Base USDC
     res.status(402).json({
       amount: totalAmount.toString(),
       currency: 'USDC',
       recipient: platformWallet,
-      network: 'solana',
-      mint: USDC_MINT.toString(),
+      network: 'base',
+      mint: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // Base USDC contract address
       projectId: projectId,
       clientWallet: clientWallet,
       platformFee: platformFee.toString(),

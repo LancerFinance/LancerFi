@@ -1,7 +1,6 @@
-import { PublicKey, Transaction } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
-import { USDC_MINT, connection, getAccountBalanceViaProxy } from './solana';
-import { getLatestBlockhashWithFallback } from './solana';
+// x402 payment now uses Base network with Base USDC
+// Re-export from base implementation
+export * from './x402-payment-base';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.PROD ? 'https://server-sepia-alpha-52.vercel.app' : 'http://localhost:3001');

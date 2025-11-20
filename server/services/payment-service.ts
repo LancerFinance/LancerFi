@@ -216,7 +216,7 @@ export async function releasePaymentFromPlatform(
 }
 
 /**
- * Verify x402 payment transaction on Solana
+ * Verify x402 payment transaction on Base network
  * Checks if a transaction sent USDC to the platform wallet
  */
 export async function verifyX402Payment(
@@ -225,18 +225,26 @@ export async function verifyX402Payment(
   expectedAmount: number
 ): Promise<{ verified: boolean; amount?: number; error?: string }> {
   try {
-    // First, check transaction status (faster than getTransaction)
+    const { ethers } = await import('ethers');
+    
+    // Base network configuration
+    const BASE_RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+    const BASE_USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+    const platformWallet = getPlatformWalletAddress();
+    
+    // Create provider for Base network
+    const provider = new ethers.JsonRpcProvider(BASE_RPC_URL);
+    
     // Retry with exponential backoff if transaction not found yet
-    let transaction = null;
+    let receipt = null;
     let retries = 0;
     const maxRetries = 5;
     
-    while (!transaction && retries < maxRetries) {
+    while (!receipt && retries < maxRetries) {
       try {
-        // Try getSignatureStatus first (faster)
-        const statusResult = await connection.getSignatureStatus(transactionSignature);
+        receipt = await provider.getTransactionReceipt(transactionSignature);
         
-        if (!statusResult || !statusResult.value) {
+        if (!receipt) {
           // Transaction not found yet - wait and retry
           if (retries < maxRetries - 1) {
             await new Promise(resolve => setTimeout(resolve, 1000 * (retries + 1))); // Exponential backoff: 1s, 2s, 3s, 4s
@@ -245,52 +253,11 @@ export async function verifyX402Payment(
           }
           return {
             verified: false,
-            error: 'Transaction not found on Solana network after multiple attempts'
+            error: 'Transaction not found on Base network after multiple attempts'
           };
-        }
-        
-        // Check if transaction has errors
-        if (statusResult.value.err) {
-          return {
-            verified: false,
-            error: `Transaction failed: ${statusResult.value.err.toString()}`
-          };
-        }
-        
-        // Transaction exists and has no errors - now get full transaction details
-        transaction = await connection.getTransaction(transactionSignature, {
-          commitment: 'confirmed',
-          maxSupportedTransactionVersion: 0
-        });
-        
-        if (!transaction) {
-          // If we can't get transaction but status shows success, still verify using status
-          // This is a fallback for when getTransaction fails but status is confirmed
-          if (statusResult.value.confirmationStatus === 'confirmed' || statusResult.value.confirmationStatus === 'finalized') {
-            // We'll verify using a different method - check balance changes via RPC
-            // For now, if status is confirmed and no error, we'll trust it
-            // But we still need to verify the amount, so we'll try to get transaction one more time
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            transaction = await connection.getTransaction(transactionSignature, {
-              commitment: 'confirmed',
-              maxSupportedTransactionVersion: 0
-            });
-            
-            if (!transaction) {
-              return {
-                verified: false,
-                error: 'Transaction confirmed but could not retrieve details for amount verification'
-              };
-            }
-          } else {
-            return {
-              verified: false,
-              error: 'Transaction not found on Solana network'
-            };
-          }
         }
       } catch (statusError: any) {
-        // If status check fails, try getTransaction directly
+        // If status check fails, retry
         if (retries < maxRetries - 1) {
           await new Promise(resolve => setTimeout(resolve, 1000 * (retries + 1)));
           retries++;
@@ -300,80 +267,106 @@ export async function verifyX402Payment(
       }
     }
 
-    // Check if transaction has errors (double-check)
-    if (!transaction) {
+    // Check if transaction has errors
+    if (!receipt) {
       return {
         verified: false,
-        error: 'Transaction is null'
+        error: 'Transaction receipt is null'
       };
     }
     
-    if (transaction.meta?.err) {
+    if (receipt.status !== 1) {
       return {
         verified: false,
-        error: `Transaction failed: ${JSON.stringify(transaction.meta.err)}`
+        error: `Transaction failed with status: ${receipt.status}`
       };
     }
 
-    // Get platform wallet address
-    const platformKeypair = getPlatformKeypair();
-    const platformWallet = platformKeypair.publicKey;
-
-    // Check if transaction fee payer matches expected sender
-    // For VersionedTransaction, use getAccountKeys() method
-    const accountKeys = transaction.transaction.message.getAccountKeys();
-    const feePayer = accountKeys.get(0);
-    if (!feePayer || feePayer.toString() !== expectedSender) {
+    // Get transaction details
+    const tx = await provider.getTransaction(transactionSignature);
+    if (!tx) {
       return {
         verified: false,
-        error: `Transaction fee payer (${feePayer?.toString() || 'unknown'}) does not match expected sender (${expectedSender})`
+        error: 'Transaction not found'
       };
     }
 
-    // Check token transfers in the transaction
-    const preBalances = transaction.meta?.preTokenBalances || [];
-    const postBalances = transaction.meta?.postTokenBalances || [];
+    // Check if transaction from matches expected sender
+    if (tx.from.toLowerCase() !== expectedSender.toLowerCase()) {
+      return {
+        verified: false,
+        error: `Transaction from address (${tx.from}) does not match expected sender (${expectedSender})`
+      };
+    }
 
-    // Find USDC transfers to platform wallet
-    let totalUSDCReceived = 0;
-    const expectedMicroUSDC = Math.round(expectedAmount * Math.pow(10, 6)); // USDC has 6 decimals
+    // Check if transaction is to USDC contract
+    if (tx.to?.toLowerCase() !== BASE_USDC_ADDRESS.toLowerCase()) {
+      return {
+        verified: false,
+        error: `Transaction is not to USDC contract. Expected: ${BASE_USDC_ADDRESS}, Got: ${tx.to}`
+      };
+    }
 
-    // Check post-token balances for platform wallet
-    for (const balance of postBalances) {
-      if (balance.owner === platformWallet.toString() && balance.mint === USDC_MINT.toString()) {
-        const postAmount = BigInt(balance.uiTokenAmount.amount);
+    // Parse transfer event from logs
+    // ERC20 Transfer event: Transfer(address indexed from, address indexed to, uint256 value)
+    const transferEventSignature = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    const platformWalletLower = platformWallet.toLowerCase();
+    
+    let totalUSDCReceived = BigInt(0);
+    const expectedMicroUSDC = BigInt(Math.round(expectedAmount * Math.pow(10, 6))); // USDC has 6 decimals
+    
+    // Check all Transfer events in the transaction
+    for (const log of receipt.logs) {
+      if (log.address.toLowerCase() === BASE_USDC_ADDRESS.toLowerCase() && 
+          log.topics[0] === transferEventSignature) {
+        // Parse Transfer event
+        // topics[0] = event signature
+        // topics[1] = from address (indexed)
+        // topics[2] = to address (indexed)
+        // data = amount
         
-        // Find corresponding pre-balance
-        const preBalance = preBalances.find(
-          b => b.owner === platformWallet.toString() && b.mint === USDC_MINT.toString()
-        );
-        const preAmount = preBalance ? BigInt(preBalance.uiTokenAmount.amount) : BigInt(0);
-        
-        const received = postAmount - preAmount;
-        if (received > 0) {
-          totalUSDCReceived += Number(received);
+        if (log.topics.length >= 3) {
+          const fromAddress = '0x' + log.topics[1].slice(-40);
+          const toAddress = '0x' + log.topics[2].slice(-40);
+          
+          // Check if this is a transfer TO the platform wallet
+          if (toAddress.toLowerCase() === platformWalletLower) {
+            const amount = BigInt(log.data);
+            totalUSDCReceived += amount;
+          }
         }
       }
     }
 
     // Verify amount matches (allow small tolerance for rounding)
-    const tolerance = 1000; // 0.001 USDC tolerance
-    if (Math.abs(totalUSDCReceived - expectedMicroUSDC) > tolerance) {
+    const tolerance = BigInt(1000); // 0.001 USDC tolerance
+    const difference = totalUSDCReceived > expectedMicroUSDC 
+      ? totalUSDCReceived - expectedMicroUSDC 
+      : expectedMicroUSDC - totalUSDCReceived;
+    
+    if (difference > tolerance) {
       return {
         verified: false,
         error: `Payment amount mismatch. Expected: ${expectedMicroUSDC} micro-USDC, Received: ${totalUSDCReceived} micro-USDC`
       };
     }
 
+    if (totalUSDCReceived === BigInt(0)) {
+      return {
+        verified: false,
+        error: 'No USDC transfer found to platform wallet in this transaction'
+      };
+    }
+
     return {
       verified: true,
-      amount: totalUSDCReceived / Math.pow(10, 6) // Convert back to USDC
+      amount: Number(totalUSDCReceived) / Math.pow(10, 6) // Convert back to USDC
     };
   } catch (error: any) {
-    console.error('Error verifying x402 payment:', error);
+    console.error('Error verifying x402 payment on Base:', error);
     return {
       verified: false,
-      error: error.message || 'Failed to verify payment transaction'
+      error: error.message || 'Failed to verify payment transaction on Base network'
     };
   }
 }
