@@ -90,7 +90,7 @@ export async function releasePaymentHandler(
       if (!freelancerWallet.startsWith('0x') || freelancerWallet.length !== 42) {
         // Check if EVM address was provided in the request body
         if (freelancerEVMAddress && freelancerEVMAddress.startsWith('0x') && freelancerEVMAddress.length === 42) {
-          // Use the provided EVM address from request - already set above
+          // Use the provided EVM address from request
         } else {
           // Try to get freelancer profile to verify Solana address
           if (project.freelancer_id) {
