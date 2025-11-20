@@ -260,15 +260,8 @@ const ProjectDetails = () => {
         }
       }
 
-      // Load freelancer profile by ID
-      let freelancerData: Profile | null = null;
-      if (projectData.freelancer_id) {
-        try {
-          freelancerData = await db.getProfile(projectData.freelancer_id);
-          setFreelancer(freelancerData);
-        } catch (error) {
-        }
-      } else {
+        // freelancerData already loaded above, just use it here
+        if (!projectData.freelancer_id) {
         // Load proposal count if no freelancer assigned
         // Apply the same filtering logic as ViewProposals to exclude old proposals from kicked-off freelancers
         try {
