@@ -230,6 +230,37 @@ const SubmitWorkDialog = ({
       // Get project details for notification
       const project = await db.getProject(projectId);
       if (project && submission) {
+        // For X402 projects, capture freelancer's EVM address when they submit work
+        if (project.payment_currency === 'X402') {
+          try {
+            const escrow = await db.getEscrow(projectId);
+            if (escrow && (!escrow.freelancer_wallet || !escrow.freelancer_wallet.startsWith('0x'))) {
+              // Get freelancer's EVM address from their connected wallet
+              const w: any = window as any;
+              let ethereumProvider = w.ethereum;
+              const ph = w.solana;
+              if (ph?.isPhantom && (ph as any).ethereum) {
+                ethereumProvider = (ph as any).ethereum;
+              } else if (!ethereumProvider && ph?.ethereum) {
+                ethereumProvider = ph.ethereum;
+              }
+              
+              if (ethereumProvider) {
+                const { ethers } = await import('ethers');
+                const provider = new ethers.BrowserProvider(ethereumProvider);
+                const signer = await provider.getSigner();
+                const evmAddress = await signer.getAddress();
+                
+                // Store EVM address in escrow
+                await db.updateEscrow(escrow.id, { freelancer_wallet: evmAddress });
+              }
+            }
+          } catch (evmError) {
+            // Silently fail - freelancer might not have EVM wallet connected
+            console.log('Could not capture freelancer EVM address:', evmError);
+          }
+        }
+        
         // Send notification to client
         await db.sendWorkSubmissionNotification(
           projectId,

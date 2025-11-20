@@ -35,10 +35,10 @@ export async function releasePaymentHandler(
       });
     }
 
-    // Get escrow from database
+    // Get escrow from database (include freelancer_wallet field)
     const { data: escrow, error: escrowError } = await supabaseClient
       .from('escrows')
-      .select('*, projects(client_id, status, freelancer_id)')
+      .select('*, projects(client_id, status, freelancer_id, payment_currency)')
       .eq('id', escrowId)
       .single();
 
