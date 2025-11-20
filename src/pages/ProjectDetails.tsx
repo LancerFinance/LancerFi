@@ -114,6 +114,42 @@ const ProjectDetails = () => {
             const escrowData = await db.getEscrow(id);
             setEscrow(escrowData);
             
+            // For X402 projects, automatically capture freelancer's EVM address if they're viewing
+            // and it's not already stored
+            const isFreelancerViewing = address && projectData.freelancer_id && freelancerData?.wallet_address === address;
+            if (escrowData.payment_currency === 'X402' && 
+                projectData.freelancer_id && 
+                isFreelancerViewing && 
+                address &&
+                (!escrowData.freelancer_wallet || !escrowData.freelancer_wallet.startsWith('0x'))) {
+              try {
+                // Get freelancer's EVM address from their connected wallet
+                const w: any = window as any;
+                let ethereumProvider = w.ethereum;
+                const ph = w.solana;
+                if (ph?.isPhantom && (ph as any).ethereum) {
+                  ethereumProvider = (ph as any).ethereum;
+                } else if (!ethereumProvider && ph?.ethereum) {
+                  ethereumProvider = ph.ethereum;
+                }
+                
+                if (ethereumProvider) {
+                  const { ethers } = await import('ethers');
+                  const provider = new ethers.BrowserProvider(ethereumProvider);
+                  const signer = await provider.getSigner();
+                  const evmAddress = await signer.getAddress();
+                  
+                  // Store EVM address in escrow
+                  await db.updateEscrow(escrowData.id, { freelancer_wallet: evmAddress });
+                  // Refresh escrow data
+                  const updatedEscrow = await db.getEscrow(id);
+                  setEscrow(updatedEscrow);
+                }
+              } catch (evmError) {
+                // Silently fail - freelancer might not have EVM wallet connected
+                console.log('Could not capture freelancer EVM address:', evmError);
+              }
+            }
             
             // Load SOL price if escrow was paid with SOL (or if payment_currency is not set, assume SOLANA for older escrows)
             const paymentCurrency = escrowData.payment_currency || 'SOLANA';
@@ -138,9 +174,10 @@ const ProjectDetails = () => {
       }
 
       // Load freelancer profile by ID
+      let freelancerData: Profile | null = null;
       if (projectData.freelancer_id) {
         try {
-          const freelancerData = await db.getProfile(projectData.freelancer_id);
+          freelancerData = await db.getProfile(projectData.freelancer_id);
           setFreelancer(freelancerData);
         } catch (error) {
         }
@@ -322,19 +359,32 @@ const ProjectDetails = () => {
       }
 
       // For X402 payments, check if we need EVM address
+      // First check if it's already stored in escrow (captured automatically)
       if (escrow.payment_currency === 'X402' && !freelancer.wallet_address.startsWith('0x')) {
-        // Show dialog to get EVM address
-        setShowEVMDialog(true);
-        setCompleting(false);
-        return; // Will continue after dialog is submitted
+        // Check if EVM address is stored in escrow
+        if (escrow.freelancer_wallet && escrow.freelancer_wallet.startsWith('0x') && escrow.freelancer_wallet.length === 42) {
+          // EVM address is already stored - use it automatically
+          // Continue with payment release
+        } else {
+          // EVM address not stored - show dialog to get it
+          setShowEVMDialog(true);
+          setCompleting(false);
+          return; // Will continue after dialog is submitted
+        }
       }
 
       // Release payment to freelancer first (this sends actual funds)
       let paymentReleased = false;
       try {
+        // For X402, use stored EVM address if available
+        const evmAddress = (escrow.payment_currency === 'X402' && escrow.freelancer_wallet?.startsWith('0x')) 
+          ? escrow.freelancer_wallet 
+          : undefined;
+        
         paymentReleased = await releasePaymentToFreelancer(
           escrow.id,
-          freelancer.wallet_address
+          freelancer.wallet_address,
+          evmAddress
         );
       } catch (e) {
         toast({
