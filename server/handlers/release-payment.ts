@@ -93,31 +93,9 @@ export async function releasePaymentHandler(
           // Use the provided EVM address from request body
           freelancerEVMAddressForRelease = freelancerEVMAddress;
         } else {
-          // Try to extract EVM address from escrow's transaction signature
-          // The escrow was funded on Base network, so we can get the sender's EVM address
-          let extractedEVMAddress: string | null = null;
-          
-          if (escrow.transaction_signature) {
-            try {
-              const { ethers } = await import('ethers');
-              const BASE_RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
-              const provider = new ethers.JsonRpcProvider(BASE_RPC_URL);
-              
-              // Get transaction details
-              const tx = await provider.getTransaction(escrow.transaction_signature);
-              if (tx && tx.from) {
-                extractedEVMAddress = tx.from;
-                console.log(`Extracted EVM address from escrow transaction: ${extractedEVMAddress}`);
-              }
-            } catch (extractError) {
-              console.error('Error extracting EVM address from transaction:', extractError);
-              // Continue to other methods
-            }
-          }
-          
-          if (extractedEVMAddress) {
-            freelancerEVMAddressForRelease = extractedEVMAddress;
-          } else {
+          // Note: The escrow transaction_signature is from the CLIENT funding the escrow,
+          // not the freelancer, so we can't extract the freelancer's EVM address from it.
+          // The freelancer's EVM address should be provided via the request body or dialog.
             // Try to get freelancer profile to verify Solana address
             if (project.freelancer_id) {
               const { data: freelancerProfile, error: profileError } = await supabaseClient
