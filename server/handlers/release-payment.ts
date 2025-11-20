@@ -84,14 +84,14 @@ export async function releasePaymentHandler(
     // For X402 payments, use Base network release (EVM)
     if (isX402) {
       // For X402, we need EVM address. Check if freelancer wallet is already EVM format
-      let freelancerEVMAddress: string;
+      let freelancerEVMAddressForRelease: string;
       
       // If freelancer wallet is Solana format, we need to get the EVM address
       if (!freelancerWallet.startsWith('0x') || freelancerWallet.length !== 42) {
         // Check if EVM address was provided in the request body
         if (freelancerEVMAddress && freelancerEVMAddress.startsWith('0x') && freelancerEVMAddress.length === 42) {
           // Use the provided EVM address from request body
-          freelancerEVMAddress = freelancerEVMAddress;
+          freelancerEVMAddressForRelease = freelancerEVMAddress;
         } else {
           // Try to get freelancer profile to verify Solana address
           if (project.freelancer_id) {
@@ -133,11 +133,11 @@ export async function releasePaymentHandler(
         }
       } else {
         // Freelancer wallet is already EVM format - use it directly
-        freelancerEVMAddress = freelancerWallet;
+        freelancerEVMAddressForRelease = freelancerWallet;
       }
       
       // Use the EVM address for payment release
-      const freelancerWalletForRelease = freelancerEVMAddress || freelancerWallet;
+      const freelancerWalletForRelease = freelancerEVMAddressForRelease || freelancerWallet;
       
       // Release X402 payment from Base platform wallet
       try {
