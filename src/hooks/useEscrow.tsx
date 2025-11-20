@@ -77,6 +77,7 @@ export const useEscrow = (): UseEscrowReturn => {
         const w: any = window as any;
         let ethereumProvider = w.ethereum;
         
+        const ph = w.solana;
         if (ph?.isPhantom && (ph as any).ethereum) {
           ethereumProvider = (ph as any).ethereum;
         } else if (!ethereumProvider && ph?.ethereum) {
@@ -93,6 +94,40 @@ export const useEscrow = (): UseEscrowReturn => {
         const provider = new ethers.BrowserProvider(ethereumProvider);
         const signer = await provider.getSigner();
         const evmAddress = await signer.getAddress();
+        
+        // Step 0: Create escrow record FIRST (status: 'pending') - same as SOL/USDC flow
+        const { getBasePlatformWalletAddress } = await import('@/lib/x402-payment-base');
+        const basePlatformWallet = getBasePlatformWalletAddress();
+        
+        const pendingEscrowData = {
+          project_id: projectId,
+          client_wallet: solAddress, // Store Solana address for user identification
+          amount_usdc: finalAmount, // x402 uses USDC
+          platform_fee: platformFee,
+          total_locked: totalLocked,
+          payment_currency: 'X402', // Mark as x402 payment
+          escrow_account: basePlatformWallet, // Base platform wallet is the escrow for x402
+          status: 'pending' as const, // Start as pending, update to funded after payment
+        };
+        
+        let escrow;
+        try {
+          escrow = await db.createEscrow(pendingEscrowData);
+          if (!escrow) {
+            throw new Error('Failed to create escrow record - no data returned');
+          }
+        } catch (escrowCreateError: any) {
+          console.error('Escrow creation error details:', {
+            error: escrowCreateError,
+            message: escrowCreateError.message,
+            details: escrowCreateError.details,
+            hint: escrowCreateError.hint,
+            code: escrowCreateError.code,
+            escrowData: pendingEscrowData
+          });
+          setIsLoading(false);
+          throw new Error(`Failed to create escrow record: ${escrowCreateError.message || escrowCreateError.details || 'Unknown error'}`);
+        }
 
         // Step 1: Request payment challenge from backend (HTTP 402) using EVM address
         toast({
@@ -166,48 +201,26 @@ export const useEscrow = (): UseEscrowReturn => {
         }
 
         if (!verification.success) {
+          // Payment verification failed - escrow already created, but we should clean it up or mark as failed
+          setIsLoading(false);
           throw new Error(verification.error || 'Payment verification failed after multiple attempts');
         }
 
-        // Step 4: Create escrow record in database (payment already made to platform wallet)
-        // For x402, the escrow is the Base platform wallet, and payment is already there
-        // Store both Solana address (for user identification) and EVM address (for Base payment)
-        const { getBasePlatformWalletAddress } = await import('@/lib/x402-payment-base');
-        const basePlatformWallet = getBasePlatformWalletAddress();
-        
-        const escrowData = {
-          project_id: projectId,
-          client_wallet: clientWallet.toString(), // Store Solana address for user identification
-          amount_usdc: finalAmount, // x402 uses USDC
-          platform_fee: platformFee,
-          total_locked: totalLocked,
-          transaction_signature: transactionSignature,
-          payment_currency: 'X402', // Mark as x402 payment
-          escrow_account: basePlatformWallet, // Base platform wallet is the escrow for x402
-          status: 'funded' as const,
-          funded_at: new Date().toISOString(),
-        };
-
-        
-        let escrow;
+        // Step 4: Update escrow record to 'funded' status (escrow was created in Step 0)
         try {
-          escrow = await db.createEscrow(escrowData);
-
-          if (!escrow) {
-            throw new Error('Failed to create escrow record - no data returned');
-          }
-
-        } catch (escrowCreateError: any) {
-          // Handle escrow creation error
-          console.error('Escrow creation error details:', {
-            error: escrowCreateError,
-            message: escrowCreateError.message,
-            details: escrowCreateError.details,
-            hint: escrowCreateError.hint,
-            code: escrowCreateError.code,
-            escrowData: escrowData
+          const updatedEscrow = await db.updateEscrow(escrow.id, {
+            status: 'funded',
+            transaction_signature: transactionSignature,
+            funded_at: new Date().toISOString(),
           });
-          throw new Error(`Failed to create escrow record: ${escrowCreateError.message || escrowCreateError.details || 'Unknown error'}`);
+          
+          if (!updatedEscrow) {
+            throw new Error('Failed to update escrow record');
+          }
+        } catch (updateError: any) {
+          console.error('Escrow update error:', updateError);
+          setIsLoading(false);
+          throw new Error(`Failed to update escrow record: ${updateError.message || 'Unknown error'}`);
         }
 
         toast({
