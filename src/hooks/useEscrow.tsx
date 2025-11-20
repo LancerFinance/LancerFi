@@ -655,14 +655,82 @@ export const useEscrow = (): UseEscrowReturn => {
       // Amount to send to freelancer (project amount, excluding platform fee)
       const amountToSend = escrow.amount_usdc;
       
-      // Use secure backend API instead of direct blockchain access
-      // signMessage will trigger Phantom popup for signature
-      const signature = await releasePaymentAPI(
-        escrowId,
-        freelancerWallet,
-        address,
-        signMessage
-      );
+      // For X402 payments, use EVM signature (Base network)
+      // For SOLANA/USDC payments, use Solana signature
+      let signature: string;
+      if (paymentCurrency === 'X402') {
+        // Get Ethereum provider for Base network
+        const w: any = window as any;
+        let ethereumProvider = w.ethereum;
+        
+        const ph = w.solana;
+        if (ph?.isPhantom && (ph as any).ethereum) {
+          ethereumProvider = (ph as any).ethereum;
+        } else if (!ethereumProvider && ph?.ethereum) {
+          ethereumProvider = ph.ethereum;
+        }
+        
+        if (!ethereumProvider) {
+          throw new Error('Ethereum provider not found. Please ensure your wallet (Phantom) supports Base network and has EVM capabilities enabled.');
+        }
+        
+        // Get EVM address and sign with Base network
+        const { ethers } = await import('ethers');
+        const provider = new ethers.BrowserProvider(ethereumProvider);
+        
+        // Request to switch to Base network if not already on it
+        const BASE_CHAIN_ID = 8453; // Base mainnet
+        try {
+          await provider.send('wallet_switchEthereumChain', [{ chainId: `0x${BASE_CHAIN_ID.toString(16)}` }]);
+        } catch (switchError: any) {
+          if (switchError.code === 4902 || switchError.code === -32603) {
+            try {
+              await provider.send('wallet_addEthereumChain', [{
+                chainId: `0x${BASE_CHAIN_ID.toString(16)}`,
+                chainName: 'Base',
+                nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                rpcUrls: ['https://mainnet.base.org'],
+                blockExplorerUrls: ['https://basescan.org']
+              }]);
+              await provider.send('wallet_switchEthereumChain', [{ chainId: `0x${BASE_CHAIN_ID.toString(16)}` }]);
+            } catch (addError) {
+              throw new Error('Failed to add Base network to wallet. Please add Base network manually.');
+            }
+          } else if (switchError.code !== 4902) {
+            throw new Error('Failed to switch to Base network');
+          }
+        }
+        
+        const signer = await provider.getSigner();
+        const evmAddress = await signer.getAddress();
+        
+        // Create EVM signer function that will be called by releasePaymentAPI
+        const evmSignMessage = async (message: string): Promise<{ signature: Uint8Array }> => {
+          // Sign message with EVM (this will show Base network in the popup)
+          const evmSignature = await signer.signMessage(message);
+          // ethers.js signMessage returns a hex string (0x...)
+          // Convert hex string to Uint8Array for compatibility with API
+          const hexString = evmSignature.startsWith('0x') ? evmSignature.slice(2) : evmSignature;
+          const signatureBytes = new Uint8Array(hexString.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+          return { signature: signatureBytes };
+        };
+        
+        // Call backend API with EVM signature
+        signature = await releasePaymentAPI(
+          escrowId,
+          freelancerWallet,
+          evmAddress,
+          evmSignMessage
+        );
+      } else {
+        // Use Solana signature for SOLANA/USDC payments
+        signature = await releasePaymentAPI(
+          escrowId,
+          freelancerWallet,
+          address,
+          signMessage
+        );
+      }
 
       toast({
         title: "Payment Released",

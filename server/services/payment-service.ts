@@ -387,3 +387,95 @@ export function getBasePlatformWalletAddress(): string {
   return process.env.BASE_PLATFORM_WALLET_ADDRESS || BASE_PLATFORM_WALLET_ADDRESS;
 }
 
+/**
+ * Release X402 payment from Base platform wallet to freelancer
+ * This handles Base network (EVM) USDC transfers
+ */
+export async function releaseX402PaymentFromPlatform(
+  freelancerWallet: string, // EVM address (0x...)
+  amount: number
+): Promise<string> {
+  // Security: Validate amount
+  if (amount <= 0) {
+    throw new Error('Payment amount must be greater than zero');
+  }
+  if (amount > 1000000) {
+    throw new Error('Payment amount exceeds maximum allowed (1M)');
+  }
+
+  // Validate freelancer wallet is a valid EVM address
+  if (!freelancerWallet || !freelancerWallet.startsWith('0x') || freelancerWallet.length !== 42) {
+    throw new Error('Invalid freelancer wallet address. Must be a valid EVM address (0x...)');
+  }
+
+  const { ethers } = await import('ethers');
+  
+  // Base network configuration
+  const BASE_RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+  const BASE_USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base USDC
+  const platformWallet = getBasePlatformWalletAddress();
+  
+  // Create provider for Base network
+  const provider = new ethers.JsonRpcProvider(BASE_RPC_URL);
+  
+  // Get platform wallet private key from environment
+  const platformPrivateKey = process.env.BASE_PLATFORM_WALLET_PRIVATE_KEY;
+  if (!platformPrivateKey) {
+    throw new Error('BASE_PLATFORM_WALLET_PRIVATE_KEY environment variable is not set');
+  }
+  
+  // Create wallet from private key
+  const wallet = new ethers.Wallet(platformPrivateKey, provider);
+  
+  // Verify we're using the correct platform wallet
+  if (wallet.address.toLowerCase() !== platformWallet.toLowerCase()) {
+    throw new Error(`Platform wallet mismatch! Expected ${platformWallet}, got ${wallet.address}`);
+  }
+  
+  // Create USDC contract instance
+  const ERC20_ABI = [
+    'function transfer(address to, uint256 amount) external returns (bool)',
+    'function balanceOf(address account) external view returns (uint256)',
+    'function decimals() external view returns (uint8)'
+  ];
+  
+  const usdcContract = new ethers.Contract(BASE_USDC_ADDRESS, ERC20_ABI, wallet);
+  
+  // Get USDC decimals (should be 6)
+  const decimals = await usdcContract.decimals();
+  
+  // Check balance
+  const balance = await usdcContract.balanceOf(wallet.address);
+  const amountInWei = ethers.parseUnits(amount.toFixed(Number(decimals)), Number(decimals));
+  
+  if (balance < amountInWei) {
+    const balanceNumber = Number(ethers.formatUnits(balance, Number(decimals)));
+    throw new Error(`Insufficient USDC Base balance. Required: ${amount} USDC, Available: ${balanceNumber} USDC`);
+  }
+  
+  // Transfer USDC to freelancer
+  try {
+    const tx = await usdcContract.transfer(freelancerWallet, amountInWei);
+    
+    // Wait for transaction to be mined
+    const receipt = await tx.wait();
+    
+    if (!receipt || !receipt.hash) {
+      throw new Error('Transaction receipt is missing hash');
+    }
+    
+    return receipt.hash;
+  } catch (error: any) {
+    console.error('Base USDC transfer failed:', error);
+    
+    if (error?.code === 4001 || error.message?.includes('User rejected') || error.message?.includes('user rejected')) {
+      throw new Error('Transaction was cancelled');
+    }
+    if (error.message?.includes('insufficient funds') || error.message?.includes('not enough')) {
+      throw new Error('Insufficient USDC Base or ETH for transaction fees');
+    }
+    
+    throw new Error(`Transaction failed: ${error.message || 'Unknown error'}`);
+  }
+}
+

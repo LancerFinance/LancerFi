@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { PublicKey } from '@solana/web3.js';
-import { releasePaymentFromPlatform, getPlatformWalletAddress, connection, USDC_MINT } from '../services/payment-service.js';
+import { releasePaymentFromPlatform, releaseX402PaymentFromPlatform, getPlatformWalletAddress, connection, USDC_MINT } from '../services/payment-service.js';
 import { supabaseClient } from '../services/supabase.js';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
@@ -90,19 +90,98 @@ export async function releasePaymentHandler(
     }
 
     // Get payment currency from escrow
-    // For x402 payments, payment_currency is 'USDC' but we need to use 'USDC' for the release
-    let paymentCurrency = escrow.payment_currency || 'SOLANA';
-    
-    // x402 payments use USDC, so if payment_currency is 'X402' or 'USDC', use 'USDC'
-    if (paymentCurrency === 'X402' || paymentCurrency === 'USDC') {
-      paymentCurrency = 'USDC';
-    }
+    const paymentCurrency = escrow.payment_currency || 'SOLANA';
+    const isX402 = paymentCurrency === 'X402';
     
     const amountToSend = escrow.amount_usdc;
     
+    // For X402 payments, use Base network release (EVM)
+    if (isX402) {
+      // Verify freelancer wallet is an EVM address for X402
+      if (!freelancerWallet.startsWith('0x') || freelancerWallet.length !== 42) {
+        return res.status(400).json({
+          error: 'Invalid freelancer wallet address for X402 payment. Must be an EVM address (0x...)'
+        });
+      }
+      
+      // Release X402 payment from Base platform wallet
+      try {
+        const signature = await releaseX402PaymentFromPlatform(
+          freelancerWallet,
+          amountToSend
+        );
+        
+        // Update escrow status in database
+        const { error: updateError } = await supabaseClient
+          .from('escrows')
+          .update({
+            status: 'released',
+            released_at: new Date().toISOString(),
+            freelancer_wallet: freelancerWallet,
+            transaction_signature: signature
+          })
+          .eq('id', escrowId);
+
+        if (updateError) {
+          console.error('Error updating escrow:', updateError);
+          return res.status(500).json({
+            error: 'Payment sent successfully but failed to update database. Transaction signature: ' + signature
+          });
+        }
+
+        // Send notifications
+        try {
+          const { data: projectData } = await supabaseClient
+            .from('projects')
+            .select('title, client_id, freelancer_id')
+            .eq('id', escrow.project_id)
+            .single();
+
+          if (projectData) {
+            const systemSender = 'system@lancerfi.app';
+            const currencyDisplay = `$${amountToSend.toLocaleString()} USDC (Base)`;
+
+            const notifications = [
+              {
+                sender_id: systemSender,
+                recipient_id: projectData.client_id,
+                subject: 'Payment Released',
+                content: `Payment of ${currencyDisplay} has been released from escrow and sent to the freelancer for project "${projectData.title}". The project can now be marked as completed.`
+              },
+              {
+                sender_id: systemSender,
+                recipient_id: freelancerWallet,
+                subject: 'Payment Received',
+                content: `Payment of ${currencyDisplay} has been released from escrow and sent to your wallet for project "${projectData.title}". Thank you for your work!`
+              }
+            ];
+
+            await supabaseClient.from('messages').insert(notifications);
+          }
+        } catch (notificationError) {
+          console.error('Error sending payment release notifications:', notificationError);
+        }
+
+        return res.json({
+          success: true,
+          transactionSignature: signature,
+          message: `Successfully released $${amountToSend} USDC (Base) to freelancer`
+        });
+      } catch (releaseError: any) {
+        console.error('Error releasing X402 payment:', releaseError);
+        return res.status(500).json({
+          error: releaseError.message || 'Failed to release X402 payment'
+        });
+      }
+    }
+    
+    // For SOLANA/USDC (Solana network), use existing Solana release flow
+    // x402 payments use USDC, so if payment_currency is 'USDC' (on Solana), use 'USDC'
+    let solanaPaymentCurrency: 'USDC' | 'SOLANA' = paymentCurrency === 'USDC' ? 'USDC' : 'SOLANA';
+    
     // CRITICAL: Check if source account exists BEFORE calling releasePaymentFromPlatform
     // The "invalid account data" error means the source account doesn't exist or is invalid
-    if (paymentCurrency === 'USDC' || paymentCurrency === 'X402') {
+    if (solanaPaymentCurrency === 'USDC') {
       try {
         const platformWallet = getPlatformWalletAddress();
         const platformWalletPubkey = new PublicKey(platformWallet);
@@ -142,12 +221,12 @@ export async function releasePaymentHandler(
       }
     }
 
-    // Release payment from platform wallet
+    // Release payment from platform wallet (Solana network)
     try {
       const signature = await releasePaymentFromPlatform(
         new PublicKey(freelancerWallet),
         amountToSend,
-        paymentCurrency as 'USDC' | 'SOLANA'
+        solanaPaymentCurrency
       );
       
       // Update escrow status in database
@@ -182,8 +261,8 @@ export async function releasePaymentHandler(
 
         if (projectData) {
           const systemSender = 'system@lancerfi.app';
-          const currencyDisplay = paymentCurrency === 'USDC' || paymentCurrency === 'X402'
-            ? `$${amountToSend.toLocaleString()} ${paymentCurrency}`
+          const currencyDisplay = solanaPaymentCurrency === 'USDC'
+            ? `$${amountToSend.toLocaleString()} USDC`
             : `${amountToSend.toLocaleString()} SOL`;
 
           const notifications = [];
@@ -227,7 +306,7 @@ export async function releasePaymentHandler(
       res.json({
         success: true,
         transactionSignature: signature,
-        message: `Successfully released ${paymentCurrency === 'USDC' ? `$${amountToSend} USDC` : `${amountToSend} SOL`} to freelancer`
+        message: `Successfully released ${solanaPaymentCurrency === 'USDC' ? `$${amountToSend} USDC` : `${amountToSend} SOL`} to freelancer`
       });
     } catch (releaseError: any) {
       console.error(`[RELEASE HANDLER] Error in releasePaymentFromPlatform:`, {
