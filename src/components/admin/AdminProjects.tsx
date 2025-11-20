@@ -63,6 +63,33 @@ const AdminProjects = () => {
     return <Badge variant={variants[status] || 'outline'}>{status}</Badge>;
   };
 
+  const handleDeleteProject = async (projectId: string) => {
+    if (!confirm(`Are you sure you want to DELETE this project? This action cannot be undone and will delete all associated escrows, proposals, and milestones.`)) {
+      return;
+    }
+    
+    try {
+      const result = await db.deleteProject(projectId);
+      if (result?.success) {
+        toast({
+          title: "Success",
+          description: "Project deleted successfully",
+        });
+        setProjects((prev) => prev.filter((project) => project.id !== projectId));
+        await loadProjects();
+      } else {
+        throw new Error("Delete operation returned no success confirmation");
+      }
+    } catch (error: any) {
+      console.error('Delete project error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete project. Please check console for details.",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -190,29 +217,7 @@ const AdminProjects = () => {
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={async () => {
-                        if (confirm(`Are you sure you want to DELETE this project? This action cannot be undone and will delete all associated escrows, proposals, and milestones.`)) {
-                          try {
-                            const result = await db.deleteProject(project.id);
-                            if (result?.success) {
-                              toast({
-                                title: "Success",
-                                description: "Project deleted successfully",
-                              });
-                              loadProjects();
-                            } else {
-                              throw new Error("Delete operation returned no success confirmation");
-                            }
-                          } catch (error: any) {
-                            console.error('Delete project error:', error);
-                            toast({
-                              title: "Error",
-                              description: error.message || "Failed to delete project. Please check console for details.",
-                              variant: "destructive"
-                            });
-                          }
-                        }
-                      }}
+                      onClick={() => handleDeleteProject(project.id)}
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
                       Delete
