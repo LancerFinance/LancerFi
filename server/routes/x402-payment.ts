@@ -58,7 +58,7 @@ router.post('/verify-payment', async (req, res) => {
     // Import payment service to verify transaction
     const { verifyX402Payment } = await import('../services/payment-service.js');
     
-    // Verify the payment transaction on Solana
+    // Verify the payment transaction on Base network
     const verification = await verifyX402Payment(
       transactionSignature,
       clientWallet,
