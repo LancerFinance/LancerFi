@@ -96,44 +96,44 @@ export async function releasePaymentHandler(
           // Note: The escrow transaction_signature is from the CLIENT funding the escrow,
           // not the freelancer, so we can't extract the freelancer's EVM address from it.
           // The freelancer's EVM address should be provided via the request body or dialog.
-            // Try to get freelancer profile to verify Solana address
-            if (project.freelancer_id) {
-              const { data: freelancerProfile, error: profileError } = await supabaseClient
-                .from('profiles')
-                .select('wallet_address')
-                .eq('id', project.freelancer_id)
-                .maybeSingle();
-              
-              if (profileError) {
-                console.error('Error fetching freelancer profile:', profileError);
-                return res.status(500).json({
-                  error: `Database error while fetching freelancer profile: ${profileError.message}`
-                });
-              }
-              
-              if (!freelancerProfile) {
-                console.error(`Freelancer profile not found for freelancer_id: ${project.freelancer_id}`);
-                return res.status(400).json({
-                  error: `Freelancer profile not found (ID: ${project.freelancer_id}). The freelancer must have a profile in the system. Please contact the freelancer to ensure their profile is set up correctly.`
-                });
-              }
-              
-              // Verify the Solana address matches for authorization (case-insensitive)
-              const profileSolanaAddress = freelancerProfile.wallet_address?.toLowerCase().trim();
-              const providedSolanaAddress = freelancerWallet.toLowerCase().trim();
-              
-              if (profileSolanaAddress !== providedSolanaAddress) {
-                return res.status(400).json({
-                  error: 'Freelancer wallet address does not match project freelancer'
-                });
-              }
+          
+          // Try to get freelancer profile to verify Solana address
+          if (project.freelancer_id) {
+            const { data: freelancerProfile, error: profileError } = await supabaseClient
+              .from('profiles')
+              .select('wallet_address')
+              .eq('id', project.freelancer_id)
+              .maybeSingle();
+            
+            if (profileError) {
+              console.error('Error fetching freelancer profile:', profileError);
+              return res.status(500).json({
+                error: `Database error while fetching freelancer profile: ${profileError.message}`
+              });
             }
             
-            // No EVM address found - return error asking for it
-            return res.status(400).json({
-              error: 'For X402 payments, freelancer must provide their EVM (Base network) wallet address. Please provide the freelancer\'s EVM address (0x...) when releasing payment.'
-            });
+            if (!freelancerProfile) {
+              console.error(`Freelancer profile not found for freelancer_id: ${project.freelancer_id}`);
+              return res.status(400).json({
+                error: `Freelancer profile not found (ID: ${project.freelancer_id}). The freelancer must have a profile in the system. Please contact the freelancer to ensure their profile is set up correctly.`
+              });
+            }
+            
+            // Verify the Solana address matches for authorization (case-insensitive)
+            const profileSolanaAddress = freelancerProfile.wallet_address?.toLowerCase().trim();
+            const providedSolanaAddress = freelancerWallet.toLowerCase().trim();
+            
+            if (profileSolanaAddress !== providedSolanaAddress) {
+              return res.status(400).json({
+                error: 'Freelancer wallet address does not match project freelancer'
+              });
+            }
           }
+          
+          // No EVM address found - return error asking for it
+          return res.status(400).json({
+            error: 'For X402 payments, freelancer must provide their EVM (Base network) wallet address. Please provide the freelancer\'s EVM address (0x...) when releasing payment.'
+          });
         }
       } else {
         // Freelancer wallet is already EVM format - use it directly
