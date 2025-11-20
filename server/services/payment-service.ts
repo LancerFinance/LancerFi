@@ -230,7 +230,7 @@ export async function verifyX402Payment(
     // Base network configuration
     const BASE_RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
     const BASE_USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-    const platformWallet = getPlatformWalletAddress();
+    const platformWallet = getBasePlatformWalletAddress(); // Use Base wallet address
     
     // Create provider for Base network
     const provider = new ethers.JsonRpcProvider(BASE_RPC_URL);
@@ -371,9 +371,19 @@ export async function verifyX402Payment(
   }
 }
 
-// Export platform wallet address getter
+// Export platform wallet address getter (Solana)
 export function getPlatformWalletAddress(): string {
   const platformKeypair = getPlatformKeypair();
   return platformKeypair.publicKey.toString();
+}
+
+// Base network platform wallet address for x402 payments
+// This is a fresh new wallet created specifically for Base USDC
+const BASE_PLATFORM_WALLET_ADDRESS = '0xdbbE0aDAD2931779270e4E2588b772e7b38453ba';
+
+// Export Base platform wallet address getter
+export function getBasePlatformWalletAddress(): string {
+  // Use environment variable if set, otherwise use the default
+  return process.env.BASE_PLATFORM_WALLET_ADDRESS || BASE_PLATFORM_WALLET_ADDRESS;
 }
 

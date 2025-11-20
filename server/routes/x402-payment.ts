@@ -1,5 +1,5 @@
 import express from 'express';
-import { USDC_MINT, getPlatformWalletAddress } from '../services/payment-service.js';
+import { getBasePlatformWalletAddress } from '../services/payment-service.js';
 
 const router = express.Router();
 
@@ -19,8 +19,8 @@ router.post('/payment-required', async (req, res) => {
     const platformFee = (amount * platformFeePercent) / 100;
     const totalAmount = amount + platformFee;
 
-    // Get platform wallet address
-    const platformWallet = getPlatformWalletAddress();
+    // Get Base platform wallet address (EVM address for Base network)
+    const platformWallet = getBasePlatformWalletAddress();
 
     // x402 Payment Required response
     // According to x402 protocol, we respond with HTTP 402 and payment details
