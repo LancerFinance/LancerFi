@@ -104,6 +104,17 @@ const ProjectDetails = () => {
       const projectData = await db.getProject(id);
       setProject(projectData);
 
+      // Load freelancer data if assigned
+      let freelancerData: Profile | null = null;
+      if (projectData.freelancer_id) {
+        try {
+          freelancerData = await db.getProfile(projectData.freelancer_id);
+          setFreelancer(freelancerData);
+        } catch (error) {
+          console.error('Error loading freelancer:', error);
+        }
+      }
+
       // Load work submissions if project is in progress
       if (projectData.status === 'in_progress' && projectData.freelancer_id) {
         await loadWorkSubmissions();
