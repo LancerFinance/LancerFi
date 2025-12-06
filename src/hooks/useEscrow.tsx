@@ -59,7 +59,7 @@ export const useEscrow = (): UseEscrowReturn => {
     setIsLoading(true);
     try {
       const clientWallet = new PublicKey(solAddress);
-      const platformFeePercent = 10; // 10% platform fee
+      const platformFeePercent = 1; // 1% platform fee
       
       let finalAmount = amount;
       let actualCurrency: PaymentCurrency = paymentCurrency;

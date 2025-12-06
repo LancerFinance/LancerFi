@@ -214,7 +214,7 @@ const EditProject = () => {
     }
   };
 
-  const platformFeePercent = 10;
+  const platformFeePercent = 1;
   const budget = parseFloat(formData.budget) || 0;
   const platformFee = (budget * platformFeePercent) / 100;
   const totalEscrow = budget + platformFee;
@@ -455,7 +455,7 @@ const EditProject = () => {
                     <span className="text-foreground">{formatUSDC(budget)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Platform Fee (10%)</span>
+                    <span className="text-muted-foreground">Platform Fee (1%)</span>
                     <span className="text-foreground">{formatUSDC(platformFee)}</span>
                   </div>
                   <div className="border-t border-border pt-3 flex justify-between font-semibold">

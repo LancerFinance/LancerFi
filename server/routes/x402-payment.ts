@@ -14,8 +14,8 @@ router.post('/payment-required', async (req, res) => {
       });
     }
 
-    // Calculate platform fee (10%)
-    const platformFeePercent = 10;
+    // Calculate platform fee (1%)
+    const platformFeePercent = 1;
     const platformFee = (amount * platformFeePercent) / 100;
     const totalAmount = amount + platformFee;
 

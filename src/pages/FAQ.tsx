@@ -21,7 +21,7 @@ const FAQ = () => {
     {
       icon: <CreditCard className="w-5 h-5" />,
       question: "What are the platform fees?",
-      answer: "We charge a 10% platform fee on successfully completed projects. This fee covers smart contract deployment, dispute resolution, and platform maintenance. No hidden fees - what you see is what you pay."
+      answer: "We charge a 1% platform fee on successfully completed projects. This fee covers smart contract deployment, dispute resolution, and platform maintenance. No hidden fees - what you see is what you pay."
     },
     {
       icon: <Users className="w-5 h-5" />,

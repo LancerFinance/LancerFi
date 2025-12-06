@@ -324,7 +324,7 @@ export async function createAndFundEscrow(
   projectId: string,
   amount: number,
   currency: PaymentCurrency = 'SOLANA',
-  platformFeePercent: number = 10
+  platformFeePercent: number = 1
 ): Promise<{ escrowAccount: PublicKey; transaction: Transaction }> {
   const platformFee = (amount * platformFeePercent) / 100;
   const totalAmount = amount + platformFee;
@@ -447,7 +447,7 @@ export async function createEscrowAccount(
   projectId: string,
   amount: number,
   currency: PaymentCurrency = 'SOLANA',
-  platformFeePercent: number = 10
+  platformFeePercent: number = 1
 ): Promise<{ escrowAccount: PublicKey; transaction: Transaction }> {
   return createAndFundEscrow(clientWallet, projectId, amount, currency, platformFeePercent);
 }

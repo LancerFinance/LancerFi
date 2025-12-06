@@ -186,7 +186,7 @@ export function validateOriginAmount(amount: number, balance: number): { isValid
 }
 
 // Calculate platform fee in Origin tokens
-export function calculateOriginFee(originAmount: number, feePercent: number = 10): number {
+export function calculateOriginFee(originAmount: number, feePercent: number = 1): number {
   return (originAmount * feePercent) / 100;
 }
 

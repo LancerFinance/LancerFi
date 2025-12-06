@@ -112,7 +112,7 @@ const PostProject = () => {
     }
   };
 
-  const platformFeePercent = 10;
+  const platformFeePercent = 1;
   const budget = parseFloat(formData.budget) || 0;
   const platformFee = (budget * platformFeePercent) / 100;
   const totalEscrow = budget + platformFee;
@@ -360,7 +360,7 @@ const PostProject = () => {
     try {
       const walletAddress = new PublicKey(address);
       const budgetAmount = parseFloat(formData.budget);
-      const platformFeePercent = 10;
+      const platformFeePercent = 1;
       const platformFee = (budgetAmount * platformFeePercent) / 100;
       const totalRequired = budgetAmount + platformFee;
       const transactionFeeBuffer = 0.01; // Buffer for transaction fees
@@ -873,15 +873,15 @@ const PostProject = () => {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Platform Fee (10%)</span>
+                    <span className="text-muted-foreground">Platform Fee (1%)</span>
                     <span className="text-foreground">
-                      {paymentCurrency === 'USDC' || paymentCurrency === 'X402' ? formatUSDC(platformFee) : formatSOL((solAmount || budget / (solPrice || 100)) * 0.1)}
+                      {paymentCurrency === 'USDC' || paymentCurrency === 'X402' ? formatUSDC(platformFee) : formatSOL((solAmount || budget / (solPrice || 100)) * 0.01)}
                     </span>
                   </div>
                   <div className="border-t border-border pt-3 flex justify-between font-semibold">
                     <span className="text-foreground">Total Escrow</span>
                     <span className="text-web3-primary">
-                      {paymentCurrency === 'USDC' || paymentCurrency === 'X402' ? formatUSDC(totalEscrow) : formatSOL((solAmount || budget / (solPrice || 100)) * 1.1)}
+                      {paymentCurrency === 'USDC' || paymentCurrency === 'X402' ? formatUSDC(totalEscrow) : formatSOL((solAmount || budget / (solPrice || 100)) * 1.01)}
                     </span>
                   </div>
                 </CardContent>
@@ -942,11 +942,11 @@ const PostProject = () => {
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Platform Fee (10%)</span>
+                          <span className="text-muted-foreground">Platform Fee (1%)</span>
                           <span className="text-foreground">
                             {paymentCurrency === 'USDC' || paymentCurrency === 'X402'
                               ? formatUSDC(platformFee)
-                              : formatSOL((solAmount || budget / (solPrice || 100)) * 0.1)
+                              : formatSOL((solAmount || budget / (solPrice || 100)) * 0.01)
                             }
                           </span>
                         </div>
@@ -956,7 +956,7 @@ const PostProject = () => {
                           <span className="text-web3-primary">
                             {paymentCurrency === 'USDC' || paymentCurrency === 'X402'
                               ? formatUSDC(totalEscrow)
-                              : formatSOL((solAmount || budget / (solPrice || 100)) * 1.1)
+                              : formatSOL((solAmount || budget / (solPrice || 100)) * 1.01)
                             }
                           </span>
                         </div>

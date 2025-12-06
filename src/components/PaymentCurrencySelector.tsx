@@ -48,12 +48,12 @@ const PaymentCurrencySelector = ({
   const getSolEquivalent = () => solAmount || (amount / (solPrice || 100));
   const getUSDCEquivalent = () => amount;
 
-  const platformFeePercent = 10;
+  const platformFeePercent = 1;
   const platformFee = (amount * platformFeePercent) / 100;
   const totalAmount = amount + platformFee;
   
   // SOL calculations
-  const solPlatformFee = getSolEquivalent() * 0.1;
+  const solPlatformFee = getSolEquivalent() * 0.01;
   const solTotalAmount = getSolEquivalent() + solPlatformFee;
 
   return (

@@ -8,7 +8,7 @@ A decentralized freelancing platform built on Solana blockchain with secure escr
 - **Escrow System**: Secure payment escrow that locks funds until project completion
 - **Wallet Integration**: Connect with Phantom wallet
 - **Smart Contracts**: Automatic payment release to freelancers upon project completion
-- **Platform Fee**: 10% platform fee automatically deducted and retained
+- **Platform Fee**: 1% platform fee automatically deducted and retained
 
 ## Tech Stack
 
@@ -139,12 +139,12 @@ This wallet holds all escrow funds and automatically releases payments to freela
 
 ## Payment Flow
 
-1. Client posts project and funds escrow (amount + 10% platform fee)
+1. Client posts project and funds escrow (amount + 1% platform fee)
 2. Funds are locked in platform escrow wallet
 3. Freelancer completes work
 4. Client marks project as completed
 5. Platform wallet automatically sends payment to freelancer's wallet
-6. Platform fee (10%) remains in platform wallet
+6. Platform fee (1%) remains in platform wallet
 
 ## Deployment
 
