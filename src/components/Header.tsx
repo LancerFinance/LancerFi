@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, VolumeX, Ban } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Menu, X, User, MessageSquare, Plus, Shield, Zap, Users } from "lucide-react";
+import { Menu, X, User, MessageSquare, Plus, Shield, Zap, Users, Github } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import WalletButton from "./WalletButton";
 import { useWallet } from "@/hooks/useWallet";
@@ -219,12 +219,21 @@ const Header = () => {
         {/* Secondary Navigation Bar */}
         <div className="hidden lg:flex items-center py-3 border-t border-border/50">
           <span className="text-sm text-muted-foreground">SOL, USDC, X402 payments • Near-zero fees</span>
-          <div className={`flex items-center space-x-2 ${connectedAddress ? 'ml-40' : 'ml-[110px]'}`}>
+          <div className={`flex items-center space-x-2 ${connectedAddress ? 'ml-36' : 'ml-[100px]'}`}>
+            <a 
+              href="https://github.com/LancerFinance/LancerFi" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary transition-all duration-200 hover:scale-105"
+              aria-label="View on GitHub"
+            >
+              <Github className="h-5 w-5" />
+            </a>
             <a 
               href="https://x.com/LancerFi" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-foreground hover:text-primary transition-colors"
+              className="text-foreground hover:text-primary transition-all duration-200 hover:scale-105"
               aria-label="Follow us on X (Twitter)"
             >
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -233,7 +242,7 @@ const Header = () => {
             </a>
             <button 
               onClick={copyContractAddress}
-              className="text-xs sm:text-sm font-medium text-foreground bg-gradient-to-b from-muted to-muted/80 hover:from-muted/90 hover:to-muted/70 border-2 border-border rounded-full px-3 py-1.5 shadow-lg hover:shadow-xl active:shadow-inner active:translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
+              className="text-xs sm:text-sm font-medium text-foreground bg-gradient-to-b from-muted to-muted/80 hover:from-muted/90 hover:to-muted/70 border-2 border-border rounded-full px-3 py-1.5 shadow-lg hover:shadow-xl active:shadow-inner active:translate-y-0.5 transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
               style={{
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)'
               }}
