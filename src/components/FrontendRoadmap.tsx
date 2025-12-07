@@ -1,28 +1,63 @@
-import { Chrome, Smartphone, CheckCircle, ArrowRight } from "lucide-react";
+import { Rocket, Settings, Users, Shield, Smartphone, CheckCircle, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const FrontendRoadmap = () => {
   const phases = [
     {
+      phase: "Phase 0",
+      title: "Platform Launch",
+      icon: <Rocket className="w-8 h-8" />,
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
+      items: [
+        "Frontend and backend implementation of LancerFi",
+        "X402 payment integration",
+        "Pump.fun token launch"
+      ]
+    },
+    {
       phase: "Phase 1",
-      title: "Chrome Extension (Launch)",
-      icon: <Chrome className="w-8 h-8" />,
+      title: "Frontend Accessibility",
+      icon: <Settings className="w-8 h-8" />,
       color: "text-blue-600",
       bgColor: "bg-blue-50",
       items: [
-        "Build and release the official LancerFi Google Chrome Extension",
-        "Enable wallet connection and job posting directly from the browser",
-        "Integrate trustless escrow and USDC payments on Solana",
-        "Launch beta testing for early freelancers and clients",
-        "Gather feedback and improve user experience before mainnet release"
+        "Increased escrow budget for already existing projects",
+        "Higher file limit sizes for work submissions",
+        "Enhanced messaging system with improved features"
       ]
     },
     {
       phase: "Phase 2",
-      title: "Mobile App (Expansion)",
-      icon: <Smartphone className="w-8 h-8" />,
+      title: "Team Formation",
+      icon: <Users className="w-8 h-8" />,
+      color: "text-green-600",
+      bgColor: "bg-green-50",
+      items: [
+        "Forming teams for project development",
+        "Payment splitting among team members",
+        "Multi-currency support for payments"
+      ]
+    },
+    {
+      phase: "Phase 3",
+      title: "Governance & Tokenomics",
+      icon: <Shield className="w-8 h-8" />,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
+      items: [
+        "Governance rights for token holders",
+        "DAO voting system for platform decisions",
+        "Lower fees for token holders",
+        "Holder exclusive perks and benefits"
+      ]
+    },
+    {
+      phase: "Phase 4",
+      title: "Mobile Application Expansion",
+      icon: <Smartphone className="w-8 h-8" />,
+      color: "text-pink-600",
+      bgColor: "bg-pink-50",
       items: [
         "Develop LancerFi Mobile App for iOS & Android",
         "Seamless wallet integration with Solana mobile wallets",
@@ -42,12 +77,12 @@ const FrontendRoadmap = () => {
             Frontend Roadmap
           </h2>
           <p className="text-sm sm:text-base text-muted-foreground max-w-3xl mx-auto">
-            Our roadmap for expanding LancerFi across all platforms. From browser extensions to mobile apps, 
-            we're building the future of Web3 freelancing.
+            Our comprehensive roadmap for building and expanding LancerFi. From platform launch to mobile expansion, 
+            we're building the future of Web3 freelancing step by step.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-7xl mx-auto">
           {phases.map((phase, index) => (
             <Card 
               key={index}
