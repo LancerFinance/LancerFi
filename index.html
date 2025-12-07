@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/faviconmain.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/faviconmain.png" />
+    <title>LancerFi - Solana Freelance Marketplace | Trustless Escrow &amp; USDC Payments</title>
+    <meta name="description" content="The Web3 freelance marketplace on Solana. Connect with smart contract developers, DeFi experts, and DAO managers. Trustless escrow, USDC payments, near-zero fees.">
+    <meta name="author" content="LancerFi" />
+
+    
+    
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://your-domain.com" />
+    <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/kJUxjKCLUlb3J5GCrkyfczbddQd2/social-images/social-1763124590261-preview.png">
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="LancerFi - Solana Freelance Marketplace" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    
+    
+    <meta name="twitter:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/kJUxjKCLUlb3J5GCrkyfczbddQd2/social-images/social-1763124590261-preview.png">
+    <meta name="twitter:image:alt" content="LancerFi - Solana Freelance Marketplace" />
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <meta property="og:title" content="LancerFi - Solana Freelance Marketplace | Trustless Escrow &amp; USDC Payments">
+  <meta name="twitter:title" content="LancerFi - Solana Freelance Marketplace | Trustless Escrow &amp; USDC Payments">
+  <meta property="og:description" content="The Web3 freelance marketplace on Solana. Connect with smart contract developers, DeFi experts, and DAO managers. Trustless escrow, USDC payments, near-zero fees.">
+  <meta name="twitter:description" content="The Web3 freelance marketplace on Solana. Connect with smart contract developers, DeFi experts, and DAO managers. Trustless escrow, USDC payments, near-zero fees.">
+</head>
+
+  <body>
+    <div id="root"></div>
+    <!-- IP Ban Check - BLOCKS React from loading if banned -->
+    <script>
+      (function() {
+        var isBanned = false;
+        var checkComplete = false;
+        var loadingOverlay = null;
+        var reactScriptsBlocked = false;
+        
+        // Create loading overlay (only used if banned)
+        function createLoadingOverlay() {
+          if (loadingOverlay) return loadingOverlay;
+          loadingOverlay = document.createElement('div');
+          loadingOverlay.id = 'ip-ban-loading-overlay';
+          loadingOverlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 999999; background: #ffffff; display: flex; align-items: center; justify-content: center;';
+          loadingOverlay.innerHTML = '<div style="text-align: center;"><div style="border: 4px solid #f3f4f6; border-top: 4px solid #3b82f6; border-radius: 50%; width: 48px; height: 48px; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div><p style="color: #6b7280; font-family: system-ui, -apple-system, sans-serif;">Loading...</p></div>';
+          var style = document.createElement('style');
+          style.textContent = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+          document.head.appendChild(style);
+          return loadingOverlay;
+        }
+        
+        function blockForever() {
+          if (isBanned) return; // Already blocked
+          isBanned = true;
+          checkComplete = true;
+          reactScriptsBlocked = true;
+          
+          // Show loading screen immediately
+          var overlay = createLoadingOverlay();
+          if (!document.body.contains(overlay)) {
+            document.body.appendChild(overlay);
+          }
+          
+          // Clear root element to prevent any rendering
+          var root = document.getElementById('root');
+          if (root) {
+            root.innerHTML = '';
+          }
+          
+          // Remove React scripts if they exist
+          var scripts = document.querySelectorAll('script[src*="/src/"]');
+          scripts.forEach(function(script) {
+            script.remove();
+          });
+          
+          // Block any future script execution
+          var originalCreateElement = document.createElement;
+          document.createElement = function(tagName) {
+            var element = originalCreateElement.call(document, tagName);
+            if (tagName.toLowerCase() === 'script' && isBanned) {
+              element.setAttribute('data-blocked', 'true');
+              element.type = 'text/plain'; // Prevent execution
+            }
+            return element;
+          };
+          
+          // IP is banned - keep loading forever, never allow React to render
+        }
+        
+        // Block scripts - use MutationObserver to catch scripts as they're added
+        var scriptObserver = new MutationObserver(function(mutations) {
+          mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+              if (node.nodeName === 'SCRIPT' && node.src && (node.src.includes('polyfills') || node.src.includes('main'))) {
+                if (isBanned || !checkComplete) {
+                  // Block script by removing src temporarily
+                  node.setAttribute('data-conditional', 'true');
+                  var originalSrc = node.src;
+                  node.removeAttribute('src');
+                  node.dataset.originalSrc = originalSrc;
+                }
+              }
+            });
+          });
+        });
+        
+        // Start observing immediately
+        scriptObserver.observe(document.documentElement, {
+          childList: true,
+          subtree: true
+        });
+        
+        // Also block any scripts that already exist
+        setTimeout(function() {
+          var scripts = document.querySelectorAll('script[src*="polyfills"], script[src*="main"]');
+          scripts.forEach(function(script) {
+            if (isBanned || !checkComplete) {
+              script.setAttribute('data-conditional', 'true');
+              var originalSrc = script.src;
+              script.removeAttribute('src');
+              script.dataset.originalSrc = originalSrc;
+            }
+          });
+        }, 0);
+        
+        function enableScripts() {
+          if (isBanned) return; // Don't enable if banned
+          
+          // Stop observing
+          if (scriptObserver) {
+            scriptObserver.disconnect();
+          }
+          
+          var scripts = document.querySelectorAll('script[data-conditional="true"]');
+          scripts.forEach(function(script) {
+            var originalSrc = script.dataset.originalSrc;
+            if (originalSrc) {
+              script.src = originalSrc;
+              script.removeAttribute('data-conditional');
+            }
+          });
+        }
+        
+        // Set a timeout to allow React if check takes too long (fail open)
+        var loadTimeout = setTimeout(function() {
+          if (!checkComplete && !isBanned) {
+            checkComplete = true;
+            // Scripts will load normally from HTML
+          }
+        }, 2000); // 2 second timeout
+        
+        // Allow React to load (restriction checking removed - implement your own if needed)
+        clearTimeout(loadTimeout);
+        checkComplete = true;
+        enableScripts();
+        
+        // Also enable scripts if timeout fires
+        var originalTimeout = setTimeout;
+        setTimeout = function(callback, delay) {
+          if (callback.toString().includes('IP check timeout')) {
+            return originalTimeout(function() {
+              callback();
+              enableScripts();
+            }, delay);
+          }
+          return originalTimeout(callback, delay);
+        };
+      })();
+    </script>
+    <!-- React scripts - Vite will inject correct production paths during build -->
+    <!-- These are blocked from executing if IP is banned by the script above -->
+    <script type="module" src="/src/polyfills.ts"></script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

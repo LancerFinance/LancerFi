@@ -1,0 +1,3 @@
+# Supabase Local Development Configuration
+# Replace with your actual project ID when setting up
+project_id = "your-project-id-here"
