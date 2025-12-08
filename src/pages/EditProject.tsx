@@ -8,12 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Upload, X } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Upload, X, Plus } from "lucide-react";
 import { useWallet } from "@/hooks/useWallet";
-import { db, Project, supabase } from "@/lib/supabase";
+import { db, Project, supabase, Escrow } from "@/lib/supabase";
 import { formatUSDC } from "@/lib/solana";
 import { useToast } from "@/hooks/use-toast";
 import { validateProject } from "@/lib/validation";
+import { AddFundsDialog } from "@/components/AddFundsDialog";
+import type { PaymentCurrency } from "@/lib/solana";
 
 // Admin wallet address - can edit any project
 const ADMIN_WALLET_ADDRESS = 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U';
@@ -28,6 +30,8 @@ const EditProject = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasEscrow, setHasEscrow] = useState(false); // Track if escrow exists
+  const [currentEscrows, setCurrentEscrows] = useState<Escrow[]>([]);
+  const [showAddFundsDialog, setShowAddFundsDialog] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -104,13 +108,17 @@ const EditProject = () => {
 
       // Check if escrow exists for this project
       try {
-        const escrow = await db.getEscrow(id);
-        if (escrow && (escrow.status === 'funded' || escrow.status === 'pending')) {
+        const escrows = await db.getAllEscrows(id);
+        setCurrentEscrows(escrows);
+        if (escrows.length > 0 && escrows.some(e => e.status === 'funded' || e.status === 'pending')) {
           setHasEscrow(true);
+        } else {
+          setHasEscrow(false);
         }
       } catch (error) {
         // Escrow doesn't exist, which is fine
         setHasEscrow(false);
+        setCurrentEscrows([]);
       }
 
     } catch (error) {
@@ -327,23 +335,30 @@ const EditProject = () => {
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="budget" className={hasEscrow ? 'text-muted-foreground' : ''}>
+                      <Label htmlFor="budget">
                         Budget (USDC) *
-                        {hasEscrow && (
-                          <span className="ml-2 text-xs text-muted-foreground italic">
-                            (Cannot be changed after payment)
-                          </span>
-                        )}
                       </Label>
-                      <Input 
-                        id="budget" 
-                        type="number"
-                        placeholder="5000"
-                        disabled={hasEscrow}
-                        className={`bg-muted/50 ${formErrors.budget ? 'border-destructive' : ''} ${hasEscrow ? 'opacity-60 cursor-not-allowed' : ''}`}
-                        value={formData.budget}
-                        onChange={(e) => handleInputChange('budget', e.target.value)}
-                      />
+                      {hasEscrow ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full justify-start h-10 bg-muted/50"
+                          onClick={() => setShowAddFundsDialog(true)}
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          {formatUSDC(parseFloat(formData.budget))}
+                        </Button>
+                      ) : (
+                        <Input 
+                          id="budget" 
+                          type="number"
+                          placeholder="5000"
+                          disabled={hasEscrow}
+                          className={`bg-muted/50 ${formErrors.budget ? 'border-destructive' : ''} ${hasEscrow ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          value={formData.budget}
+                          onChange={(e) => handleInputChange('budget', e.target.value)}
+                        />
+                      )}
                       {formErrors.budget && (
                         <p className="text-sm text-destructive">{formErrors.budget}</p>
                       )}
@@ -480,6 +495,20 @@ const EditProject = () => {
           </div>
         </div>
       </div>
+
+      {/* Add Funds Dialog */}
+      {id && currentEscrows.length > 0 && (
+        <AddFundsDialog
+          open={showAddFundsDialog}
+          onOpenChange={setShowAddFundsDialog}
+          projectId={id}
+          currentEscrows={currentEscrows}
+          paymentCurrency={(currentEscrows[0]?.payment_currency as PaymentCurrency) || 'SOLANA'}
+          onSuccess={() => {
+            loadProject(); // Reload to get updated escrows
+          }}
+        />
+      )}
     </div>
   );
 };

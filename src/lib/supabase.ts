@@ -343,6 +343,17 @@ export const db = {
     return data;
   },
 
+  async getAllEscrows(projectId: string) {
+    const { data, error } = await supabase
+      .from('escrows')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
   async getEscrowById(id: string) {
     const { data, error } = await supabase
       .from('escrows')

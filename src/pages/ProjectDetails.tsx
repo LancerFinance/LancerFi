@@ -59,6 +59,7 @@ const ProjectDetails = () => {
   
   const [project, setProject] = useState<Project | null>(null);
   const [escrow, setEscrow] = useState<Escrow | null>(null);
+  const [allEscrows, setAllEscrows] = useState<Escrow[]>([]);
   const [client, setClient] = useState<Profile | null>(null);
   const [freelancer, setFreelancer] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -182,10 +183,12 @@ const ProjectDetails = () => {
         await loadWorkSubmissions();
       }
 
-          // Load escrow if exists
+          // Load escrows if exist
           try {
-            const escrowData = await db.getEscrow(id);
-            setEscrow(escrowData);
+            const escrowsData = await db.getAllEscrows(id);
+            setAllEscrows(escrowsData);
+            // Set the first escrow for backward compatibility
+            setEscrow(escrowsData.length > 0 ? escrowsData[0] : null);
             
             // For X402 projects, automatically capture freelancer's EVM address if they're viewing
             // Phantom connects to Solana by default, but we need to access Base (EVM) separately
@@ -484,37 +487,63 @@ const ProjectDetails = () => {
         throw new Error('Freelancer wallet address not found. Cannot complete project without freelancer information.');
       }
 
-      if (!escrow) {
+      if (allEscrows.length === 0) {
         throw new Error('No escrow found for this project. Cannot release payment.');
       }
 
-      // Security: Verify escrow hasn't already been released
-      if (escrow.status === 'released') {
-        toast({
-          title: "Payment Already Released",
-          description: "Payment has already been sent to the freelancer for this project.",
-          variant: "destructive"
-        });
-        return;
+      // Filter to only funded escrows that haven't been released
+      const escrowsToRelease = allEscrows.filter(e => 
+        e.status === 'funded' && e.status !== 'released'
+      );
+
+      if (escrowsToRelease.length === 0) {
+        // Check if all are already released
+        const allReleased = allEscrows.every(e => e.status === 'released');
+        if (allReleased) {
+          toast({
+            title: "Payment Already Released",
+            description: "All payments have already been sent to the freelancer for this project.",
+            variant: "destructive"
+          });
+          return;
+        }
+        throw new Error('No funded escrows found to release.');
       }
 
       // For X402 payments, the backend will automatically use the stored EVM address
       // from escrow.freelancer_wallet if it exists (captured when freelancer views/submits work)
       // No need to check here - just proceed with payment release
 
-      // Release payment to freelancer first (this sends actual funds)
-      let paymentReleased = false;
+      // Release all escrows to freelancer
+      let allPaymentsReleased = true;
+      let releasedCount = 0;
+      const totalAmount = escrowsToRelease.reduce((sum, e) => sum + (e.amount_usdc || 0), 0);
+      const paymentCurrency = escrowsToRelease[0]?.payment_currency || 'SOLANA';
+
       try {
-        // For X402, use stored EVM address if available
-        const evmAddress = (escrow.payment_currency === 'X402' && escrow.freelancer_wallet?.startsWith('0x')) 
-          ? escrow.freelancer_wallet 
-          : undefined;
-        
-        paymentReleased = await releasePaymentToFreelancer(
-          escrow.id,
-          freelancer.wallet_address,
-          evmAddress
-        );
+        for (const escrowEntry of escrowsToRelease) {
+          try {
+            // For X402, use stored EVM address if available
+            const evmAddress = (escrowEntry.payment_currency === 'X402' && escrowEntry.freelancer_wallet?.startsWith('0x')) 
+              ? escrowEntry.freelancer_wallet 
+              : undefined;
+            
+            const paymentReleased = await releasePaymentToFreelancer(
+              escrowEntry.id,
+              freelancer.wallet_address,
+              evmAddress
+            );
+
+            if (paymentReleased) {
+              releasedCount++;
+            } else {
+              allPaymentsReleased = false;
+            }
+          } catch (e) {
+            console.error(`Failed to release escrow ${escrowEntry.id}:`, e);
+            allPaymentsReleased = false;
+          }
+        }
       } catch (e) {
         toast({
           title: "Payment Release Failed",
@@ -524,11 +553,11 @@ const ProjectDetails = () => {
         return;
       }
 
-      // Only update project status if payment was successfully released
-      if (!paymentReleased) {
+      // Only update project status if all payments were successfully released
+      if (!allPaymentsReleased || releasedCount < escrowsToRelease.length) {
         toast({
-          title: "Payment Release Failed",
-          description: "Payment was not released. Project status was not updated.",
+          title: "Partial Payment Release",
+          description: `Released ${releasedCount} of ${escrowsToRelease.length} payments. Some payments may not have been released. Project status was not updated.`,
           variant: "destructive"
         });
         return;
@@ -542,15 +571,13 @@ const ProjectDetails = () => {
 
       // Send notifications to both client and freelancer
       try {
-        const amount = escrow.amount_usdc;
-        const currency = escrow.payment_currency || 'SOLANA';
         await db.sendProjectCompletionNotification(
           id,
           project.client_id,
           freelancer?.wallet_address || null,
           project.title,
-          amount,
-          currency
+          totalAmount,
+          paymentCurrency
         );
       } catch (notificationError) {
         // Don't fail the completion if notifications fail
@@ -558,8 +585,8 @@ const ProjectDetails = () => {
 
       toast({
         title: 'Project Completed!',
-        description: paymentReleased
-          ? 'Project has been marked as completed and payment has been sent to freelancer.'
+        description: allPaymentsReleased
+          ? `Project has been marked as completed and ${releasedCount} payment${releasedCount > 1 ? 's have' : ' has'} been sent to freelancer.`
           : 'Project marked as completed.',
       });
 
@@ -858,130 +885,199 @@ const ProjectDetails = () => {
               )}
 
               {/* Escrow Information */}
-              {escrow && (
+              {allEscrows.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Shield className="w-5 h-5 text-web3-primary" />
                       Escrow Details
+                      {allEscrows.length > 1 && (
+                        <span className="text-sm font-normal text-muted-foreground ml-2">
+                          ({allEscrows.length} payments)
+                        </span>
+                      )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-sm text-muted-foreground mb-1">Status</div>
-                        <div className={`font-medium capitalize ${getEscrowStatusColor(escrow.status)}`}>
-                          {escrow.status}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground mb-1">Payment Currency</div>
-                        <div className="font-medium">
-                          {escrow.payment_currency || 'SOLANA'}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground mb-1">Total Locked</div>
-                        <div className="font-medium text-web3-primary">
-                          {(escrow.payment_currency || 'SOLANA') === 'SOLANA' 
-                            ? formatSOL(escrow.total_locked)
-                            : formatUSDC(escrow.total_locked)
-                          }
-                          {(escrow.payment_currency || 'SOLANA') === 'SOLANA' && solPrice && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              (~{formatUSDC(escrow.total_locked * solPrice)})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground mb-1">Project Amount</div>
-                        <div className="font-medium">
-                          {(escrow.payment_currency || 'SOLANA') === 'SOLANA'
-                            ? formatSOL(escrow.amount_usdc)
-                            : formatUSDC(escrow.amount_usdc)
-                          }
-                          {(escrow.payment_currency || 'SOLANA') === 'SOLANA' && solPrice && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              (~{formatUSDC(escrow.amount_usdc * solPrice)})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground mb-1">Platform Fee</div>
-                        <div className="font-medium">
-                          {(escrow.payment_currency || 'SOLANA') === 'SOLANA'
-                            ? formatSOL(escrow.platform_fee)
-                            : formatUSDC(escrow.platform_fee)
-                          }
-                          {(escrow.payment_currency || 'SOLANA') === 'SOLANA' && solPrice && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              (~{formatUSDC(escrow.platform_fee * solPrice)})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {escrow.funded_at && (
-                        <div>
-                          <div className="text-sm text-muted-foreground mb-1">Funded Date</div>
-                          <div className="font-medium text-sm">
-                            {new Date(escrow.funded_at).toLocaleDateString()}
+                    {/* Summary totals */}
+                    {(() => {
+                      const totalLocked = allEscrows.reduce((sum, e) => sum + (e.total_locked || 0), 0);
+                      const totalProjectAmount = allEscrows.reduce((sum, e) => sum + (e.amount_usdc || 0), 0);
+                      const totalPlatformFee = allEscrows.reduce((sum, e) => sum + (e.platform_fee || 0), 0);
+                      const paymentCurrency = allEscrows[0]?.payment_currency || 'SOLANA';
+                      
+                      return (
+                        <div className="p-4 bg-muted/50 rounded-lg border border-web3-primary/20">
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <div className="text-sm text-muted-foreground mb-1">Payment Currency</div>
+                              <div className="font-medium">{paymentCurrency}</div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-muted-foreground mb-1">Status</div>
+                              <div className={`font-medium capitalize ${getEscrowStatusColor(allEscrows[0]?.status || 'pending')}`}>
+                                {allEscrows[0]?.status || 'pending'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
+                            <div>
+                              <div className="text-sm text-muted-foreground mb-1">Total Locked</div>
+                              <div className="font-medium text-web3-primary text-lg">
+                                {paymentCurrency === 'SOLANA' 
+                                  ? formatSOL(totalLocked)
+                                  : formatUSDC(totalLocked)
+                                }
+                                {paymentCurrency === 'SOLANA' && solPrice && (
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    (~{formatUSDC(totalLocked * solPrice)})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-muted-foreground mb-1">Project Amount</div>
+                              <div className="font-medium text-lg">
+                                {paymentCurrency === 'SOLANA'
+                                  ? formatSOL(totalProjectAmount)
+                                  : formatUSDC(totalProjectAmount)
+                                }
+                                {paymentCurrency === 'SOLANA' && solPrice && (
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    (~{formatUSDC(totalProjectAmount * solPrice)})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-muted-foreground mb-1">Platform Fee</div>
+                              <div className="font-medium text-lg">
+                                {paymentCurrency === 'SOLANA'
+                                  ? formatSOL(totalPlatformFee)
+                                  : formatUSDC(totalPlatformFee)
+                                }
+                                {paymentCurrency === 'SOLANA' && solPrice && (
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    (~{formatUSDC(totalPlatformFee * solPrice)})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      )}
-                      {escrow.released_at && (
-                        <div>
-                          <div className="text-sm text-muted-foreground mb-1">Released Date</div>
-                          <div className="font-medium text-sm">
-                            {new Date(escrow.released_at).toLocaleDateString()}
+                      );
+                    })()}
+
+                    {/* Individual escrow entries */}
+                    {allEscrows.length > 1 && (
+                      <div className="space-y-3">
+                        <div className="text-sm font-medium text-muted-foreground">Individual Payments:</div>
+                        {allEscrows.map((escrowEntry, index) => (
+                          <div key={escrowEntry.id} className="p-3 bg-muted/30 rounded-lg border">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="text-sm font-medium">Payment #{index + 1}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {escrowEntry.funded_at && new Date(escrowEntry.funded_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">Amount: </span>
+                                <span className="font-medium">
+                                  {(escrowEntry.payment_currency || 'SOLANA') === 'SOLANA'
+                                    ? formatSOL(escrowEntry.amount_usdc)
+                                    : formatUSDC(escrowEntry.amount_usdc)
+                                  }
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Fee: </span>
+                                <span className="font-medium">
+                                  {(escrowEntry.payment_currency || 'SOLANA') === 'SOLANA'
+                                    ? formatSOL(escrowEntry.platform_fee)
+                                    : formatUSDC(escrowEntry.platform_fee)
+                                  }
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Total: </span>
+                                <span className="font-medium text-web3-primary">
+                                  {(escrowEntry.payment_currency || 'SOLANA') === 'SOLANA'
+                                    ? formatSOL(escrowEntry.total_locked)
+                                    : formatUSDC(escrowEntry.total_locked)
+                                  }
+                                </span>
+                              </div>
+                            </div>
+                            {escrowEntry.transaction_signature && (
+                              <div className="mt-2">
+                                <a 
+                                  href={(() => {
+                                    const isBaseNetwork = escrowEntry.payment_currency === 'X402';
+                                    return isBaseNetwork
+                                      ? `https://basescan.org/tx/${escrowEntry.transaction_signature}`
+                                      : `https://solscan.io/tx/${escrowEntry.transaction_signature}${import.meta.env.MODE === 'production' ? '?cluster=mainnet-beta' : '?cluster=devnet'}`;
+                                  })()}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-web3-primary hover:underline"
+                                >
+                                  View transaction →
+                                </a>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
-                    </div>
-                    {escrow.escrow_account && (
-                      <div>
-                        <div className="text-sm text-muted-foreground mb-1">Escrow Account</div>
-                        <div 
-                          onClick={() => copyToClipboard(escrow.escrow_account!, 'Escrow Account')}
-                          className="font-mono text-sm bg-muted p-2 rounded break-all cursor-pointer transition-all duration-200 select-all hover:bg-muted/80"
-                          title="Click to copy"
-                        >
-                          {escrow.escrow_account}
-                        </div>
+                        ))}
                       </div>
                     )}
-                    {escrow.transaction_signature && (
-                      <div>
-                        <div className="text-sm text-muted-foreground mb-1">Transaction Signature</div>
-                        <div 
-                          onClick={() => copyToClipboard(escrow.transaction_signature!, 'Transaction Signature')}
-                          className="font-mono text-xs bg-muted p-2 rounded break-all cursor-pointer transition-all duration-200 select-all hover:bg-muted/80"
-                          title="Click to copy"
-                        >
-                          {escrow.transaction_signature}
-                        </div>
-                        {(() => {
-                          const paymentCurrency = escrow.payment_currency || 'SOLANA';
-                          // X402 is on Base network, USDC and SOLANA are on Solana network
-                          const isBaseNetwork = paymentCurrency === 'X402';
-                          const explorerUrl = isBaseNetwork
-                            ? `https://basescan.org/tx/${escrow.transaction_signature}`
-                            : `https://solscan.io/tx/${escrow.transaction_signature}${import.meta.env.MODE === 'production' ? '?cluster=mainnet-beta' : '?cluster=devnet'}`;
-                          const explorerName = isBaseNetwork ? 'Basescan' : 'Solscan';
-                          
-                          return (
-                            <a 
-                              href={explorerUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-web3-primary hover:underline mt-1 inline-block"
+
+                    {/* Single escrow details (if only one) */}
+                    {allEscrows.length === 1 && escrow && (
+                      <>
+                        {escrow.escrow_account && (
+                          <div>
+                            <div className="text-sm text-muted-foreground mb-1">Escrow Account</div>
+                            <div 
+                              onClick={() => copyToClipboard(escrow.escrow_account!, 'Escrow Account')}
+                              className="font-mono text-sm bg-muted p-2 rounded break-all cursor-pointer transition-all duration-200 select-all hover:bg-muted/80"
+                              title="Click to copy"
                             >
-                              View on {explorerName} →
-                            </a>
-                          );
-                        })()}
-                      </div>
+                              {escrow.escrow_account}
+                            </div>
+                          </div>
+                        )}
+                        {escrow.transaction_signature && (
+                          <div>
+                            <div className="text-sm text-muted-foreground mb-1">Transaction Signature</div>
+                            <div 
+                              onClick={() => copyToClipboard(escrow.transaction_signature!, 'Transaction Signature')}
+                              className="font-mono text-xs bg-muted p-2 rounded break-all cursor-pointer transition-all duration-200 select-all hover:bg-muted/80"
+                              title="Click to copy"
+                            >
+                              {escrow.transaction_signature}
+                            </div>
+                            {(() => {
+                              const paymentCurrency = escrow.payment_currency || 'SOLANA';
+                              const isBaseNetwork = paymentCurrency === 'X402';
+                              const explorerUrl = isBaseNetwork
+                                ? `https://basescan.org/tx/${escrow.transaction_signature}`
+                                : `https://solscan.io/tx/${escrow.transaction_signature}${import.meta.env.MODE === 'production' ? '?cluster=mainnet-beta' : '?cluster=devnet'}`;
+                              const explorerName = isBaseNetwork ? 'Basescan' : 'Solscan';
+                              
+                              return (
+                                <a 
+                                  href={explorerUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-web3-primary hover:underline mt-1 inline-block"
+                                >
+                                  View on {explorerName} →
+                                </a>
+                              );
+                            })()}
+                          </div>
+                        )}
+                      </>
                     )}
                   </CardContent>
                 </Card>
