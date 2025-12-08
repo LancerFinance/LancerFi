@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, VolumeX, Ban } from "lucide-react";
+import { Search, VolumeX, Ban, BookOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Menu, X, User, MessageSquare, Plus, Shield, Zap, Users, Github } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
