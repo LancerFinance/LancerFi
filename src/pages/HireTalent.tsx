@@ -39,50 +39,71 @@ const HireTalent = () => {
       let earningsByFreelancer: Record<string, number> = {};
 
       if (freelancerIds.length > 0) {
-        // Fetch projects assigned to these freelancers
+        // Create maps for matching
+        const walletToFreelancerId: Record<string, string> = {};
+        freelancerList.forEach((f) => {
+          if (f.wallet_address && f.id) {
+            walletToFreelancerId[f.wallet_address.toLowerCase()] = f.id;
+          }
+        });
+
+        // Fetch ALL released escrows (not just for specific projects)
+        // When payment is released, escrow.freelancer_wallet is set, so we can match directly
+        const { data: allEscrows, error: escErr } = await supabase
+          .from('escrows')
+          .select('project_id, freelancer_wallet, amount_usdc, payment_currency, status')
+          .eq('status', 'released')
+          .not('freelancer_wallet', 'is', null);
+        if (escErr) throw escErr;
+
+        // Also fetch projects to create project_id -> freelancer_id mapping as fallback
         const { data: projects, error: projErr } = await supabase
           .from('projects')
           .select('id, freelancer_id')
           .in('freelancer_id', freelancerIds);
         if (projErr) throw projErr;
 
-        const projectIds = (projects || []).map((p: any) => p.id);
-        const projectToFreelancer: Record<string, string> = {};
+        const projectToFreelancerId: Record<string, string> = {};
         (projects || []).forEach((p: any) => {
-          if (p.id && p.freelancer_id) projectToFreelancer[p.id] = p.freelancer_id;
+          if (p.id && p.freelancer_id) {
+            projectToFreelancerId[p.id] = p.freelancer_id;
+          }
         });
 
-        if (projectIds.length > 0) {
-          // Sum released escrows for those projects
-          // Fetch payment_currency to know if amount_usdc is in SOL or USD
-          const { data: escrows, error: escErr } = await supabase
-            .from('escrows')
-            .select('project_id, amount_usdc, payment_currency, status')
-            .in('project_id', projectIds)
-            .eq('status', 'released');
-          if (escErr) throw escErr;
+        // Separate SOL and USD earnings
+        const solEarningsByFreelancer: Record<string, number> = {};
+        const usdEarningsByFreelancer: Record<string, number> = {};
 
-          // Separate SOL and USD earnings
-          const solEarningsByFreelancer: Record<string, number> = {};
-          const usdEarningsByFreelancer: Record<string, number> = {};
-
-          (escrows || []).forEach((e: any) => {
-            const fid = projectToFreelancer[e.project_id as string];
-            if (fid) {
-              const amount = Number(e.amount_usdc || 0);
-              const currency = e.payment_currency || 'SOLANA';
-              
-              // If currency is SOLANA, amount_usdc is in SOL - add to SOL earnings
-              // If currency is X402 or USDC, amount_usdc is already in USD - add to USD earnings
-              if (currency === 'SOLANA') {
-                solEarningsByFreelancer[fid] = (solEarningsByFreelancer[fid] || 0) + amount;
-              } else {
-                usdEarningsByFreelancer[fid] = (usdEarningsByFreelancer[fid] || 0) + amount;
-              }
+        (allEscrows || []).forEach((e: any) => {
+          let fid: string | undefined;
+          
+          // Primary: Match by freelancer_wallet (set when payment is released)
+          if (e.freelancer_wallet) {
+            const walletLower = e.freelancer_wallet.toLowerCase();
+            fid = walletToFreelancerId[walletLower];
+          }
+          
+          // Fallback: Match by project's freelancer_id (in case freelancer_wallet wasn't set)
+          if (!fid && e.project_id) {
+            fid = projectToFreelancerId[e.project_id];
+          }
+          
+          if (fid) {
+            const amount = Number(e.amount_usdc || 0);
+            const currency = e.payment_currency || 'SOLANA';
+            
+            // If currency is SOLANA, amount_usdc is in SOL - add to SOL earnings
+            // If currency is X402 or USDC, amount_usdc is already in USD - add to USD earnings
+            if (currency === 'SOLANA') {
+              solEarningsByFreelancer[fid] = (solEarningsByFreelancer[fid] || 0) + amount;
+            } else {
+              usdEarningsByFreelancer[fid] = (usdEarningsByFreelancer[fid] || 0) + amount;
             }
-          });
+          }
+        });
 
-          // Convert SOL earnings to USD and combine with USD earnings
+        // Convert SOL earnings to USD and combine with USD earnings
+        if (Object.keys(solEarningsByFreelancer).length > 0 || Object.keys(usdEarningsByFreelancer).length > 0) {
           const priceData = await getSolanaPrice();
           const solPrice = priceData.price_usd;
           
