@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Header from "@/components/Header";
 import ProjectCard from "@/components/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Filter, Search, Wallet, Briefcase, Wrench, CheckCircle } from "lucide-react";
+import { Plus, Filter, Search, Wallet, Briefcase, Wrench, CheckCircle, Bookmark } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { db, Project, Escrow } from "@/lib/supabase";
@@ -23,27 +23,96 @@ const ProjectDashboard = () => {
   const navigate = useNavigate();
   const [postedProjects, setPostedProjects] = useState<Project[]>([]);
   const [workingProjects, setWorkingProjects] = useState<Project[]>([]);
+  const [bookmarkedProjects, setBookmarkedProjects] = useState<Project[]>([]);
   const [escrows, setEscrows] = useState<Record<string, Escrow>>({});
   const [proposalCounts, setProposalCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [bookmarksLoading, setBookmarksLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [solPrice, setSolPrice] = useState<number | null>(null);
+
+  const loadBookmarkedProjects = async () => {
+    const currentAddress = address;
+    if (!currentAddress) {
+      setBookmarksLoading(false);
+      setBookmarkedProjects([]);
+      return;
+    }
+    
+    try {
+      setBookmarksLoading(true);
+      
+      // Check if getBookmarkedProjects exists (in case table doesn't exist yet)
+      if (!db.getBookmarkedProjects) {
+        console.warn('Bookmarks feature not available - table may not exist');
+        setBookmarkedProjects([]);
+        return;
+      }
+      
+      const bookmarked = await db.getBookmarkedProjects(currentAddress);
+      setBookmarkedProjects(bookmarked || []);
+      
+      // Load escrows and proposal counts for bookmarked projects
+      const escrowData: Record<string, Escrow> = {};
+      const proposalCountData: Record<string, number> = {};
+      
+      for (const project of bookmarked || []) {
+        try {
+          const escrow = await db.getEscrow(project.id);
+          if (escrow) {
+            escrowData[project.id] = escrow;
+          }
+        } catch (error) {
+          // Escrow doesn't exist, skip
+        }
+        
+        try {
+          const proposals = await db.getProposals(project.id);
+          proposalCountData[project.id] = proposals.length;
+        } catch (error) {
+          proposalCountData[project.id] = 0;
+        }
+      }
+      
+      // Merge with existing escrows and proposal counts
+      setEscrows(prev => ({ ...prev, ...escrowData }));
+      setProposalCounts(prev => ({ ...prev, ...proposalCountData }));
+    } catch (error: any) {
+      console.error('Error loading bookmarked projects:', error);
+      // Don't show error toast if it's just that the table doesn't exist
+      if (error?.message?.includes('relation') || error?.message?.includes('does not exist')) {
+        console.warn('Bookmarks table does not exist yet. Please run the migration.');
+        setBookmarkedProjects([]);
+      } else {
+        toast({
+          title: "Failed to Load Bookmarks",
+          description: "Please try refreshing the page",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setBookmarksLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (address) {
       // Reset state before loading new wallet's projects
       setPostedProjects([]);
       setWorkingProjects([]);
+      setBookmarkedProjects([]);
       setEscrows({});
       setProposalCounts({});
       setLoading(true);
       loadProjects();
+      loadBookmarkedProjects();
     } else {
       // Clear projects when wallet disconnects
       setPostedProjects([]);
       setWorkingProjects([]);
+      setBookmarkedProjects([]);
       setEscrows({});
       setProposalCounts({});
       setLoading(false);
@@ -286,6 +355,15 @@ const ProjectDashboard = () => {
     return matchesSearch && matchesCategory;
   });
 
+  const filteredBookmarkedProjects = bookmarkedProjects.filter(project => {
+    const matchesSearch = !searchTerm || 
+      project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
+    const matchesCategory = categoryFilter === 'all' || project.category === categoryFilter;
+    return matchesSearch && matchesStatus && matchesCategory;
+  });
+
   // Filter out completed projects for stats (they should only appear in Completed tab)
   const activePostedProjects = postedProjects.filter(p => p.status !== 'completed');
   
@@ -407,6 +485,12 @@ const ProjectDashboard = () => {
                 <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                 <span>Completed</span>
                 <span className="ml-0.5">({completedProjects.length})</span>
+              </TabsTrigger>
+              <TabsTrigger value="bookmarks" className="flex items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs md:text-sm px-2 sm:px-4 py-2 flex-1 sm:flex-initial whitespace-nowrap">
+                <Bookmark className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Bookmarks</span>
+                <span className="sm:hidden">Saved</span>
+                <span className="ml-0.5">({bookmarkedProjects.length})</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -692,6 +776,93 @@ const ProjectDashboard = () => {
                   />
                 ))}
               </div>
+            )}
+          </TabsContent>
+
+          {/* Bookmarks Tab */}
+          <TabsContent value="bookmarks" className="space-y-6">
+            {!isConnected ? (
+              <div className="text-center py-12">
+                <Bookmark className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <div className="text-muted-foreground mb-4">
+                  Connect your wallet to view your bookmarked projects
+                </div>
+                <Button variant="outline" onClick={() => navigate('/')}>
+                  <Wallet className="w-4 h-4 mr-2" />
+                  Connect Wallet
+                </Button>
+              </div>
+            ) : (
+              <>
+                {/* Filters */}
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search bookmarked projects..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="disputed">Disputed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue placeholder="Filter by category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {PROJECT_CATEGORIES.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Projects Grid */}
+                {bookmarksLoading ? (
+                  <div className="text-center py-12">
+                    <div className="text-muted-foreground">Loading bookmarks...</div>
+                  </div>
+                ) : filteredBookmarkedProjects.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Bookmark className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <div className="text-muted-foreground mb-4">
+                      {bookmarkedProjects.length === 0 
+                        ? 'No bookmarked projects yet' 
+                        : 'No bookmarked projects match your filters'}
+                    </div>
+                    {bookmarkedProjects.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Bookmark projects you're interested in to find them easily later
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredBookmarkedProjects.map((project) => (
+                      <ProjectCard
+                        key={project.id}
+                        project={project}
+                        escrow={escrows[project.id]}
+                        proposalCount={proposalCounts[project.id]}
+                        onViewProject={handleViewProject}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </TabsContent>
         </Tabs>

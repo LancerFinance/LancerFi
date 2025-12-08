@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Header from "@/components/Header";
-import { Star, Clock, DollarSign, Shield, MessageCircle, ArrowLeft, User, Award, TrendingUp } from "lucide-react";
+import { Star, Clock, DollarSign, Shield, MessageCircle, ArrowLeft, User, Award, TrendingUp, Bookmark, BookmarkCheck } from "lucide-react";
 import { db } from "@/lib/supabase";
 import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/hooks/useWallet";
@@ -48,6 +48,8 @@ const ServiceDetails = () => {
   const [loading, setLoading] = useState(true);
   const [hasSubmittedProposal, setHasSubmittedProposal] = useState(false);
   const [freelancerEarnings, setFreelancerEarnings] = useState<number>(0);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -58,10 +60,61 @@ const ServiceDetails = () => {
   useEffect(() => {
     if (id && address && isConnected) {
       checkExistingProposal(id);
+      checkBookmarkStatus();
     } else {
       setHasSubmittedProposal(false);
+      setIsBookmarked(false);
     }
   }, [id, address, isConnected]);
+
+  const checkBookmarkStatus = async () => {
+    if (!address || !id) return;
+    try {
+      const bookmarked = await db.isBookmarked(address, id);
+      setIsBookmarked(bookmarked);
+    } catch (error) {
+      console.error('Error checking bookmark status:', error);
+    }
+  };
+
+  const handleBookmarkToggle = async () => {
+    if (!isConnected || !address || !id) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to bookmark services",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setBookmarkLoading(true);
+    try {
+      if (isBookmarked) {
+        await db.removeBookmark(address, id);
+        setIsBookmarked(false);
+        toast({
+          title: "Bookmark Removed",
+          description: "Service removed from your bookmarks",
+        });
+      } else {
+        await db.addBookmark(address, id);
+        setIsBookmarked(true);
+        toast({
+          title: "Bookmark Added",
+          description: "Service added to your bookmarks",
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update bookmark. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setBookmarkLoading(false);
+    }
+  };
 
   const loadServiceDetails = async (serviceId: string) => {
     try {
@@ -311,12 +364,33 @@ const ServiceDetails = () => {
               <CardHeader>
                 <div className="flex justify-between items-start mb-4">
                   <Badge variant="secondary">{service.category}</Badge>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-primary">
-                      ${service.budget_usdc}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Fixed Price
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBookmarkToggle}
+                      disabled={bookmarkLoading}
+                      title={isBookmarked ? "Remove bookmark" : "Bookmark service"}
+                    >
+                      {isBookmarked ? (
+                        <>
+                          <BookmarkCheck className="w-4 h-4 mr-2 text-web3-primary fill-web3-primary" />
+                          Bookmarked
+                        </>
+                      ) : (
+                        <>
+                          <Bookmark className="w-4 h-4 mr-2" />
+                          Bookmark
+                        </>
+                      )}
+                    </Button>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-primary">
+                        ${service.budget_usdc}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Fixed Price
+                      </div>
                     </div>
                   </div>
                 </div>

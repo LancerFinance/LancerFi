@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import Header from "@/components/Header";
-import { Search, Filter, Star, Clock, DollarSign, Grid, List } from "lucide-react";
+import { Search, Filter, Star, Clock, DollarSign, Grid, List, Bookmark, BookmarkCheck } from "lucide-react";
 import { db, supabase } from "@/lib/supabase";
+import { useWallet } from "@/hooks/useWallet";
+import { useToast } from "@/hooks/use-toast";
 
 interface Service {
   id: string;
@@ -47,6 +49,8 @@ const categories = [
 const BrowseServices = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { address, isConnected } = useWallet();
+  const { toast } = useToast();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
@@ -55,6 +59,8 @@ const BrowseServices = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showFilters, setShowFilters] = useState(false);
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+  const [bookmarkLoading, setBookmarkLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadServices();
@@ -64,6 +70,77 @@ const BrowseServices = () => {
     setSearchTerm(searchParams.get('search') || '');
     setSelectedCategory(searchParams.get('category') || 'all');
   }, [searchParams]);
+
+  useEffect(() => {
+    if (isConnected && address && services.length > 0) {
+      loadBookmarkStatuses();
+    }
+  }, [isConnected, address, services]);
+
+  const loadBookmarkStatuses = async () => {
+    if (!address) return;
+    try {
+      const bookmarkedSet = new Set<string>();
+      for (const service of services) {
+        try {
+          const isBookmarked = await db.isBookmarked(address, service.id);
+          if (isBookmarked) {
+            bookmarkedSet.add(service.id);
+          }
+        } catch (error) {
+          // Ignore errors for individual bookmarks
+        }
+      }
+      setBookmarkedIds(bookmarkedSet);
+    } catch (error) {
+      console.error('Error loading bookmark statuses:', error);
+    }
+  };
+
+  const handleBookmarkToggle = async (e: React.MouseEvent, serviceId: string) => {
+    e.stopPropagation();
+    if (!isConnected || !address) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to bookmark services",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setBookmarkLoading(prev => ({ ...prev, [serviceId]: true }));
+    try {
+      const isBookmarked = bookmarkedIds.has(serviceId);
+      if (isBookmarked) {
+        await db.removeBookmark(address, serviceId);
+        setBookmarkedIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(serviceId);
+          return newSet;
+        });
+        toast({
+          title: "Bookmark Removed",
+          description: "Service removed from your bookmarks",
+        });
+      } else {
+        await db.addBookmark(address, serviceId);
+        setBookmarkedIds(prev => new Set(prev).add(serviceId));
+        toast({
+          title: "Bookmark Added",
+          description: "Service added to your bookmarks",
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update bookmark. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setBookmarkLoading(prev => ({ ...prev, [serviceId]: false }));
+    }
+  };
 
   const loadServices = async () => {
     try {
@@ -321,12 +398,28 @@ const BrowseServices = () => {
                       <Badge variant="secondary" className="text-xs">
                         {service.category}
                       </Badge>
-                      {service.freelancer?.rating && (
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span>{service.freelancer.rating}</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {service.freelancer?.rating && (
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            <span>{service.freelancer.rating}</span>
+                          </div>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => handleBookmarkToggle(e, service.id)}
+                          disabled={bookmarkLoading[service.id]}
+                          title={bookmarkedIds.has(service.id) ? "Remove bookmark" : "Bookmark service"}
+                        >
+                          {bookmarkedIds.has(service.id) ? (
+                            <BookmarkCheck className="h-4 w-4 text-web3-primary fill-web3-primary" />
+                          ) : (
+                            <Bookmark className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                     <CardTitle className="text-lg line-clamp-2 group-hover:text-primary transition-colors">
                       {service.title}

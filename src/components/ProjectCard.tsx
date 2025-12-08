@@ -117,22 +117,23 @@ const ProjectCard = ({ project, escrow, onViewProject, proposalCount = 0 }: Proj
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-2 flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <CardTitle className="text-xl text-foreground line-clamp-2 break-words flex-1">
+            <div className="flex items-start justify-between gap-2 w-full">
+              <CardTitle className="text-xl text-foreground line-clamp-2 break-words flex-1 min-w-0">
                 {project.title}
               </CardTitle>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 flex-shrink-0"
+                className="h-8 w-8 flex-shrink-0 ml-2 opacity-100 hover:opacity-100"
                 onClick={handleBookmarkToggle}
                 disabled={bookmarkLoading}
                 title={isBookmarked ? "Remove bookmark" : "Bookmark project"}
+                style={{ minWidth: '32px', minHeight: '32px' }}
               >
                 {isBookmarked ? (
-                  <BookmarkCheck className="h-4 w-4 text-web3-primary fill-web3-primary" />
+                  <BookmarkCheck className="h-5 w-5 text-web3-primary fill-web3-primary" />
                 ) : (
-                  <Bookmark className="h-4 w-4" />
+                  <Bookmark className="h-5 w-5 text-foreground" />
                 )}
               </Button>
             </div>
@@ -231,13 +232,29 @@ const ProjectCard = ({ project, escrow, onViewProject, proposalCount = 0 }: Proj
           </div>
         )}
 
-        <Button
-          variant="outline" 
-          className="w-full"
-          onClick={() => onViewProject(project.id)}
-        >
-          View Project Details
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline" 
+            className="flex-1"
+            onClick={() => onViewProject(project.id)}
+          >
+            View Project Details
+          </Button>
+          <Button
+            variant={isBookmarked ? "default" : "outline"}
+            size="icon"
+            className="flex-shrink-0"
+            onClick={handleBookmarkToggle}
+            disabled={bookmarkLoading}
+            title={isBookmarked ? "Remove bookmark" : "Bookmark project"}
+          >
+            {isBookmarked ? (
+              <BookmarkCheck className="h-4 w-4 text-white fill-white" />
+            ) : (
+              <Bookmark className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
