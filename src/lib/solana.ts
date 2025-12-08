@@ -283,9 +283,9 @@ export const USDC_MINT = SOLANA_NETWORK === 'mainnet-beta'
   : new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'); // Devnet USDC
 
 // Platform fee wallet - Production wallet address (LancerFi escrow wallet)
-// Public Key: AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U
+// Public Key: PLATFORM_WALLET_ADDRESS
 // Private key stored securely in escrow-keypair.json (NEVER commit to git)
-export const PLATFORM_WALLET = new PublicKey('AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U'); // LancerFi escrow wallet
+export const PLATFORM_WALLET = new PublicKey('PLATFORM_WALLET_ADDRESS'); // LancerFi escrow wallet
 
 // ⚠️ SECURITY: Platform wallet keypair loading has been moved to backend server
 // This function is deprecated and should not be used in frontend

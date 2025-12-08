@@ -24,32 +24,13 @@ dist-ssr
 *.sw?
 .vercel
 
-# Environment variables (CRITICAL - contains private keys and secrets!)
-.env
-.env.*
-!.env.example
-!.env.template
+# Backend environment variables (CRITICAL - contains private keys!)
 server/.env
 server/dist
 .env.backend
-.env.local
-.env.production
-.env.development
 
 # Private keys - NEVER commit these!
 **/escrow-keypair.json
 **/*keypair*.json
 *.key
 *.pem
-*.p12
-*.pfx
-
-# Vercel (may contain sensitive deployment info)
-.vercel
-
-# Lock files (optional - some projects prefer to commit these)
-# Uncomment if you want to exclude lock files
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
-# bun.lockb

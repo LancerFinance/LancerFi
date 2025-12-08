@@ -46,7 +46,7 @@ const FAQ = () => {
     {
       icon: <MessageSquare className="w-5 h-5" />,
       question: "How do I contact support?",
-      answer: "You can contact our support team directly through the Messages page. Click on the 'Support' button to send a message to admin@lancerfi.app. Our team typically responds within 24 hours."
+      answer: "You can contact our support team directly through the Messages page. Click on the 'Support' button to send a message to support@lancerfi.app. Our team typically responds within 24 hours."
     }
   ];
 
@@ -119,7 +119,7 @@ const FAQ = () => {
                 </Button>
                 {showSupportDialog && (
                   <MessageDialog
-                    recipientId="admin@lancerfi.app"
+                    recipientId="support@lancerfi.app"
                     recipientName="Support"
                     triggerVariant="outline"
                     triggerClassName="hidden"

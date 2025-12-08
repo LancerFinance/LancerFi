@@ -38,6 +38,6 @@ export async function verifyWalletSignatureForVercel(
 export function generateChallengeForVercel(): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2);
-  return `LancerFi Challenge\nTimestamp: ${timestamp}\nNonce: ${random}\n\nThis signature proves you own this wallet.`;
+  return `LancerFi Admin Challenge\nTimestamp: ${timestamp}\nNonce: ${random}\n\nThis signature proves you own this wallet.`;
 }
 

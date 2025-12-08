@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, VolumeX, Ban } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Menu, X, User, MessageSquare, Plus, Shield, Zap, Users } from "lucide-react";
+import { Menu, X, User, MessageSquare, Plus, Shield, Zap, Users, Github } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import WalletButton from "./WalletButton";
 import { useWallet } from "@/hooks/useWallet";
@@ -11,6 +11,7 @@ import { db } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
+// Admin wallet address
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -18,25 +19,37 @@ const Header = () => {
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
   const [dashboardNotificationCount, setDashboardNotificationCount] = useState(0);
+  const [restrictionStatus, setRestrictionStatus] = useState<{
+    isRestricted: boolean;
+    restrictionType: 'mute' | 'ban_wallet' | 'ban_ip' | null;
+    expiresAt: string | null;
+    reason: string | null;
+  } | null>(null);
   const { toast } = useToast();
   const {
     isConnected,
     address: connectedAddress
   } = useWallet();
   
+  // Check if connected wallet is admin wallet
   useEffect(() => {
     if (isConnected && connectedAddress) {
       checkUnreadMessages();
       checkDashboardNotifications();
+      checkRestrictionStatus();
+      }
       // Check for new messages and notifications every 10 seconds
       const interval = setInterval(() => {
         checkUnreadMessages();
         checkDashboardNotifications();
+        checkRestrictionStatus();
+        }
       }, 10000);
 
       // Listen for message read events to update count immediately
       const handleMessageRead = () => {
         checkUnreadMessages();
+        }
       };
       window.addEventListener('messageRead', handleMessageRead);
       return () => {
@@ -46,8 +59,22 @@ const Header = () => {
     } else {
       setUnreadCount(0);
       setDashboardNotificationCount(0);
+      setUnreadSupportCount(0);
+      setRestrictionStatus(null);
     }
-  }, [isConnected, connectedAddress]);
+  
+  const checkRestrictionStatus = async () => {
+    if (!connectedAddress) {
+      setRestrictionStatus(null);
+      return;
+    }
+    try {
+      const restriction = await db.checkUserRestriction(connectedAddress);
+      setRestrictionStatus(restriction);
+    } catch (error) {
+      setRestrictionStatus(null);
+    }
+  };
   const checkUnreadMessages = async () => {
     if (!connectedAddress) return;
     try {
@@ -71,6 +98,15 @@ const Header = () => {
     }
   };
   
+    try {
+      const allMessages = await db.getAllMessages();
+      const supportMessages = (allMessages || []).filter(
+      );
+      setUnreadSupportCount(supportMessages.length);
+    } catch (error) {
+      // Silently fail
+    }
+  };
 
   const copyContractAddress = async () => {
     const contractAddress = "XXXXXXpump";
@@ -170,12 +206,36 @@ const Header = () => {
         {/* Secondary Navigation Bar */}
         <div className="hidden lg:flex items-center py-3 border-t border-border/50">
           <span className="text-sm text-muted-foreground">SOL, USDC, X402 payments • Near-zero fees</span>
-          <div className={`flex items-center space-x-2 ${connectedAddress ? 'ml-40' : 'ml-[110px]'}`}>
+          <div className={`flex items-center space-x-2 ${connectedAddress ? 'ml-36' : 'ml-[100px]'}`}>
+            <a 
+              href="https://lancerfi.gitbook.io" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary transition-all duration-200 hover:scale-105"
+              aria-label="View GitBook Documentation"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                <path d="M8 7h6"></path>
+                <path d="M8 11h6"></path>
+                <path d="M8 15h4"></path>
+              </svg>
+            </a>
+            <a 
+              href="https://github.com/LancerFinance/LancerFi" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary transition-all duration-200 hover:scale-105"
+              aria-label="View on GitHub"
+            >
+              <Github className="h-5 w-5" />
+            </a>
             <a 
               href="https://x.com/LancerFi" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-foreground hover:text-primary transition-colors"
+              className="text-foreground hover:text-primary transition-all duration-200 hover:scale-105"
               aria-label="Follow us on X (Twitter)"
             >
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -184,7 +244,7 @@ const Header = () => {
             </a>
             <button 
               onClick={copyContractAddress}
-              className="text-xs sm:text-sm font-medium text-foreground bg-gradient-to-b from-muted to-muted/80 hover:from-muted/90 hover:to-muted/70 border-2 border-border rounded-full px-3 py-1.5 shadow-lg hover:shadow-xl active:shadow-inner active:translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
+              className="text-xs sm:text-sm font-medium text-foreground bg-gradient-to-b from-muted to-muted/80 hover:from-muted/90 hover:to-muted/70 border-2 border-border rounded-full px-3 py-1.5 shadow-lg hover:shadow-xl active:shadow-inner active:translate-y-0.5 transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
               style={{
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)'
               }}
@@ -263,6 +323,25 @@ const Header = () => {
         </div>
       </header>
       
+      {/* Muted/Banned Banner */}
+      {restrictionStatus?.isRestricted && (
+        <div className="w-full bg-yellow-500/10 border-b border-yellow-500/20 py-2 px-4">
+          <div className="container mx-auto flex items-center justify-center gap-2 text-sm font-medium text-yellow-700 dark:text-yellow-400">
+            {restrictionStatus.restrictionType === 'mute' ? (
+              <VolumeX className="w-4 h-4" />
+            ) : (
+              <Ban className="w-4 h-4" />
+            )}
+            <span>
+              {restrictionStatus.restrictionType === 'mute' ? 'MUTED' : 'BANNED'}
+              {restrictionStatus.expiresAt && (
+                <> UNTIL {format(new Date(restrictionStatus.expiresAt), 'MMM d, yyyy HH:mm')}</>
+              )}
+              {!restrictionStatus.expiresAt && ' PERMANENTLY'}
+            </span>
+          </div>
+        </div>
+      )}
     </>
   );
 };

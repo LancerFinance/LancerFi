@@ -7,6 +7,8 @@ import rpcProxyRouter from '../server/routes/rpc-proxy.js';
 import x402PaymentRouter from '../server/routes/x402-payment.js';
 import projectRateLimitRouter from '../server/routes/project-rate-limit.js';
 import projectCleanupRouter from '../server/routes/project-cleanup.js';
+import adminAuthRouter from '../server/routes/admin-auth.js';
+import adminRestrictionsRouter from '../server/routes/admin-restrictions.js';
 import systemStatusRouter from '../server/routes/system-status.js';
 import messagesRouter from '../server/routes/messages.js';
 import { 
@@ -63,16 +65,12 @@ app.use((req, res, next) => {
 });
 
 // Middleware
-// Configure allowed origins via environment variables
-// For production, set FRONTEND_URL in your environment
-// For local development, localhost origins are allowed
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  process.env.FRONTEND_URL_WWW, // Optional www version
+  'https://lancerfi.app',
+  'https://www.lancerfi.app', // Add www version
   'http://localhost:8080',
   'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:8080',
 ].filter(Boolean) as string[];
 
 app.use(cors({
@@ -118,6 +116,8 @@ app.use('/api/rpc', rpcRateLimiter, rpcProxyRouter);
 app.use('/api/x402', paymentRateLimiter, x402PaymentRouter);
 app.use('/api/project', projectRateLimitRouter);
 app.use('/api/project', projectCleanupRouter);
+app.use('/api/admin', adminAuthRouter);
+app.use('/api/admin', adminRestrictionsRouter);
 app.use('/api/system-status', systemStatusRouter);
 app.use('/api/messages', messagesRouter);
 

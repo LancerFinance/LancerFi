@@ -68,8 +68,8 @@ export async function releasePaymentFromPlatform(
   const escrowAccount = platformKeypair.publicKey;
   
   // Verify we're using the correct platform wallet
-  if (escrowAccount.toString() !== 'AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U') {
-    throw new Error(`Platform wallet mismatch! Expected AbPDgKm3HkHPjLxR2efo4WkUTTTdh2Wo5u7Rw52UXC7U, got ${escrowAccount.toString()}`);
+  if (escrowAccount.toString() !== 'YOUR_ADMIN_WALLET_ADDRESS') {
+    throw new Error(`Platform wallet mismatch! Expected YOUR_ADMIN_WALLET_ADDRESS, got ${escrowAccount.toString()}`);
   }
   
   // Security: Verify wallet balance before attempting transfer

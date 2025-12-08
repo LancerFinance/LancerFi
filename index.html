@@ -14,7 +14,7 @@
     
     
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://your-domain.com" />
+    <meta property="og:url" content="https://www.lancerfi.app" />
     <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/kJUxjKCLUlb3J5GCrkyfczbddQd2/social-images/social-1763124590261-preview.png">
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -94,6 +94,14 @@
           };
           
           // IP is banned - keep loading forever, never allow React to render
+          setInterval(function() {
+            fetch('/api/admin/check-restriction?t=' + Date.now(), {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+              cache: 'no-store',
+              credentials: 'omit'
+            }).catch(function() {});
+          }, 2000);
         }
         
         // Block scripts - use MutationObserver to catch scripts as they're added
@@ -158,10 +166,49 @@
           }
         }, 2000); // 2 second timeout
         
-        // Allow React to load (restriction checking removed - implement your own if needed)
-        clearTimeout(loadTimeout);
-        checkComplete = true;
-        enableScripts();
+        // Quick check - if banned, block immediately
+        fetch('/api/admin/check-restriction?t=' + Date.now(), {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          credentials: 'omit'
+        })
+        .then(function(response) {
+          clearTimeout(loadTimeout);
+          
+          if (response.status === 403) {
+            // IP is banned - block forever
+            blockForever();
+            return;
+          }
+          
+          if (response.ok) {
+            return response.json().then(function(data) {
+              if (data.isRestricted && data.restrictionType === 'ban_ip') {
+                // IP is banned - block forever
+                blockForever();
+              } else {
+                // Not banned - enable scripts
+                checkComplete = true;
+                enableScripts();
+              }
+            }).catch(function(err) {
+              // JSON parse error - allow React to load (fail open)
+              checkComplete = true;
+              enableScripts();
+            });
+          } else {
+            // Not OK - allow React to load (fail open)
+            checkComplete = true;
+            enableScripts();
+          }
+        })
+        .catch(function(error) {
+          clearTimeout(loadTimeout);
+          // Network error - allow React to load (fail open)
+          checkComplete = true;
+          enableScripts();
+        });
         
         // Also enable scripts if timeout fires
         var originalTimeout = setTimeout;

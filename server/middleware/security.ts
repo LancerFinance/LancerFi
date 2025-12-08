@@ -226,9 +226,14 @@ export async function trackUserIP(req: Request, res: Response, next: NextFunctio
 /**
  * Middleware to check if IP address is banned and block all requests
  * This should be applied early in the middleware chain
+ * Allows /api/admin/check-restriction endpoint so frontend can check ban status
  */
 export async function checkIPBan(req: Request, res: Response, next: NextFunction) {
   try {
+    // Allow check-restriction endpoint to work even for banned IPs (so frontend can check)
+    if (req.path === '/api/admin/check-restriction' || req.path.startsWith('/api/admin/check-restriction')) {
+      return next();
+    }
     
     const clientIP = getClientIP(req);
     

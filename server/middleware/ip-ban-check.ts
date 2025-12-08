@@ -95,13 +95,14 @@ export async function checkIPBanStatus(clientIP: string): Promise<{
 /**
  * Middleware wrapper for Vercel serverless functions
  * Use this at the start of your handler to block banned IPs
+ * Allows check-restriction endpoint so frontend can check ban status
  */
 export async function checkIPBanForVercel(req: VercelRequest, res: VercelResponse): Promise<boolean> {
-  // Admin restriction checking removed - implement your own if needed
-  // const url = req.url || '';
-  // if (url.includes('/check-restriction') || url.includes('check-restriction')) {
-  //   return false; // Allow request
-  // }
+  // Allow check-restriction endpoint to work even for banned IPs (so frontend can check)
+  const url = req.url || '';
+  if (url.includes('/check-restriction') || url.includes('check-restriction')) {
+    return false; // Allow request
+  }
   
   const clientIP = getClientIPFromVercelRequest(req);
   const banStatus = await checkIPBanStatus(clientIP);

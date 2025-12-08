@@ -35,13 +35,14 @@ interface MessageWithSender extends Message {
   recipient_photo_url?: string;
 }
 
-// Support email identifier (for support messages)
-const ADMIN_EMAIL = 'admin@lancerfi.app';
+// Admin identifiers
+const ADMIN_EMAIL = 'support@lancerfi.app';
+const ADMIN_WALLET_ADDRESS = 'YOUR_PLATFORM_WALLET_ADDRESS';
 
-// Helper function to check if a user is support/admin (for UI display only)
+// Helper function to check if a user is admin
 const isAdmin = (userId: string | null | undefined): boolean => {
   if (!userId) return false;
-  return userId === ADMIN_EMAIL;
+  return userId === ADMIN_EMAIL || userId === ADMIN_WALLET_ADDRESS;
 };
 
 const Messages = () => {
@@ -648,7 +649,7 @@ const SupportButtonWrapper = ({ address, loadMessages }: SupportButtonWrapperPro
       </Button>
       {showDialog && (
         <MessageDialog
-          recipientId="admin@lancerfi.app"
+          recipientId="support@lancerfi.app"
           recipientName="Support"
           triggerVariant="outline"
           triggerClassName="hidden"

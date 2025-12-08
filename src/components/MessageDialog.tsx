@@ -265,7 +265,7 @@ const MessageDialog = ({
       const attachmentUrls = ENABLE_ATTACHMENTS ? await uploadAttachments() : [];
 
       // For support messages, use backend endpoint that enforces rate limiting
-      if (recipientId === 'admin@lancerfi.app') {
+      if (recipientId === 'support@lancerfi.app') {
         const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
         const response = await fetch(`${API_BASE_URL}/api/messages/create-support-message`, {
           method: 'POST',

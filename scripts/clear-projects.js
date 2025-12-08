@@ -50,13 +50,9 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   }
 }
 
-// Require environment variables - no hardcoded defaults for security
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error('❌ Error: Missing required environment variables!');
-  console.error('Please set SUPABASE_URL and SUPABASE_SERVICE_KEY in your environment');
-  console.error('or create a server/.env file with these variables.');
-  process.exit(1);
-}
+// Use defaults if still not set
+SUPABASE_URL = SUPABASE_URL || "https://xhxcfyosctbvlvewyptf.supabase.co";
+SUPABASE_SERVICE_KEY = SUPABASE_SERVICE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoeGNmeW9zY3Ridmx2ZXd5cHRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4Nzg1OTYsImV4cCI6MjA3MzQ1NDU5Nn0.8q6W5IUDAq5-pSl16kiqD3hh21dymAlm9TeYZiv7EqA";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 

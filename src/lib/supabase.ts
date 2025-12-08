@@ -30,7 +30,7 @@ export interface Profile {
   timezone?: string;
   banner_url?: string;
   profile_photo_url?: string;
-  // User restriction fields (mute/ban functionality)
+  // Admin restriction fields
   email?: string;
   is_muted?: boolean;
   is_banned?: boolean;
@@ -521,7 +521,7 @@ export const db = {
       .from('messages')
       .update({ is_read: true })
       .eq('id', messageId)
-      .eq('recipient_id', 'admin@lancerfi.app')
+      .eq('recipient_id', 'support@lancerfi.app')
       .select()
       .single();
     
@@ -533,7 +533,7 @@ export const db = {
     const { data, error } = await supabase
       .from('messages')
       .update({ is_read: true })
-      .eq('recipient_id', 'admin@lancerfi.app')
+      .or('recipient_id.eq.support@lancerfi.app,recipient_id.eq.YOUR_PLATFORM_WALLET_ADDRESS')
       .eq('is_read', false)
       .select();
     
@@ -988,7 +988,7 @@ export const db = {
     }
   },
 
-  // Support message functions
+  // Admin functions
   async getAllMessages() {
     const { data, error } = await supabase
       .from('messages')

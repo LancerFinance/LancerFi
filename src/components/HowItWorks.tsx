@@ -1,4 +1,4 @@
-import { FileText, Users, Lock, CreditCard } from "lucide-react";
+import { FileText, Users, Lock, CreditCard, BookOpen } from "lucide-react";
 
 const HowItWorks = () => {
   const steps = [
@@ -67,10 +67,22 @@ const HowItWorks = () => {
           ))}
         </div>
 
-        <div className="text-center mt-16 fade-in">
+        <div className="text-center mt-16 fade-in space-y-6">
           <div className="inline-flex items-center space-x-2 bg-secondary rounded-full px-6 py-3 border border-border shadow-md">
             <Lock className="w-5 h-5 text-foreground" />
             <span className="text-foreground font-medium">Powered by Solana Smart Contracts</span>
+          </div>
+          
+          <div className="mt-8">
+            <a
+              href="https://lancerfi.gitbook.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors font-medium text-sm sm:text-base"
+            >
+              <BookOpen className="w-5 h-5" />
+              <span>Explore our GitBook</span>
+            </a>
           </div>
         </div>
       </div>

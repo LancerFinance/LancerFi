@@ -20,10 +20,61 @@ export const IPBanGuard = ({ children }: IPBanGuardProps) => {
     let checkInterval: NodeJS.Timeout | null = null;
 
     const checkIPBan = async () => {
-      // IP ban checking removed - implement your own if needed
-      // This component now allows all access
-      if (isMounted) {
-        setIsBanned(false);
+      try {
+        const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
+        
+        // Check IP ban status (lightweight background check)
+        const response = await fetch(`${API_BASE_URL}/api/admin/check-restriction?t=${Date.now()}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store',
+          credentials: 'omit',
+        });
+
+        if (!isMounted) return;
+
+        if (response.status === 403) {
+          // IP is banned - block access
+          setIsBanned(true);
+          
+          // Continue checking periodically
+          if (checkInterval) {
+            clearInterval(checkInterval);
+          }
+          checkInterval = setInterval(() => {
+            if (isMounted) {
+              checkIPBan();
+            }
+          }, 2000);
+          return;
+        } else if (response.ok) {
+          const data = await response.json().catch(() => ({}));
+          if (data.isRestricted && data.restrictionType === 'ban_ip') {
+            // IP is banned - block access
+            setIsBanned(true);
+            
+            // Continue checking periodically
+            if (checkInterval) {
+              clearInterval(checkInterval);
+            }
+            checkInterval = setInterval(() => {
+              if (isMounted) {
+                checkIPBan();
+              }
+            }, 2000);
+            return;
+          }
+        }
+        
+        // IP is not banned - allow access
+        if (isMounted) {
+          setIsBanned(false);
+        }
+      } catch (error) {
+        // On error, fail open (don't block) since index.html already checked
+        // Continue silently
       }
     };
 

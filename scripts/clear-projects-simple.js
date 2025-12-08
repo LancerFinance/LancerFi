@@ -7,16 +7,9 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Require environment variables - no hardcoded defaults for security
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error('❌ Error: Missing required environment variables!');
-  console.error('Please set SUPABASE_URL and SUPABASE_SERVICE_KEY (or SUPABASE_ANON_KEY) in your environment');
-  console.error('or create a server/.env file with these variables.');
-  process.exit(1);
-}
+// Use the same defaults as server/services/supabase.ts
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://xhxcfyosctbvlvewyptf.supabase.co";
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoeGNmeW9zY3Ridmx2ZXd5cHRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4Nzg1OTYsImV4cCI6MjA3MzQ1NDU5Nn0.8q6W5IUDAq5-pSl16kiqD3hh21dymAlm9TeYZiv7EqA";
 
 console.log('🗑️  Starting database cleanup...\n');
 console.log(`Connecting to: ${SUPABASE_URL.substring(0, 30)}...\n`);

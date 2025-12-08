@@ -25,8 +25,8 @@ A decentralized freelancing platform built on Solana blockchain with secure escr
 - Supabase (PostgreSQL database)
 
 ### Infrastructure
-- Frontend: Vercel (or your preferred hosting)
-- Backend API: Vercel serverless functions (or your preferred hosting)
+- Frontend: Vercel (https://lancerfi.app)
+- Backend API: Vercel serverless functions
 - Database: Supabase
 
 ## Setup
@@ -118,7 +118,7 @@ The network is automatically selected:
 
 Before deploying to mainnet, ensure:
 
-1. **Platform Wallet Funding**: Your platform wallet must have:
+1. **Platform Wallet Funding**: The platform wallet `YOUR_ADMIN_WALLET_ADDRESS` must have:
    - Sufficient SOL balance for transaction fees (recommend 1-5 SOL)
    - USDC balance if clients will pay with USDC (optional but recommended)
 
@@ -133,12 +133,9 @@ See `MAINNET_READINESS.md` for detailed setup instructions.
 
 ## Platform Wallet
 
-The platform uses a Solana wallet for escrow operations. This wallet:
-- Holds all escrow funds
-- Automatically releases payments to freelancers when projects are completed
-- Retains the platform fee (1%)
+The escrow wallet address: `YOUR_ADMIN_WALLET_ADDRESS`
 
-**Important**: Generate your own platform wallet and configure it via the `PLATFORM_WALLET_PRIVATE_KEY` environment variable. Never use a wallet from an example or commit your private key to version control.
+This wallet holds all escrow funds and automatically releases payments to freelancers when projects are completed.
 
 ## Payment Flow
 
@@ -151,9 +148,12 @@ The platform uses a Solana wallet for escrow operations. This wallet:
 
 ## Deployment
 
-Both frontend and backend can be deployed to Vercel or your preferred hosting platform.
+Both frontend and backend are deployed to Vercel:
 
-See `SECURITY.md` and `.vercel.env.example` for environment variable configuration.
+- **Frontend**: https://www.lancerfi.app
+- **Backend API**: Configured via Vercel environment variables
+
+See Vercel dashboard for environment variable configuration.
 
 ## Security
 
@@ -165,4 +165,4 @@ See `SECURITY.md` and `.vercel.env.example` for environment variable configurati
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT
