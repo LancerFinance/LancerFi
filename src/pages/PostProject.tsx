@@ -263,7 +263,7 @@ const PostProject = () => {
         description: "Please create a profile with your name before posting a project",
         variant: "destructive",
       });
-      navigate('/create-profile');
+      navigate('/edit-profile');
       return;
     }
 

@@ -202,7 +202,7 @@ const SubmitProposal = () => {
         description: "Please create a freelancer profile before submitting proposals",
         variant: "destructive",
       });
-      navigate('/create-profile');
+      navigate('/edit-profile');
       return;
     }
 
@@ -213,7 +213,7 @@ const SubmitProposal = () => {
         description: "Please complete your freelancer profile (name and username required) before submitting proposals",
         variant: "destructive",
       });
-      navigate('/create-profile');
+      navigate('/edit-profile');
       return;
     }
 
