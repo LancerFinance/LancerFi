@@ -1112,4 +1112,74 @@ export const db = {
     };
   },
 
+  // Bookmarks
+  async isBookmarked(walletAddress: string, projectId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('bookmarks')
+      .select('id')
+      .eq('user_wallet_address', walletAddress)
+      .eq('project_id', projectId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error checking bookmark:', error);
+      return false;
+    }
+    
+    return !!data;
+  },
+
+  async addBookmark(walletAddress: string, projectId: string) {
+    const { data, error } = await supabase
+      .from('bookmarks')
+      .insert({
+        user_wallet_address: walletAddress,
+        project_id: projectId
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      // If it's a unique constraint error, the bookmark already exists
+      if (error.code === '23505') {
+        return { success: true, alreadyExists: true };
+      }
+      throw error;
+    }
+    
+    return { success: true, data };
+  },
+
+  async removeBookmark(walletAddress: string, projectId: string) {
+    const { error } = await supabase
+      .from('bookmarks')
+      .delete()
+      .eq('user_wallet_address', walletAddress)
+      .eq('project_id', projectId);
+    
+    if (error) throw error;
+    return { success: true };
+  },
+
+  async getBookmarkedProjects(walletAddress: string): Promise<Project[]> {
+    const { data: bookmarks, error: bookmarksError } = await supabase
+      .from('bookmarks')
+      .select('project_id')
+      .eq('user_wallet_address', walletAddress)
+      .order('created_at', { ascending: false });
+    
+    if (bookmarksError) throw bookmarksError;
+    if (!bookmarks || bookmarks.length === 0) return [];
+    
+    const projectIds = bookmarks.map(b => b.project_id);
+    const { data: projects, error: projectsError } = await supabase
+      .from('projects')
+      .select('*')
+      .in('id', projectIds)
+      .order('created_at', { ascending: false });
+    
+    if (projectsError) throw projectsError;
+    return projects || [];
+  },
+
 };

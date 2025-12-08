@@ -19,7 +19,9 @@ import {
   AlertTriangle,
   MessageSquare,
   Edit,
-  Loader2
+  Loader2,
+  Bookmark,
+  BookmarkCheck
 } from "lucide-react";
 import { db, supabase, Project, Escrow, Profile, WorkSubmission } from "@/lib/supabase";
 import SubmitWorkDialog from "@/components/SubmitWorkDialog";
@@ -69,6 +71,8 @@ const ProjectDetails = () => {
   const [showKickOffDialog, setShowKickOffDialog] = useState(false);
   const [showEVMDialog, setShowEVMDialog] = useState(false);
   const [freelancerEVMAddress, setFreelancerEVMAddress] = useState('');
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const { canProceed: canComplete } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'completing a project' });
   const { canProceed: canKickOff } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'kicking off a freelancer' });
   
@@ -93,6 +97,64 @@ const ProjectDetails = () => {
       loadProjectDetails();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (isConnected && address && project) {
+      checkBookmarkStatus();
+    } else {
+      // Reset bookmark status when wallet disconnects
+      setIsBookmarked(false);
+    }
+  }, [isConnected, address, project?.id]);
+
+  const checkBookmarkStatus = async () => {
+    if (!address || !project) return;
+    try {
+      const bookmarked = await db.isBookmarked(address, project.id);
+      setIsBookmarked(bookmarked);
+    } catch (error) {
+      console.error('Error checking bookmark status:', error);
+    }
+  };
+
+  const handleBookmarkToggle = async () => {
+    if (!isConnected || !address || !project) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to bookmark projects",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setBookmarkLoading(true);
+    try {
+      if (isBookmarked) {
+        await db.removeBookmark(address, project.id);
+        setIsBookmarked(false);
+        toast({
+          title: "Bookmark Removed",
+          description: "Project removed from your bookmarks",
+        });
+      } else {
+        await db.addBookmark(address, project.id);
+        setIsBookmarked(true);
+        toast({
+          title: "Bookmark Added",
+          description: "Project added to your bookmarks",
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update bookmark. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setBookmarkLoading(false);
+    }
+  };
 
   const loadProjectDetails = async () => {
     if (!id) return;
@@ -674,29 +736,50 @@ const ProjectDetails = () => {
                   </div>
                 </div>
               </div>
-              {isProjectOwner && (
-                <div className="flex gap-2">
-                  <Link to={`/project/${id}/edit`}>
-                    <Button variant="outline" size="sm">
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit Project
-                    </Button>
-                  </Link>
-                  {!project.freelancer_id && (
-                    <Link to={`/project/${id}/proposals`}>
-                      <Button variant="default" size="sm" className="relative">
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        View Proposals
-                        {proposalCount > 0 && (
-                          <Badge className="ml-2 bg-accent-amber text-white">
-                            {proposalCount}
-                          </Badge>
-                        )}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBookmarkToggle}
+                  disabled={bookmarkLoading}
+                  title={isBookmarked ? "Remove bookmark" : "Bookmark project"}
+                >
+                  {isBookmarked ? (
+                    <>
+                      <BookmarkCheck className="w-4 h-4 mr-2 text-web3-primary fill-web3-primary" />
+                      Bookmarked
+                    </>
+                  ) : (
+                    <>
+                      <Bookmark className="w-4 h-4 mr-2" />
+                      Bookmark
+                    </>
+                  )}
+                </Button>
+                {isProjectOwner && (
+                  <>
+                    <Link to={`/project/${id}/edit`}>
+                      <Button variant="outline" size="sm">
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit Project
                       </Button>
                     </Link>
-                  )}
-                </div>
-              )}
+                    {!project.freelancer_id && (
+                      <Link to={`/project/${id}/proposals`}>
+                        <Button variant="default" size="sm" className="relative">
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          View Proposals
+                          {proposalCount > 0 && (
+                            <Badge className="ml-2 bg-accent-amber text-white">
+                              {proposalCount}
+                            </Badge>
+                          )}
+                        </Button>
+                      </Link>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
 

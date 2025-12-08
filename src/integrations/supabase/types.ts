@@ -426,6 +426,35 @@ export type Database = {
           },
         ]
       }
+      bookmarks: {
+        Row: {
+          id: string
+          user_wallet_address: string
+          project_id: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_wallet_address: string
+          project_id: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_wallet_address?: string
+          project_id?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookmarks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

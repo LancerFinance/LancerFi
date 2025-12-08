@@ -1,11 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, DollarSign, Shield, User, CheckCircle } from "lucide-react";
-import { Project, Escrow } from "@/lib/supabase";
+import { Clock, DollarSign, Shield, User, CheckCircle, Bookmark, BookmarkCheck } from "lucide-react";
+import { Project, Escrow, db } from "@/lib/supabase";
 import { formatUSDC, formatSOL } from "@/lib/solana";
 import { useState, useEffect } from "react";
 import { getSolanaPrice } from "@/lib/solana-price";
+import { useWallet } from "@/hooks/useWallet";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProjectCardProps {
   project: Project;
@@ -16,6 +18,10 @@ interface ProjectCardProps {
 
 const ProjectCard = ({ project, escrow, onViewProject, proposalCount = 0 }: ProjectCardProps) => {
   const [solPrice, setSolPrice] = useState<number | null>(null);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const { address, isConnected } = useWallet();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (escrow?.payment_currency === 'SOLANA') {
@@ -27,6 +33,65 @@ const ProjectCard = ({ project, escrow, onViewProject, proposalCount = 0 }: Proj
       });
     }
   }, [escrow?.payment_currency]);
+
+  useEffect(() => {
+    if (isConnected && address) {
+      checkBookmarkStatus();
+    } else {
+      // Reset bookmark status when wallet disconnects
+      setIsBookmarked(false);
+    }
+  }, [isConnected, address, project.id]);
+
+  const checkBookmarkStatus = async () => {
+    if (!address) return;
+    try {
+      const bookmarked = await db.isBookmarked(address, project.id);
+      setIsBookmarked(bookmarked);
+    } catch (error) {
+      console.error('Error checking bookmark status:', error);
+    }
+  };
+
+  const handleBookmarkToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isConnected || !address) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to bookmark projects",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setBookmarkLoading(true);
+    try {
+      if (isBookmarked) {
+        await db.removeBookmark(address, project.id);
+        setIsBookmarked(false);
+        toast({
+          title: "Bookmark Removed",
+          description: "Project removed from your bookmarks",
+        });
+      } else {
+        await db.addBookmark(address, project.id);
+        setIsBookmarked(true);
+        toast({
+          title: "Bookmark Added",
+          description: "Project added to your bookmarks",
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update bookmark. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setBookmarkLoading(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -52,9 +117,25 @@ const ProjectCard = ({ project, escrow, onViewProject, proposalCount = 0 }: Proj
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-2 flex-1 min-w-0">
-            <CardTitle className="text-xl text-foreground line-clamp-2 break-words">
-              {project.title}
-            </CardTitle>
+            <div className="flex items-start justify-between gap-2">
+              <CardTitle className="text-xl text-foreground line-clamp-2 break-words flex-1">
+                {project.title}
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 flex-shrink-0"
+                onClick={handleBookmarkToggle}
+                disabled={bookmarkLoading}
+                title={isBookmarked ? "Remove bookmark" : "Bookmark project"}
+              >
+                {isBookmarked ? (
+                  <BookmarkCheck className="h-4 w-4 text-web3-primary fill-web3-primary" />
+                ) : (
+                  <Bookmark className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
             <div className="flex items-center space-x-2 flex-wrap">
               <Badge className={getStatusColor(project.status)}>
                 {project.status.replace('_', ' ').toUpperCase()}
