@@ -13,7 +13,7 @@ import { validateImageFile, validateDocumentFile } from "@/lib/file-security";
 import { checkImageForNSFW } from "@/lib/nsfw-detection";
 
 // Feature flag: Set to true to enable attachments feature
-const ENABLE_ATTACHMENTS = false;
+const ENABLE_ATTACHMENTS = true;
 
 interface MessageDialogProps {
   recipientId: string;
