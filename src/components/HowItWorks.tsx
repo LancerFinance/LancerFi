@@ -75,7 +75,7 @@ const HowItWorks = () => {
           
           <div className="mt-8">
             <a
-              href="https://lancerfi.gitbook.io"
+              href="https://lancer-finance.gitbook.io/lancer-finance/"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors font-medium text-sm sm:text-base"

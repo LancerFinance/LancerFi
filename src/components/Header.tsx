@@ -221,7 +221,7 @@ const Header = () => {
           <span className="text-sm text-muted-foreground">SOL, USDC, X402 payments • Near-zero fees</span>
           <div className={`flex items-center space-x-2 ${connectedAddress ? 'ml-36' : 'ml-[100px]'}`}>
             <a 
-              href="https://lancerfi.gitbook.io" 
+              href="https://lancer-finance.gitbook.io/lancer-finance/" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-foreground hover:text-primary transition-all duration-200 hover:scale-105"
