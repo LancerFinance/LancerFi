@@ -488,7 +488,8 @@ const ViewProposals = () => {
                                 )}
                                 <span>{proposal.freelancer.completed_projects || 0} projects completed</span>
                                 <span>
-                                  {formatUSDC(proposal.freelancer.total_earned || 0)} earned
+                                  {/* Note: total_earned from database mixes currencies, so we show 0 */}
+                                  {formatUSDC(0)} earned
                                 </span>
                               </div>
                             </div>

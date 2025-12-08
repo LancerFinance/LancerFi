@@ -11,6 +11,8 @@ import { db } from "@/lib/supabase";
 import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/hooks/useWallet";
 import { toast } from "@/hooks/use-toast";
+import { getSolanaPrice } from "@/lib/solana-price";
+import { formatUSDC } from "@/lib/solana";
 
 interface ServiceDetails {
   id: string;
@@ -45,6 +47,7 @@ const ServiceDetails = () => {
   const [service, setService] = useState<ServiceDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasSubmittedProposal, setHasSubmittedProposal] = useState(false);
+  const [freelancerEarnings, setFreelancerEarnings] = useState<number>(0);
 
   useEffect(() => {
     if (id) {
@@ -67,10 +70,60 @@ const ServiceDetails = () => {
       
       if (project) {
         let freelancerData = null;
+        let calculatedEarnings = 0;
+        
         if (project.freelancer_id) {
           freelancerData = await db.getProfile(project.freelancer_id);
+          
+          // Calculate earnings from escrows (not from database total_earned which mixes currencies)
+          if (freelancerData?.id) {
+            const { data: projects } = await supabase
+              .from('projects')
+              .select('id')
+              .eq('freelancer_id', freelancerData.id);
+            
+            const projectIds = (projects || []).map((p: any) => p.id);
+            
+            if (projectIds.length > 0) {
+              const { data: escrows } = await supabase
+                .from('escrows')
+                .select('amount_usdc, payment_currency')
+                .in('project_id', projectIds)
+                .eq('status', 'released');
+              
+              if (escrows && escrows.length > 0) {
+                let solEarnings = 0;
+                let usdEarnings = 0;
+                
+                escrows.forEach((e: any) => {
+                  const amount = Number(e.amount_usdc || 0);
+                  const currency = e.payment_currency || 'SOLANA';
+                  
+                  if (currency === 'SOLANA') {
+                    solEarnings += amount;
+                  } else {
+                    usdEarnings += amount;
+                  }
+                });
+                
+                if (solEarnings > 0) {
+                  try {
+                    const priceData = await getSolanaPrice();
+                    const solPrice = priceData.price_usd;
+                    usdEarnings += solEarnings * solPrice;
+                  } catch (error) {
+                    console.error('Error fetching SOL price:', error);
+                    usdEarnings += solEarnings * 100;
+                  }
+                }
+                
+                calculatedEarnings = usdEarnings;
+              }
+            }
+          }
         }
         
+        setFreelancerEarnings(calculatedEarnings);
         setService({
           ...project,
           freelancer: freelancerData
@@ -379,7 +432,7 @@ const ServiceDetails = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="text-center p-4 bg-muted/50 rounded-lg">
                       <TrendingUp className="h-6 w-6 mx-auto mb-2 text-web3-success" />
-                      <div className="text-2xl font-bold">${service.freelancer.total_earned}</div>
+                      <div className="text-2xl font-bold">{formatUSDC(freelancerEarnings)}</div>
                       <div className="text-sm text-muted-foreground">Total Earned</div>
                     </div>
                     <div className="text-center p-4 bg-muted/50 rounded-lg">

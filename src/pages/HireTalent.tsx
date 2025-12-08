@@ -119,22 +119,13 @@ const HireTalent = () => {
 
       // Calculate USD earnings for each freelancer
       // earningsByFreelancer contains USD amounts from escrows (already converted)
-      // For freelancers without escrows, convert their database total_earned (SOL) to USD
+      // Note: We don't use database total_earned as fallback because it mixes currencies (SOL, USDC, X402)
+      // and cannot be accurately converted without currency information
       const earningsMap: Record<string, number> = {};
       for (const freelancer of freelancerList) {
-        let usdEarned = 0;
-        
-        // If we calculated earnings from escrows, use those (already in USD)
-        if (earningsByFreelancer[freelancer.id] !== undefined && earningsByFreelancer[freelancer.id] > 0) {
-          usdEarned = earningsByFreelancer[freelancer.id];
-        } 
-        // Otherwise, convert database total_earned (which is in SOL) to USD
-        else if (freelancer.total_earned && Number(freelancer.total_earned) > 0) {
-          // The database total_earned is stored in SOL, so convert to USD
-          const solAmount = Number(freelancer.total_earned);
-          usdEarned = solAmount * solPrice;
-        }
-        
+        // Use earnings calculated from escrows (already in USD)
+        // If no escrows found, earnings remain 0 (freelancer hasn't earned anything yet)
+        const usdEarned = earningsByFreelancer[freelancer.id] || 0;
         earningsMap[freelancer.id] = usdEarned;
       }
       

@@ -184,18 +184,9 @@ const FreelancerProfile = () => {
         }
       }
       
-      // If no escrows found, convert database total_earned (SOL) to USD
-      if (totalEarnedUSD === 0 && data?.total_earned && data.total_earned > 0) {
-        try {
-          const priceData = await getSolanaPrice();
-          const solPrice = priceData.price_usd;
-          totalEarnedUSD = data.total_earned * solPrice;
-        } catch (error) {
-          console.error('Error fetching SOL price:', error);
-          // Use fallback price of $100
-          totalEarnedUSD = data.total_earned * 100;
-        }
-      }
+      // Note: We don't use database total_earned as fallback because it mixes currencies (SOL, USDC, X402)
+      // and cannot be accurately converted without currency information
+      // If no escrows found, totalEarnedUSD remains 0 (freelancer hasn't earned anything yet)
       
       setUsdEarned(totalEarnedUSD);
       setProfile(data);
