@@ -54,17 +54,14 @@ const FrontendRoadmap = () => {
     },
     {
       phase: "Phase 4",
-      title: "Mobile Application Expansion",
+      title: "Mobile Application",
       icon: <Smartphone className="w-8 h-8" />,
       color: "text-pink-600",
       bgColor: "bg-pink-50",
       items: [
         "Develop LancerFi Mobile App for iOS & Android",
-        "Seamless wallet integration with Solana mobile wallets",
-        "Enable push notifications for job updates and payment status",
-        "Add real-time chat between clients and freelancers",
-        "Launch in-app dispute resolution and escrow tracking",
-        "Introduce cross-platform sync (browser and mobile)"
+        "Introduce cross-platform sync (browser and mobile)",
+        "Experimental features"
       ]
     }
   ];
@@ -82,42 +79,86 @@ const FrontendRoadmap = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-7xl mx-auto">
-          {phases.map((phase, index) => (
-            <Card 
-              key={index}
-              className="bg-gradient-card border-border/50 hover:shadow-lg transition-shadow fade-in"
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              <CardHeader>
-                <div className="flex items-center gap-4 mb-4">
-                  <div className={`w-14 h-14 ${phase.bgColor} rounded-xl flex items-center justify-center ${phase.color}`}>
-                    {phase.icon}
-                  </div>
-                  <div>
-                    <div className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                      {phase.phase}
+        <div className="max-w-7xl mx-auto">
+          {/* First row: Phase 0, 1, 2 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-6 sm:mb-8">
+            {phases.slice(0, 3).map((phase, index) => (
+              <Card 
+                key={index}
+                className="bg-gradient-card border-border/50 hover:shadow-lg transition-all duration-200 hover:scale-110 fade-in"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <CardHeader>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className={`w-14 h-14 ${phase.bgColor} rounded-xl flex items-center justify-center ${phase.color}`}>
+                      {phase.icon}
                     </div>
-                    <CardTitle className="text-xl sm:text-2xl text-foreground">
-                      {phase.title}
-                    </CardTitle>
+                    <div>
+                      <div className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                        {phase.phase}
+                      </div>
+                      <CardTitle className="text-xl sm:text-2xl text-foreground">
+                        {phase.title}
+                      </CardTitle>
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {phase.items.map((item, itemIndex) => (
-                    <li key={itemIndex} className="flex items-start gap-3">
-                      <CheckCircle className={`w-5 h-5 ${phase.color} flex-shrink-0 mt-0.5`} />
-                      <span className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-                        {item}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ))}
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    {phase.items.map((item, itemIndex) => (
+                      <li key={itemIndex} className="flex items-start gap-3">
+                        <CheckCircle className={`w-5 h-5 ${phase.color} flex-shrink-0 mt-0.5`} />
+                        <span className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                          {item}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Second row: Phase 3, 4 (centered) */}
+          <div className="flex justify-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-4xl">
+              {phases.slice(3).map((phase, index) => (
+                <Card 
+                  key={index + 3}
+                  className="bg-gradient-card border-border/50 hover:shadow-lg transition-all duration-200 hover:scale-110 fade-in"
+                  style={{ animationDelay: `${(index + 3) * 0.1}s` }}
+                >
+                  <CardHeader>
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className={`w-14 h-14 ${phase.bgColor} rounded-xl flex items-center justify-center ${phase.color}`}>
+                        {phase.icon}
+                      </div>
+                      <div>
+                        <div className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                          {phase.phase}
+                        </div>
+                        <CardTitle className="text-xl sm:text-2xl text-foreground">
+                          {phase.title}
+                        </CardTitle>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-3">
+                      {phase.items.map((item, itemIndex) => (
+                        <li key={itemIndex} className="flex items-start gap-3">
+                          <CheckCircle className={`w-5 h-5 ${phase.color} flex-shrink-0 mt-0.5`} />
+                          <span className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                            {item}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="text-center mt-8 sm:mt-12 md:mt-16 fade-in">
