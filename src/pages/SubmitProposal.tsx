@@ -24,6 +24,7 @@ const SubmitProposal = () => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [totalProjectBudget, setTotalProjectBudget] = useState<number>(0);
 
   const [formData, setFormData] = useState({
     coverLetter: '',
@@ -93,10 +94,42 @@ const SubmitProposal = () => {
         setProfile(profiles);
       }
 
+      // Load escrows to calculate total budget
+      let calculatedTotalBudget = projectData.budget_usdc;
+      try {
+        const escrows = await db.getAllEscrows(projectId);
+        if (escrows && escrows.length > 0) {
+          const totalBudgetInCurrency = escrows.reduce((sum, e) => {
+            return sum + (Number(e.amount_usdc) || 0);
+          }, 0);
+          
+          const paymentCurrency = escrows[0]?.payment_currency || 'SOLANA';
+          if (paymentCurrency === 'SOLANA') {
+            // Convert SOL to USD
+            const { getSolanaPrice } = await import('@/lib/solana-price');
+            try {
+              const priceData = await getSolanaPrice();
+              calculatedTotalBudget = totalBudgetInCurrency * priceData.price_usd;
+            } catch {
+              // Fallback to original budget if price fetch fails
+              calculatedTotalBudget = projectData.budget_usdc;
+            }
+          } else {
+            // USDC/X402 - amount_usdc is already in USD
+            calculatedTotalBudget = totalBudgetInCurrency;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading escrows:', error);
+        // Use original budget if escrow loading fails
+      }
+      
+      setTotalProjectBudget(calculatedTotalBudget);
+
       // Pre-fill budget with project budget
       setFormData(prev => ({
         ...prev,
-        proposedBudget: projectData.budget_usdc.toString()
+        proposedBudget: calculatedTotalBudget.toString()
       }));
 
     } catch (error) {
@@ -119,12 +152,13 @@ const SubmitProposal = () => {
     }
     
     // Real-time validation for budget
-    if (field === 'proposedBudget' && value && project) {
+    if (field === 'proposedBudget' && value) {
       const proposedBudget = parseFloat(value);
-      if (proposedBudget > project.budget_usdc) {
+      const maxBudget = totalProjectBudget || project?.budget_usdc || 0;
+      if (proposedBudget > maxBudget) {
         setFormErrors(prev => ({
           ...prev,
-          proposedBudget: `Proposed budget cannot exceed client's budget of $${project.budget_usdc}`
+          proposedBudget: `Proposed budget cannot exceed client's budget of $${maxBudget.toFixed(2)}`
         }));
       } else {
         // Clear error if it was previously set and now valid
@@ -149,7 +183,8 @@ const SubmitProposal = () => {
   const handleBudgetBlur = () => {
     // If the field is empty on blur, restore the default budget
     if (!formData.proposedBudget && project) {
-      setFormData(prev => ({ ...prev, proposedBudget: project.budget_usdc.toString() }));
+      const defaultBudget = (totalProjectBudget || project.budget_usdc).toString();
+      setFormData(prev => ({ ...prev, proposedBudget: defaultBudget }));
     }
   };
 
@@ -168,8 +203,11 @@ const SubmitProposal = () => {
       const proposedBudget = parseFloat(formData.proposedBudget);
       if (proposedBudget <= 0) {
         errors.proposedBudget = "Budget must be greater than 0";
-      } else if (project && proposedBudget > project.budget_usdc) {
-        errors.proposedBudget = `Proposed budget cannot exceed client's budget of $${project.budget_usdc}`;
+      } else {
+        const maxBudget = totalProjectBudget || project?.budget_usdc || 0;
+        if (proposedBudget > maxBudget) {
+          errors.proposedBudget = `Proposed budget cannot exceed client's budget of $${maxBudget.toFixed(2)}`;
+        }
       }
     }
 
@@ -413,7 +451,7 @@ const SubmitProposal = () => {
                         <p className="text-sm text-destructive">{formErrors.proposedBudget}</p>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        Client's budget: ${project.budget_usdc}
+                        Client's budget: ${(totalProjectBudget || project.budget_usdc).toFixed(2)}
                       </p>
                     </div>
 

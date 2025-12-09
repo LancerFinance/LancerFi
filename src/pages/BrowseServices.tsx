@@ -11,6 +11,7 @@ import { Search, Filter, Star, Clock, DollarSign, Grid, List, Bookmark, Bookmark
 import { db, supabase } from "@/lib/supabase";
 import { useWallet } from "@/hooks/useWallet";
 import { useToast } from "@/hooks/use-toast";
+import { getSolanaPrice } from "@/lib/solana-price";
 
 interface Service {
   id: string;
@@ -18,6 +19,7 @@ interface Service {
   description: string;
   category: string;
   budget_usdc: number;
+  calculatedBudget?: number; // Total budget from all escrows
   timeline: string;
   required_skills: string[];
   status: string;
@@ -166,6 +168,57 @@ const BrowseServices = () => {
       // Filter out hidden projects in JavaScript (Supabase .or() syntax is complex)
       const visibleProjects = (projects || []).filter((p: any) => !p.is_hidden);
 
+      // Fetch SOL price once for all projects (more efficient)
+      let solPrice: number | null = null;
+      try {
+        const priceData = await getSolanaPrice();
+        solPrice = priceData.price_usd;
+      } catch (error) {
+        console.error('Error fetching SOL price:', error);
+        solPrice = 100; // Fallback price
+      }
+
+      // Calculate total budget from all escrows for each project
+      const projectsWithCalculatedBudget = await Promise.all(
+        visibleProjects.map(async (project: any) => {
+          try {
+            const escrows = await db.getAllEscrows(project.id);
+            
+            if (!escrows || escrows.length === 0) {
+              return { ...project, calculatedBudget: project.budget_usdc };
+            }
+
+            // Sum all escrow amounts (project amount only, excluding platform fees)
+            const totalBudgetInCurrency = escrows.reduce((sum, e) => {
+              const amount = Number(e.amount_usdc) || 0;
+              return sum + amount;
+            }, 0);
+
+            if (totalBudgetInCurrency === 0) {
+              return { ...project, calculatedBudget: project.budget_usdc };
+            }
+
+            // Convert to USD if needed (for SOL payments)
+            const paymentCurrency = escrows[0]?.payment_currency || 'SOLANA';
+            
+            if (paymentCurrency === 'SOLANA') {
+              if (solPrice && solPrice > 0) {
+                const totalUSD = totalBudgetInCurrency * solPrice;
+                return { ...project, calculatedBudget: totalUSD };
+              } else {
+                return { ...project, calculatedBudget: project.budget_usdc };
+              }
+            } else {
+              // USDC/X402 - amount_usdc is already in USD
+              return { ...project, calculatedBudget: totalBudgetInCurrency };
+            }
+          } catch (error) {
+            console.error(`Error calculating budget for project ${project.id}:`, error);
+            return { ...project, calculatedBudget: project.budget_usdc };
+          }
+        })
+      );
+
       if (error) {
         // If join fails, fallback to checking escrows separately
         const allProjects = await db.getProjects({ status: 'active' });
@@ -174,13 +227,45 @@ const BrowseServices = () => {
             if (project.freelancer_id) return null; // Skip projects with freelancers
             if (project.is_hidden) return null; // Skip hidden projects
             const escrow = await db.getEscrow(project.id);
-            return escrow && escrow.status === 'funded' ? project : null;
+            if (!escrow || escrow.status !== 'funded') return null;
+            
+            // Calculate total budget from all escrows
+            try {
+              const escrows = await db.getAllEscrows(project.id);
+              if (!escrows || escrows.length === 0) {
+                return { ...project, calculatedBudget: project.budget_usdc };
+              }
+
+              const totalBudgetInCurrency = escrows.reduce((sum, e) => {
+                return sum + (Number(e.amount_usdc) || 0);
+              }, 0);
+
+              if (totalBudgetInCurrency === 0) {
+                return { ...project, calculatedBudget: project.budget_usdc };
+              }
+
+              const paymentCurrency = escrows[0]?.payment_currency || 'SOLANA';
+              if (paymentCurrency === 'SOLANA') {
+                try {
+                  const priceData = await getSolanaPrice();
+                  const totalUSD = totalBudgetInCurrency * priceData.price_usd;
+                  return { ...project, calculatedBudget: totalUSD };
+                } catch {
+                  return { ...project, calculatedBudget: project.budget_usdc };
+                }
+              } else {
+                return { ...project, calculatedBudget: totalBudgetInCurrency };
+              }
+            } catch (error) {
+              console.error(`Error calculating budget for project ${project.id}:`, error);
+              return { ...project, calculatedBudget: project.budget_usdc };
+            }
           })
         );
         const validProjects = projectsWithEscrows.filter(p => p !== null);
         setServices(validProjects as Service[]);
       } else {
-        setServices(visibleProjects as Service[]);
+        setServices(projectsWithCalculatedBudget as Service[]);
       }
     } catch (error) {
       console.error('Error loading services:', error);
@@ -191,7 +276,39 @@ const BrowseServices = () => {
           allProjects.map(async (project) => {
             if (project.freelancer_id) return null;
             const escrow = await db.getEscrow(project.id);
-            return escrow && escrow.status === 'funded' ? project : null;
+            if (!escrow || escrow.status !== 'funded') return null;
+            
+            // Calculate total budget from all escrows
+            try {
+              const escrows = await db.getAllEscrows(project.id);
+              if (!escrows || escrows.length === 0) {
+                return { ...project, calculatedBudget: project.budget_usdc };
+              }
+
+              const totalBudgetInCurrency = escrows.reduce((sum, e) => {
+                return sum + (Number(e.amount_usdc) || 0);
+              }, 0);
+
+              if (totalBudgetInCurrency === 0) {
+                return { ...project, calculatedBudget: project.budget_usdc };
+              }
+
+              const paymentCurrency = escrows[0]?.payment_currency || 'SOLANA';
+              if (paymentCurrency === 'SOLANA') {
+                try {
+                  const priceData = await getSolanaPrice();
+                  const totalUSD = totalBudgetInCurrency * priceData.price_usd;
+                  return { ...project, calculatedBudget: totalUSD };
+                } catch {
+                  return { ...project, calculatedBudget: project.budget_usdc };
+                }
+              } else {
+                return { ...project, calculatedBudget: totalBudgetInCurrency };
+              }
+            } catch (error) {
+              console.error(`Error calculating budget for project ${project.id}:`, error);
+              return { ...project, calculatedBudget: project.budget_usdc };
+            }
           })
         );
         const validProjects = projectsWithEscrows.filter(p => p !== null);
@@ -220,9 +337,9 @@ const BrowseServices = () => {
   }).sort((a, b) => {
     switch (sortBy) {
       case 'price-low':
-        return a.budget_usdc - b.budget_usdc;
+        return (a.calculatedBudget || a.budget_usdc) - (b.calculatedBudget || b.budget_usdc);
       case 'price-high':
-        return b.budget_usdc - a.budget_usdc;
+        return (b.calculatedBudget || b.budget_usdc) - (a.calculatedBudget || a.budget_usdc);
       case 'rating':
         return (b.freelancer?.rating || 0) - (a.freelancer?.rating || 0);
       default:
@@ -469,7 +586,7 @@ const BrowseServices = () => {
                     </div>
                     <div className="flex items-center gap-1 text-lg font-bold text-primary">
                       <DollarSign className="h-5 w-5" />
-                      <span>{service.budget_usdc}</span>
+                      <span>{service.calculatedBudget ? service.calculatedBudget.toFixed(2) : service.budget_usdc}</span>
                     </div>
                   </div>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -66,6 +66,7 @@ const ProjectDetails = () => {
   const [completing, setCompleting] = useState(false);
   const [proposalCount, setProposalCount] = useState(0);
   const [solPrice, setSolPrice] = useState<number | null>(null);
+  const [calculatedBudget, setCalculatedBudget] = useState<string>('');
   const [workSubmissions, setWorkSubmissions] = useState<WorkSubmission[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [kickingOffFreelancer, setKickingOffFreelancer] = useState(false);
@@ -76,6 +77,66 @@ const ProjectDetails = () => {
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const { canProceed: canComplete } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'completing a project' });
   const { canProceed: canKickOff } = useRateLimit({ minTimeBetweenCalls: 2000, actionName: 'kicking off a freelancer' });
+  
+  // Calculate total budget from all escrows whenever escrows or solPrice changes
+  useEffect(() => {
+    const calculateBudget = async () => {
+      if (!project) {
+        setCalculatedBudget('');
+        return;
+      }
+      
+      // If no escrows, return original project budget
+      if (!allEscrows || allEscrows.length === 0) {
+        setCalculatedBudget(formatUSDC(project.budget_usdc));
+        return;
+      }
+      
+      // Calculate total budget from all escrows (project amount, excluding platform fees)
+      // Match the same logic used in Escrow Details section - sum all escrows regardless of status
+      const totalBudgetInCurrency = allEscrows.reduce((sum, e) => {
+        if (e) {
+          const amount = Number(e.amount_usdc) || 0;
+          return sum + amount;
+        }
+        return sum;
+      }, 0);
+      
+      // If total is 0, fall back to original budget
+      if (totalBudgetInCurrency === 0 || isNaN(totalBudgetInCurrency)) {
+        setCalculatedBudget(formatUSDC(project.budget_usdc));
+        return;
+      }
+      
+      // Convert to USD if needed (for SOL payments)
+      const paymentCurrency = allEscrows[0]?.payment_currency || 'SOLANA';
+      
+      if (paymentCurrency === 'SOLANA') {
+        // For SOL, amount_usdc stores SOL amount, so convert to USD
+        let priceToUse = solPrice;
+        
+        // If solPrice is not available, fetch it
+        if (!priceToUse || priceToUse <= 0) {
+          try {
+            const priceData = await getSolanaPrice();
+            priceToUse = priceData.price_usd;
+            setSolPrice(priceToUse);
+          } catch (error) {
+            console.error('Error fetching SOL price:', error);
+            priceToUse = 100; // Fallback price
+          }
+        }
+        
+        const totalUSD = totalBudgetInCurrency * priceToUse;
+        setCalculatedBudget(formatUSDC(totalUSD));
+      } else {
+        // For USDC/X402, amount_usdc is already in USD
+        setCalculatedBudget(formatUSDC(totalBudgetInCurrency));
+      }
+    };
+    
+    calculateBudget();
+  }, [project, allEscrows, solPrice]);
   
   const copyToClipboard = async (text: string, fieldName: string) => {
     try {
@@ -98,6 +159,20 @@ const ProjectDetails = () => {
       loadProjectDetails();
     }
   }, [id]);
+
+  // Load SOL price when escrows are available
+  useEffect(() => {
+    if (allEscrows.length > 0) {
+      const paymentCurrency = allEscrows[0]?.payment_currency || 'SOLANA';
+      if (paymentCurrency === 'SOLANA' && !solPrice) {
+        getSolanaPrice().then(priceData => {
+          setSolPrice(priceData.price_usd);
+        }).catch(() => {
+          setSolPrice(100); // Fallback
+        });
+      }
+    }
+  }, [allEscrows, solPrice]);
 
   useEffect(() => {
     if (isConnected && address && project) {
@@ -188,17 +263,18 @@ const ProjectDetails = () => {
             const escrowsData = await db.getAllEscrows(id);
             setAllEscrows(escrowsData);
             // Set the first escrow for backward compatibility
-            setEscrow(escrowsData.length > 0 ? escrowsData[0] : null);
+            const firstEscrow = escrowsData.length > 0 ? escrowsData[0] : null;
+            setEscrow(firstEscrow);
             
             // For X402 projects, automatically capture freelancer's EVM address if they're viewing
             // Phantom connects to Solana by default, but we need to access Base (EVM) separately
             const isFreelancerViewing = address && projectData.freelancer_id && freelancerData?.wallet_address === address;
             
-            if (escrowData && escrowData.payment_currency === 'X402' && 
+            if (firstEscrow && firstEscrow.payment_currency === 'X402' && 
                 projectData.freelancer_id && 
                 isFreelancerViewing && 
                 address &&
-                (!escrowData.freelancer_wallet || !escrowData.freelancer_wallet.startsWith('0x'))) {
+                (!firstEscrow.freelancer_wallet || !firstEscrow.freelancer_wallet.startsWith('0x'))) {
               // Show a toast first to inform the user
               toast({
                 title: "Base Wallet Connection Needed",
@@ -280,17 +356,22 @@ const ProjectDetails = () => {
                 }
                 
                 // Store EVM address in escrow
-                await db.updateEscrow(escrowData.id, { freelancer_wallet: evmAddress });
-                
-                toast({
-                  title: "Base Address Saved!",
-                  description: `Your Base address (${evmAddress.slice(0, 6)}...${evmAddress.slice(-4)}) has been saved. You'll receive X402 payments to this address.`,
-                  variant: "default"
-                });
-                
-                // Refresh escrow data
-                const updatedEscrow = await db.getEscrow(id);
-                setEscrow(updatedEscrow);
+                if (firstEscrow) {
+                  await db.updateEscrow(firstEscrow.id, { freelancer_wallet: evmAddress });
+                  
+                  toast({
+                    title: "Base Address Saved!",
+                    description: `Your Base address (${evmAddress.slice(0, 6)}...${evmAddress.slice(-4)}) has been saved. You'll receive X402 payments to this address.`,
+                    variant: "default"
+                  });
+                  
+                  // Refresh escrow data
+                  const updatedEscrows = await db.getAllEscrows(id);
+                  setAllEscrows(updatedEscrows);
+                  if (updatedEscrows.length > 0) {
+                    setEscrow(updatedEscrows[0]);
+                  }
+                }
               } catch (evmError: any) {
                 console.error("❌ Could not capture freelancer's EVM address:", evmError);
                 toast({
@@ -302,14 +383,20 @@ const ProjectDetails = () => {
             }
             
             // Load SOL price if escrow was paid with SOL (or if payment_currency is not set, assume SOLANA for older escrows)
-            const paymentCurrency = escrowData.payment_currency || 'SOLANA';
-            if (paymentCurrency === 'SOLANA') {
-              try {
-                const priceData = await getSolanaPrice();
-                setSolPrice(priceData.price_usd);
-              } catch (error) {
+            if (escrowsData.length > 0) {
+              const paymentCurrency = firstEscrow?.payment_currency || 'SOLANA';
+              if (paymentCurrency === 'SOLANA') {
+                try {
+                  const priceData = await getSolanaPrice();
+                  setSolPrice(priceData.price_usd);
+                } catch (error) {
+                  console.error('Error loading SOL price:', error);
+                  // Use fallback price if API fails
+                  setSolPrice(100);
+                }
               }
             }
+            
           } catch (error) {
             // Escrow doesn't exist
           }
@@ -1096,7 +1183,9 @@ const ProjectDetails = () => {
                     <DollarSign className="w-5 h-5 text-web3-primary" />
                     <div>
                       <div className="text-sm text-muted-foreground">Budget</div>
-                      <div className="font-semibold">{formatUSDC(project.budget_usdc)}</div>
+                      <div className="font-semibold">
+                        {calculatedBudget ? calculatedBudget : (project ? formatUSDC(project.budget_usdc) : '$0.00')}
+                      </div>
                     </div>
                   </div>
                   <Separator />

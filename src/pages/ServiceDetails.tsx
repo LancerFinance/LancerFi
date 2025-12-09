@@ -50,6 +50,8 @@ const ServiceDetails = () => {
   const [freelancerEarnings, setFreelancerEarnings] = useState<number>(0);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const [calculatedBudget, setCalculatedBudget] = useState<string>('');
+  const [solPrice, setSolPrice] = useState<number | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -124,6 +126,38 @@ const ServiceDetails = () => {
       if (project) {
         let freelancerData = null;
         let calculatedEarnings = 0;
+        
+        // Calculate budget from all escrows (same logic as ProjectDetails)
+        let calculatedBudgetValue = project.budget_usdc;
+        try {
+          const escrows = await db.getAllEscrows(serviceId);
+          if (escrows && escrows.length > 0) {
+            // Sum all escrow amounts (project amount only, excluding platform fees)
+            const totalBudgetInCurrency = escrows.reduce((sum, e) => {
+              return sum + (Number(e.amount_usdc) || 0);
+            }, 0);
+            
+            if (totalBudgetInCurrency > 0) {
+              const paymentCurrency = escrows[0]?.payment_currency || 'SOLANA';
+              if (paymentCurrency === 'SOLANA') {
+                try {
+                  const priceData = await getSolanaPrice();
+                  setSolPrice(priceData.price_usd);
+                  calculatedBudgetValue = totalBudgetInCurrency * priceData.price_usd;
+                } catch (error) {
+                  console.error('Error fetching SOL price:', error);
+                  calculatedBudgetValue = project.budget_usdc;
+                }
+              } else {
+                // USDC/X402 - amount_usdc is already in USD
+                calculatedBudgetValue = totalBudgetInCurrency;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error loading escrows for budget calculation:', error);
+        }
+        setCalculatedBudget(formatUSDC(calculatedBudgetValue));
         
         if (project.freelancer_id) {
           freelancerData = await db.getProfile(project.freelancer_id);
@@ -384,14 +418,6 @@ const ServiceDetails = () => {
                         </>
                       )}
                     </Button>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">
-                        ${service.budget_usdc}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Fixed Price
-                      </div>
-                    </div>
                   </div>
                 </div>
                 <CardTitle className="text-2xl">{service.title}</CardTitle>
@@ -548,9 +574,8 @@ const ServiceDetails = () => {
               <CardContent className="space-y-4">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-primary mb-2">
-                    ${service.budget_usdc}
+                    {calculatedBudget || formatUSDC(service.budget_usdc)}
                   </div>
-                  <div className="text-muted-foreground">Fixed Price Project</div>
                 </div>
 
                 <Separator />
